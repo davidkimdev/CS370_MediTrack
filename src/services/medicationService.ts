@@ -21,7 +21,7 @@ export class MedicationService {
     // Then get all inventory
     const { data: inventory, error: invError } = await supabase
       .from('inventory')
-      .select('medication_id, qty_units')
+      .select('medication_id, qty_units, updated_at, created_at')
     
       //console.log('Inventory data:', inventory)
 
@@ -30,18 +30,48 @@ export class MedicationService {
     }
 
     // Group inventory by medication_id
-    const inventoryMap = new Map<string, number>()
+    type InventoryAggregate = {
+      total: number
+      latestUpdated: Date | null
+    }
+    const inventoryMap = new Map<string, InventoryAggregate>()
     console.log('Total inventory items fetched:', inventory?.length)
     inventory?.forEach(inv => {
-      const current = inventoryMap.get(inv.medication_id) || 0
-      inventoryMap.set(inv.medication_id, current + inv.qty_units)
+      const current = inventoryMap.get(inv.medication_id) || { total: 0, latestUpdated: null }
+      const nextTotal = current.total + (inv.qty_units || 0)
+      const candidateDates = [inv.updated_at, inv.created_at]
+        .filter(Boolean)
+        .map(dateString => new Date(dateString as string))
+        .filter(date => !Number.isNaN(date.getTime()))
+
+      let latestUpdated = current.latestUpdated
+      candidateDates.forEach(dateValue => {
+        if (!latestUpdated || dateValue > latestUpdated) {
+          latestUpdated = dateValue
+        }
+      })
+
+      inventoryMap.set(inv.medication_id, {
+        total: nextTotal,
+        latestUpdated
+      })
       // console.log(`Inventory: med_id=${inv.medication_id}, qty=${inv.qty_units}, running_total=${current + inv.qty_units}`)
     })
 
     // console.log('Inventory map:', Array.from(inventoryMap.entries()))
 
     return medications?.map(med => {
-      const totalStock = inventoryMap.get(med.id) || 0
+      const aggregate = inventoryMap.get(med.id)
+      const totalStock = aggregate?.total || 0
+      const latestInventoryUpdate = aggregate?.latestUpdated
+      const medicationUpdatedAt = [med.updated_at, med.created_at]
+        .filter(Boolean)
+        .map((dateString: string) => new Date(dateString))
+        .find(date => !Number.isNaN(date.getTime()))
+      const lastUpdated =
+        latestInventoryUpdate && medicationUpdatedAt
+          ? (latestInventoryUpdate > medicationUpdatedAt ? latestInventoryUpdate : medicationUpdatedAt)
+          : latestInventoryUpdate || medicationUpdatedAt || new Date()
 
       // Debug logging
       // if (med.name === 'Acetaminophen') {
@@ -58,12 +88,12 @@ export class MedicationService {
         genericName: med.name,
         strength: med.strength || '',
         dosageForm: med.dosage_form || 'tablet',
-        category: 'General',
+        category: med.category || 'General',
         currentStock: totalStock,
-        minStock: 20,
-        maxStock: 100,
+        minStock: typeof med.min_stock === 'number' ? med.min_stock : 20,
+        maxStock: typeof med.max_stock === 'number' ? med.max_stock : 100,
         isAvailable: med.is_active && totalStock > 0,
-        lastUpdated: new Date(med.created_at || new Date()),
+        lastUpdated,
         alternatives: [],
         commonUses: [],
         contraindications: []
@@ -132,14 +162,19 @@ export class MedicationService {
       throw new Error('Failed to fetch inventory')
     }
 
-    return data?.map(item => ({
-      id: item.id,
-      medicationId: item.medication_id,
-      lotNumber: item.lot_number,
-      expirationDate: new Date(item.expiration_date),
-      quantity: item.qty_units,
-      isExpired: new Date(item.expiration_date) < new Date()
-    })) || []
+    return data?.map(item => {
+      const expirationDate = item.expiration_date
+        ? logDateToUTCNoon(item.expiration_date)
+        : new Date()
+      return {
+        id: item.id,
+        medicationId: item.medication_id,
+        lotNumber: item.lot_number,
+        expirationDate,
+        quantity: item.qty_units,
+        isExpired: expirationDate < new Date()
+      }
+    }) || []
   }
 
   static async getAllInventory(): Promise<InventoryItem[]> {
@@ -153,14 +188,19 @@ export class MedicationService {
       throw new Error('Failed to fetch inventory')
     }
 
-    return data?.map(item => ({
-      id: item.id,
-      medicationId: item.medication_id,
-      lotNumber: item.lot_number,
-      expirationDate: new Date(item.expiration_date),
-      quantity: item.qty_units,
-      isExpired: new Date(item.expiration_date) < new Date()
-    })) || []
+    return data?.map(item => {
+      const expirationDate = item.expiration_date
+        ? logDateToUTCNoon(item.expiration_date)
+        : new Date()
+      return {
+        id: item.id,
+        medicationId: item.medication_id,
+        lotNumber: item.lot_number,
+        expirationDate,
+        quantity: item.qty_units,
+        isExpired: expirationDate < new Date()
+      }
+    }) || []
   }
 
   static async createInventoryItem(item: Omit<InventoryItem, 'id' | 'isExpired'>): Promise<InventoryItem> {
@@ -181,13 +221,17 @@ export class MedicationService {
       throw new Error('Failed to create inventory item')
     }
 
+    const expirationDate = data.expiration_date
+      ? logDateToUTCNoon(data.expiration_date)
+      : new Date()
+
     return {
       id: data.id,
       medicationId: data.medication_id,
       lotNumber: data.lot_number,
-      expirationDate: new Date(data.expiration_date),
+      expirationDate,
       quantity: data.qty_units,
-      isExpired: new Date(data.expiration_date) < new Date()
+      isExpired: expirationDate < new Date()
     }
   }
 
@@ -238,13 +282,17 @@ export class MedicationService {
       throw new Error('Failed to update inventory item')
     }
 
+    const expirationDate = data.expiration_date
+      ? logDateToUTCNoon(data.expiration_date)
+      : new Date()
+
     return {
       id: data.id,
       medicationId: data.medication_id,
       lotNumber: data.lot_number,
-      expirationDate: new Date(data.expiration_date),
+      expirationDate,
       quantity: data.qty_units,
-      isExpired: new Date(data.expiration_date) < new Date()
+      isExpired: expirationDate < new Date()
     }
   }
 

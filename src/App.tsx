@@ -18,6 +18,7 @@ import { MedicationService } from './services/medicationService';
 import { syncService } from './services/syncService';
 import { OfflineStore } from './utils/offlineStore';
 import { showSuccessToast, showErrorToast } from './utils/toastUtils';
+import { formatDateEST } from './utils/timezone';
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -91,12 +92,15 @@ export default function App() {
             setDispensingRecords([]);
             setInventory([]);
             setUsers([]);
+            setCurrentUser(null);
             setError(null);
           } else {
-            setError('Failed to load data from database. Please try again.');
+            const message = err instanceof Error ? err.message : 'Failed to load data from database. Please try again.';
+            setError(message);
           }
         } catch (e) {
-          setError('Failed to load data from database. Please try again.');
+          const message = err instanceof Error ? err.message : 'Failed to load data from database. Please try again.';
+          setError(message);
         }
       } finally {
         setIsLoading(false);
@@ -313,7 +317,7 @@ export default function App() {
       
       showSuccessToast(
         'Added new inventory lot',
-        `Lot ${newLot.lotNumber} • ${newLot.quantity} units • Expires ${newLot.expirationDate.toLocaleDateString()}`
+        `Lot ${newLot.lotNumber} • ${newLot.quantity} units • Expires ${formatDateEST(newLot.expirationDate)}`
       );
     } catch (err) {
       console.error('Error adding lot:', err);
@@ -325,7 +329,11 @@ export default function App() {
     }
   };
 
-  const handleUpdateLot = async (id: string, updates: Partial<Pick<InventoryItem, 'quantity' | 'lotNumber' | 'expirationDate'>>) => {
+  const handleUpdateLot = async (
+    id: string,
+    updates: Partial<Pick<InventoryItem, 'quantity' | 'lotNumber' | 'expirationDate'>>,
+    options?: { reason?: string }
+  ) => {
     try {
       const updatedLot = await MedicationService.updateInventoryItem(id, updates);
       setInventory(prev => prev.map(lot => lot.id === id ? updatedLot : lot));
@@ -333,10 +341,23 @@ export default function App() {
       // Reload medications to update total stock count
       const updatedMedications = await MedicationService.getAllMedications();
       setMedications(updatedMedications);
-      
+
+      const detailParts: string[] = [`Lot ${updatedLot.lotNumber}`];
+      if (updates.quantity !== undefined) {
+        detailParts.push(`Quantity: ${updatedLot.quantity} units`);
+      }
+      if (updates.lotNumber !== undefined) {
+        detailParts.push(`Lot #: ${updatedLot.lotNumber}`);
+      }
+      if (updates.expirationDate !== undefined) {
+        detailParts.push(`Expires ${formatDateEST(updatedLot.expirationDate)}`);
+      }
+      const details = detailParts.join(' • ');
+      const reasonSuffix = options?.reason ? ` • Reason: ${options.reason}` : '';
+
       showSuccessToast(
         'Updated inventory lot',
-        `Lot ${updatedLot.lotNumber} • New quantity: ${updatedLot.quantity} units`
+        `${details}${reasonSuffix}`
       );
     } catch (err) {
       console.error('Error updating lot:', err);
@@ -346,6 +367,10 @@ export default function App() {
         'Please try again or contact support.'
       );
     }
+  };
+
+  const handleSetLotQuantity = async (lotId: string, newQuantity: number, reason: string) => {
+    await handleUpdateLot(lotId, { quantity: newQuantity }, { reason });
   };
 
   const handleDeleteLot = async (id: string) => {
@@ -371,21 +396,6 @@ export default function App() {
         'Failed to delete inventory lot',
         'Please try again or contact support.'
       );
-    }
-  };
-
-  const handleUpdateStock = async (medicationId: string, newQuantity: number, reason: string) => {
-    // NOTE: Stock updates are now handled through inventory lots
-    // Total stock is calculated by summing all inventory lots for a medication
-    // This function is deprecated - use handleUpdateInventoryItem instead
-    console.warn('handleUpdateStock is deprecated - stock is managed through inventory lots');
-    try {
-      // Just reload medications to refresh calculated stock
-      const updatedMedications = await MedicationService.getAllMedications();
-      setMedications(updatedMedications);
-    } catch (err) {
-      console.error('Error updating stock:', err);
-      setError('Failed to update stock. Please try again.');
     }
   };
 
@@ -600,8 +610,10 @@ export default function App() {
               {canAccessStockManagement ? (
                 <StockManagement
                   medications={medications}
+                  inventory={inventory}
                   currentUser={currentUser!}
-                  onUpdateStock={handleUpdateStock}
+                  onUpdateLot={handleSetLotQuantity}
+                  onAddLot={handleAddLot}
                 />
               ) : (
                 <div className="text-center py-12 text-muted-foreground">

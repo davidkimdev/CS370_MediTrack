@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { AlertTriangle, CheckCircle, Edit, Package, Plus, Search, TrendingDown, TrendingUp, Upload } from 'lucide-react';
-import { Medication, User, StockUpdate, InventoryItem } from '../types/medication';
+import { Medication, User, InventoryItem } from '../types/medication';
+import { formatDateEST } from '../utils/timezone';
 import { BulkImportDialog, ImportedMedicationRow } from './BulkImportDialog';
 import { AddLotDialog } from './AddLotDialog';
 import { MedicationService } from '../services/medicationService';
@@ -17,12 +18,13 @@ import { MedicationService } from '../services/medicationService';
 
 interface StockManagementProps {
   medications: Medication[];
+  inventory: InventoryItem[];
   currentUser: User;
-  onUpdateStock: (medicationId: string, newQuantity: number, reason: string) => void;
+  onUpdateLot: (lotId: string, newQuantity: number, reason: string) => Promise<void>;
   onAddLot: (lot: Omit<InventoryItem, 'id' | 'isExpired'>) => Promise<void>;
 }
 
-export function StockManagement({ medications, currentUser, onUpdateStock, onAddLot }: StockManagementProps) {
+export function StockManagement({ medications, inventory, currentUser, onUpdateLot, onAddLot }: StockManagementProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedMedication, setSelectedMedication] = useState<Medication | null>(null);
@@ -32,6 +34,8 @@ export function StockManagement({ medications, currentUser, onUpdateStock, onAdd
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [isAddLotDialogOpen, setIsAddLotDialogOpen] = useState(false);
   const [selectedMedicationForLot, setSelectedMedicationForLot] = useState<Medication | null>(null);
+  const [isUpdatingStock, setIsUpdatingStock] = useState(false);
+  const [selectedLotId, setSelectedLotId] = useState<string>('');
 
   const statusOptions = [
     { value: 'all', label: 'All Items' },
@@ -89,6 +93,18 @@ export function StockManagement({ medications, currentUser, onUpdateStock, onAdd
     });
   }, [medications, searchTerm, statusFilter]);
 
+const medicationLots = useMemo(() => {
+    if (!selectedMedication) return [] as InventoryItem[];
+    return inventory
+      .filter((lot) => lot.medicationId === selectedMedication.id)
+      .sort((a, b) => a.expirationDate.getTime() - b.expirationDate.getTime());
+  }, [inventory, selectedMedication]);
+
+  const selectedLot = useMemo(() => {
+    if (!selectedLotId) return null;
+    return medicationLots.find((lot) => lot.id === selectedLotId) || null;
+  }, [medicationLots, selectedLotId]);
+
   const getStockStatus = (medication: Medication) => {
     if (!medication.isAvailable) {
       return { status: 'Out', color: 'destructive', icon: AlertTriangle };
@@ -99,7 +115,7 @@ export function StockManagement({ medications, currentUser, onUpdateStock, onAdd
     return { status: 'Good', color: 'default', icon: CheckCircle };
   };
 
-  const handleUpdateStock = () => {
+  const handleUpdateStock = async () => {
     if (!selectedMedication || !newQuantity || !updateReason) {
       console.log('Please fill in all required fields');
       return;
@@ -111,18 +127,42 @@ export function StockManagement({ medications, currentUser, onUpdateStock, onAdd
       return;
     }
 
-    onUpdateStock(selectedMedication.id, quantity, updateReason);
-    console.log(`Stock updated for ${selectedMedication.name}`);
-    
-    setIsUpdateDialogOpen(false);
-    setSelectedMedication(null);
-    setNewQuantity('');
-    setUpdateReason('');
+    if (!selectedLotId) {
+      console.log('Please select an inventory lot to update');
+      return;
+    }
+
+    const lotExists = inventory.some((item) => item.id === selectedLotId);
+    if (!lotExists) {
+      console.log('Selected inventory lot not found');
+      return;
+    }
+
+    setIsUpdatingStock(true);
+    try {
+      await onUpdateLot(selectedLotId, quantity, updateReason);
+      setIsUpdateDialogOpen(false);
+      setSelectedMedication(null);
+      setNewQuantity('');
+      setUpdateReason('');
+      setSelectedLotId('');
+    } catch (error) {
+      console.error('Failed to update stock:', error);
+    } finally {
+      setIsUpdatingStock(false);
+    }
   };
 
   const openUpdateDialog = (medication: Medication) => {
     setSelectedMedication(medication);
-    setNewQuantity(medication.currentStock.toString());
+    setSelectedMedicationForLot(medication);
+    const medLots = inventory
+      .filter((lot) => lot.medicationId === medication.id)
+      .sort((a, b) => a.expirationDate.getTime() - b.expirationDate.getTime());
+    const defaultLot = medLots[0];
+    setSelectedLotId(defaultLot ? defaultLot.id : '');
+    setNewQuantity(defaultLot ? defaultLot.quantity.toString() : '');
+    setUpdateReason('');
     setIsUpdateDialogOpen(true);
   };
 
@@ -353,7 +393,19 @@ export function StockManagement({ medications, currentUser, onUpdateStock, onAdd
       </Card>
 
       {/* Update Stock Dialog */}
-      <Dialog open={isUpdateDialogOpen} onOpenChange={setIsUpdateDialogOpen}>
+      <Dialog
+        open={isUpdateDialogOpen}
+        onOpenChange={(open) => {
+          setIsUpdateDialogOpen(open);
+          if (!open) {
+            setSelectedMedication(null);
+            setSelectedLotId('');
+            setNewQuantity('');
+            setUpdateReason('');
+            setIsUpdatingStock(false);
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
@@ -369,22 +421,77 @@ export function StockManagement({ medications, currentUser, onUpdateStock, onAdd
                   Min: {selectedMedication.minStock} • 
                   Max: {selectedMedication.maxStock}
                 </p>
+                {selectedLot && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Selected Lot: {selectedLot.lotNumber} • Expires {formatDateEST(selectedLot.expirationDate)} • Current Quantity: {selectedLot.quantity}
+                  </p>
+                )}
               </div>
-              
+
               <div className="space-y-2">
-                <Label htmlFor="new-quantity">New Quantity *</Label>
+                <Label htmlFor="lot-select">Inventory lot *</Label>
+                {medicationLots.length > 0 ? (
+                  <Select
+                    value={selectedLotId}
+                    onValueChange={(value) => {
+                      setSelectedLotId(value);
+                      const lot = medicationLots.find((item) => item.id === value);
+                      setNewQuantity(lot ? lot.quantity.toString() : '');
+                    }}
+                    disabled={isUpdatingStock}
+                  >
+                    <SelectTrigger className="h-auto py-3">
+                      <SelectValue placeholder="Choose a lot" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {medicationLots.map((lot) => (
+                        <SelectItem key={lot.id} value={lot.id}>
+                          <div className="flex flex-col text-left">
+                            <span className="font-medium text-sm">Lot {lot.lotNumber}</span>
+                            <span className="text-xs text-muted-foreground">
+                              Expires {formatDateEST(lot.expirationDate)} • Quantity {lot.quantity}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="p-3 bg-muted rounded-md text-sm text-muted-foreground space-y-2">
+                    <p>No inventory lots available for this medication. Add a lot before updating its quantity.</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => {
+                        if (selectedMedication) {
+                          setSelectedMedicationForLot(selectedMedication);
+                        }
+                        setIsUpdateDialogOpen(false);
+                        setIsAddLotDialogOpen(true);
+                      }}
+                    >
+                      Add New Lot
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="new-quantity">Set quantity for selected lot *</Label>
                 <Input
                   id="new-quantity"
                   type="number"
                   min="0"
                   value={newQuantity}
                   onChange={(e) => setNewQuantity(e.target.value)}
+                  disabled={!selectedLot || isUpdatingStock}
                 />
               </div>
               
               <div className="space-y-2">
                 <Label htmlFor="reason">Reason for Update *</Label>
-                <Select value={updateReason} onValueChange={setUpdateReason}>
+                <Select value={updateReason} onValueChange={setUpdateReason} disabled={!selectedLot}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select reason" />
                   </SelectTrigger>
@@ -399,12 +506,17 @@ export function StockManagement({ medications, currentUser, onUpdateStock, onAdd
               </div>
               
               <div className="flex gap-2">
-                <Button onClick={handleUpdateStock} className="flex-1">
-                  Update Stock
+                <Button
+                  onClick={handleUpdateStock}
+                  className="flex-1"
+                  disabled={isUpdatingStock || !selectedLot || !newQuantity || !updateReason}
+                >
+                  {isUpdatingStock ? 'Updating...' : 'Update Stock'}
                 </Button>
                 <Button 
                   variant="outline" 
                   onClick={() => setIsUpdateDialogOpen(false)}
+                  disabled={isUpdatingStock}
                 >
                   Cancel
                 </Button>
