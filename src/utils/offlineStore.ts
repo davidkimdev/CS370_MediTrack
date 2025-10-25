@@ -1,8 +1,12 @@
 // Simple IndexedDB-backed offline store for medications and pending dispenses
-// Uses a single database "medtrack" with object stores: medications, pendingDispenses, metadata
-import type { Medication, DispensingRecord } from '../types/medication'
+// Uses a single database "medtrack" with object stores: medications, pendingDispenses, pendingLots, metadata
+import type { Medication, DispensingRecord, InventoryItem } from '../types/medication'
 
 type PendingDispense = Omit<DispensingRecord, 'id' | 'patientInitials' | 'notes'> & {
+  id: string // local temp id
+}
+
+type PendingLot = Omit<InventoryItem, 'id' | 'isExpired'> & {
   id: string // local temp id
 }
 
@@ -11,6 +15,7 @@ const DB_VERSION = 1
 const STORES = {
   medications: 'medications',
   pendingDispenses: 'pendingDispenses',
+  pendingLots: 'pendingLots',
   metadata: 'metadata',
 } as const
 
@@ -24,6 +29,9 @@ function openDB(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(STORES.pendingDispenses)) {
         db.createObjectStore(STORES.pendingDispenses, { keyPath: 'id' })
+      }
+      if (!db.objectStoreNames.contains(STORES.pendingLots)) {
+        db.createObjectStore(STORES.pendingLots, { keyPath: 'id' })
       }
       if (!db.objectStoreNames.contains(STORES.metadata)) {
         db.createObjectStore(STORES.metadata)
@@ -124,6 +132,22 @@ export const OfflineStore = {
       await putInStore(STORES.medications, updated)
     }
   },
+  async incrementMedicationStock(medicationId: string, quantity: number): Promise<void> {
+    if (quantity === 0) return
+    const med = await getFromStore<Medication>(STORES.medications, medicationId)
+    if (!med) {
+      console.warn('Offline cache missing medication for stock increment', medicationId)
+      return
+    }
+    const updatedStock = Math.max(0, (med.currentStock || 0) + quantity)
+    const updated: Medication = {
+      ...med,
+      currentStock: updatedStock,
+      isAvailable: updatedStock > 0,
+      lastUpdated: new Date(),
+    }
+    await putInStore(STORES.medications, updated)
+  },
   async decrementMedicationStock(medicationId: string, quantity: number): Promise<void> {
     const med = await getFromStore<Medication>(STORES.medications, medicationId)
     if (med) {
@@ -149,8 +173,26 @@ export const OfflineStore = {
     await clearStore(STORES.pendingDispenses)
   },
   async getPendingCount(): Promise<number> {
-    const all = await OfflineStore.getPendingDispenses()
-    return all.length
+    const dispenses = await OfflineStore.getPendingDispenses()
+    const lots = await OfflineStore.getPendingLots()
+    return dispenses.length + lots.length
+  },
+
+  // Pending lots queue
+  async enqueueLot(lot: Omit<PendingLot, 'id'>): Promise<PendingLot> {
+    const id = `pl_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+    const value: PendingLot = { ...lot, id }
+    await putInStore(STORES.pendingLots, value)
+    return value
+  },
+  async getPendingLots(): Promise<PendingLot[]> {
+    return getAllFromStore<PendingLot>(STORES.pendingLots)
+  },
+  async removePendingLot(id: string): Promise<void> {
+    await deleteFromStore(STORES.pendingLots, id)
+  },
+  async clearPendingLots(): Promise<void> {
+    await clearStore(STORES.pendingLots)
   },
 
   // Metadata
@@ -165,4 +207,4 @@ export const OfflineStore = {
   },
 }
 
-export type { PendingDispense }
+export type { PendingDispense, PendingLot }

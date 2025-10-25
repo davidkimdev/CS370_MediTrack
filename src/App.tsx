@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs';
 import { FormularyView } from './components/FormularyView';
 import { MedicationDetail } from './components/MedicationDetail';
@@ -11,14 +11,26 @@ import { Badge } from './components/ui/badge';
 import { Button } from './components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './components/ui/sheet';
-import { Toaster } from './components/ui/sonner';
-import { Pill, ClipboardList, Settings, User, Menu, LogOut, CheckCircle, XCircle, RotateCcw, AlertTriangle } from 'lucide-react';
-import { Medication, DispensingRecord, InventoryItem, User as UserType } from './types/medication';
+import { Pill, ClipboardList, Settings, User, Menu, LogOut } from 'lucide-react';
+import { Medication, DispensingRecord, InventoryItem, User as UserType, UserRole } from './types/medication';
 import { MedicationService } from './services/medicationService';
 import { syncService } from './services/syncService';
 import { OfflineStore } from './utils/offlineStore';
-import { showSuccessToast, showErrorToast } from './utils/toastUtils';
-import { formatDateEST } from './utils/timezone';
+
+const LOGIN_STORAGE_KEY = 'medtrack-net-id';
+const USER_STORAGE_KEY = 'medtrack-user-id';
+const USER_SNAPSHOT_KEY = 'medtrack-user-snapshot';
+
+const getStoredUserSnapshot = (): UserType | null => {
+  if (typeof window === 'undefined') return null;
+  const raw = window.localStorage.getItem(USER_SNAPSHOT_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as UserType;
+  } catch {
+    return null;
+  }
+};
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -36,10 +48,16 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [editingRecord, setEditingRecord] = useState<DispensingRecord | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  
-  // State for undo functionality
-  const [recentDispensingRecords, setRecentDispensingRecords] = useState<DispensingRecord[]>([]);
-  const [recentInventoryChanges, setRecentInventoryChanges] = useState<{recordId: string, inventoryId: string, previousQuantity: number}[]>([]);
+  const preferredRoleRef = useRef<UserRole | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const storedNetId = window.localStorage.getItem(LOGIN_STORAGE_KEY);
+    if (storedNetId) {
+      setLoggedInNetId(storedNetId);
+      setIsLoggedIn(true);
+    }
+  }, []);
 
   // Load initial data from Supabase (online) or IndexedDB (offline fallback)
   useEffect(() => {
@@ -70,16 +88,17 @@ export default function App() {
           usersData = [];
         }
 
+        if (usersData.length === 0) {
+          const storedUser = getStoredUserSnapshot();
+          if (storedUser) {
+            usersData = [storedUser];
+          }
+        }
+
         setMedications(medicationsData);
         setDispensingRecords(dispensingData);
         setInventory(inventoryData);
         setUsers(usersData);
-
-        // Set default user (first pharmacy staff or first user)
-        const defaultUser = usersData.find(u => u.role === 'pharmacy_staff') || usersData[0];
-        if (defaultUser) {
-          setCurrentUser(defaultUser);
-        }
 
         setPendingChanges(0);
       } catch (err) {
@@ -91,16 +110,14 @@ export default function App() {
             setMedications(cachedMeds);
             setDispensingRecords([]);
             setInventory([]);
-            setUsers([]);
-            setCurrentUser(null);
+            const fallbackUser = getStoredUserSnapshot();
+            setUsers(fallbackUser ? [fallbackUser] : []);
             setError(null);
           } else {
-            const message = err instanceof Error ? err.message : 'Failed to load data from database. Please try again.';
-            setError(message);
+            setError('Failed to load data from database. Please try again.');
           }
         } catch (e) {
-          const message = err instanceof Error ? err.message : 'Failed to load data from database. Please try again.';
-          setError(message);
+          setError('Failed to load data from database. Please try again.');
         }
       } finally {
         setIsLoading(false);
@@ -124,9 +141,13 @@ export default function App() {
     }
   }, []);
 
-  const handleLogin = (netId: string) => {
+  const handleLogin = (netId: string, preferredRole: UserRole) => {
     setLoggedInNetId(netId);
     setIsLoggedIn(true);
+    preferredRoleRef.current = preferredRole;
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(LOGIN_STORAGE_KEY, netId);
+    }
     console.log(`User logged in: ${netId}`);
   };
 
@@ -136,8 +157,52 @@ export default function App() {
     setCurrentView('formulary');
     setSelectedMedication(null);
     setActiveTab('formulary');
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem(LOGIN_STORAGE_KEY);
+    }
     console.log('User logged out');
   };
+
+  useEffect(() => {
+    if (!isLoggedIn || users.length === 0) return;
+
+    setCurrentUser(prev => {
+      if (prev) return prev;
+
+      const storedUserId = typeof window !== 'undefined' ? window.localStorage.getItem(USER_STORAGE_KEY) : null;
+      let nextUser = storedUserId ? users.find(u => u.id === storedUserId) : undefined;
+
+      if (!nextUser && preferredRoleRef.current) {
+        nextUser = users.find(u => u.role === preferredRoleRef.current);
+      }
+
+      if (!nextUser) {
+        nextUser = users.find(u => u.role === 'pharmacy_staff') || users[0];
+      }
+
+      if (nextUser && typeof window !== 'undefined') {
+        window.localStorage.setItem(USER_STORAGE_KEY, nextUser.id);
+      }
+
+      preferredRoleRef.current = nextUser?.role ?? preferredRoleRef.current;
+      return nextUser || null;
+    });
+  }, [isLoggedIn, users]);
+
+  const handleUserSwitch = (userId: string) => {
+    const user = users.find(u => u.id === userId);
+    if (!user) return;
+    setCurrentUser(user);
+    preferredRoleRef.current = user.role;
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(USER_STORAGE_KEY, user.id);
+    }
+  };
+
+  useEffect(() => {
+    if (!currentUser || typeof window === 'undefined') return;
+    window.localStorage.setItem(USER_SNAPSHOT_KEY, JSON.stringify(currentUser));
+  }, [currentUser]);
 
   const handleMedicationSelect = (medication: Medication) => {
     setSelectedMedication(medication);
@@ -156,129 +221,27 @@ export default function App() {
         const newRecord = await MedicationService.createDispensingRecord(record);
         setDispensingRecords((prev: DispensingRecord[]) => [newRecord, ...prev]);
 
-        // Store for undo functionality
+        // Update inventory lot quantity in database
         const inventoryLot = inventory.find(inv => inv.lotNumber === record.lotNumber && inv.medicationId === record.medicationId);
-        const previousQuantity = inventoryLot?.quantity || 0;
-        
         if (inventoryLot) {
           const newQuantity = Math.max(0, inventoryLot.quantity - record.quantity);
           await MedicationService.updateInventoryItem(inventoryLot.id, { quantity: newQuantity });
-          
-          // Track changes for undo
-          const inventoryChangeRecord = {
-            recordId: newRecord.id,
-            inventoryId: inventoryLot.id,
-            previousQuantity: previousQuantity
-          };
-          
-          setRecentInventoryChanges(prev => [...prev, inventoryChangeRecord]);
-          
-          // Update local state
-          const newStock = Math.max(0, (medications.find((m: Medication) => m.id === record.medicationId)?.currentStock || 0) - record.quantity);
-          setMedications((prev: Medication[]) => prev.map((med: Medication) => med.id === record.medicationId ? { ...med, currentStock: newStock, isAvailable: newStock > 0, lastUpdated: new Date() } : med));
-          setInventory(prev => prev.map(inv => inv.lotNumber === record.lotNumber ? { ...inv, quantity: Math.max(0, inv.quantity - record.quantity) } : inv));
-          
-          // Add to recent records for undo
-          setRecentDispensingRecords(prev => [newRecord, ...prev].slice(0, 5)); // Keep only last 5 for undo
-
-          // Show success toast with undo option
-          showSuccessToast(
-            `Dispensed ${record.quantity} ${record.medicationName} to ${record.patientInitials}`,
-            `Lot: ${record.lotNumber} • Provider: ${record.dispensedBy}`,
-            {
-              label: "Withdraw",
-              onClick: () => handleUndoDispensing(newRecord.id, newRecord, inventoryChangeRecord)
-            }
-          );
         }
 
+        // Update local state
+        const newStock = Math.max(0, (medications.find((m: Medication) => m.id === record.medicationId)?.currentStock || 0) - record.quantity);
+        setMedications((prev: Medication[]) => prev.map((med: Medication) => med.id === record.medicationId ? { ...med, currentStock: newStock, isAvailable: newStock > 0, lastUpdated: new Date() } : med));
+        setInventory(prev => prev.map(inv => inv.lotNumber === record.lotNumber ? { ...inv, quantity: Math.max(0, inv.quantity - record.quantity) } : inv));
       } else {
         // Offline: queue and update local stock/cache immediately
         await syncService.queueOfflineDispense(record);
         setMedications((prev: Medication[]) => prev.map((med: Medication) => med.id === record.medicationId ? { ...med, currentStock: Math.max(0, med.currentStock - record.quantity), isAvailable: med.currentStock - record.quantity > 0, lastUpdated: new Date() } : med));
         setInventory(prev => prev.map(inv => inv.lotNumber === record.lotNumber ? { ...inv, quantity: Math.max(0, inv.quantity - record.quantity) } : inv));
         setPendingChanges((prev: number) => prev + 1);
-        
-        // Show offline success message
-        showSuccessToast(
-          `Dispensing queued for sync: ${record.quantity} ${record.medicationName}`,
-          `Will sync when online • Patient: ${record.patientInitials}`
-        );
       }
     } catch (err) {
       console.error('Error dispensing medication:', err);
       setError('Failed to record dispensing. Please try again.');
-      showErrorToast(
-        'Failed to dispense medication',
-        'Please try again or contact support if the issue persists.'
-      );
-    }
-  };
-
-  // Undo/Withdraw dispensing function
-  const handleUndoDispensing = async (
-    recordId: string, 
-    recordToUndo?: DispensingRecord, 
-    inventoryChange?: {recordId: string, inventoryId: string, previousQuantity: number}
-  ) => {
-    try {
-      // Use provided record or find it in state
-      const targetRecord = recordToUndo || recentDispensingRecords.find(r => r.id === recordId);
-      const targetInventoryChange = inventoryChange || recentInventoryChanges.find(ic => ic.recordId === recordId);
-      
-      if (!targetRecord) {
-        showErrorToast('Cannot withdraw: Record not found');
-        return;
-      }
-
-      if (navigator.onLine) {
-        // Delete the dispensing record from database
-        await MedicationService.deleteDispensingRecord(recordId);
-        
-        // Restore inventory quantity if we have the change record
-        if (targetInventoryChange) {
-          await MedicationService.updateInventoryItem(targetInventoryChange.inventoryId, { 
-            quantity: targetInventoryChange.previousQuantity 
-          });
-        }
-
-        // Update local state - remove the record
-        setDispensingRecords(prev => prev.filter(r => r.id !== recordId));
-        
-        // Restore medication stock
-        setMedications(prev => prev.map(med => 
-          med.id === targetRecord.medicationId 
-            ? { ...med, currentStock: med.currentStock + targetRecord.quantity, isAvailable: true, lastUpdated: new Date() }
-            : med
-        ));
-        
-        // Restore inventory quantity
-        setInventory(prev => prev.map(inv => 
-          inv.lotNumber === targetRecord.lotNumber 
-            ? { ...inv, quantity: inv.quantity + targetRecord.quantity }
-            : inv
-        ));
-
-        // Clean up tracking arrays
-        setRecentDispensingRecords(prev => prev.filter(r => r.id !== recordId));
-        setRecentInventoryChanges(prev => prev.filter(ic => ic.recordId !== recordId));
-
-        showSuccessToast(
-          'Successfully withdrew dispensing record',
-          `Restored ${targetRecord.quantity} ${targetRecord.medicationName} to inventory`
-        );
-      } else {
-        showErrorToast(
-          'Cannot withdraw while offline',
-          'Please connect to the internet to withdraw dispensing records'
-        );
-      }
-    } catch (err) {
-      console.error('Error undoing dispensing:', err);
-      showErrorToast(
-        'Failed to withdraw dispensing record',
-        'Please try again or contact support'
-      );
     }
   };
 
@@ -291,49 +254,66 @@ export default function App() {
     try {
       const updatedRecord = await MedicationService.updateDispensingRecord(id, updates);
       setDispensingRecords(prev => prev.map(rec => rec.id === id ? updatedRecord : rec));
-      
-      showSuccessToast(
-        'Updated dispensing record',
-        `Changes saved for ${updatedRecord.medicationName} • Patient: ${updatedRecord.patientInitials}`
-      );
     } catch (err) {
       console.error('Error updating dispensing record:', err);
-      showErrorToast(
-        'Failed to update dispensing record',
-        'Please try again or contact support.'
-      );
       throw err; // Re-throw to let dialog handle error display
     }
   };
 
   const handleAddLot = async (lot: Omit<InventoryItem, 'id' | 'isExpired'>) => {
-    try {
-      const newLot = await MedicationService.createInventoryItem(lot);
-      setInventory(prev => [...prev, newLot]);
+    const queueLotOffline = async () => {
+      await syncService.queueOfflineLot(lot);
 
-      // Reload medications to update total stock count
-      const updatedMedications = await MedicationService.getAllMedications();
-      setMedications(updatedMedications);
-      
-      showSuccessToast(
-        'Added new inventory lot',
-        `Lot ${newLot.lotNumber} • ${newLot.quantity} units • Expires ${formatDateEST(newLot.expirationDate)}`
-      );
+      const medication = medications.find(m => m.id === lot.medicationId);
+      if (medication) {
+        const newStock = medication.currentStock + lot.quantity;
+        setMedications((prev: Medication[]) => prev.map((med: Medication) =>
+          med.id === lot.medicationId
+            ? { ...med, currentStock: newStock, isAvailable: newStock > 0, lastUpdated: new Date() }
+            : med
+        ));
+      }
+
+      setPendingChanges((prev: number) => prev + 1);
+    };
+
+    const shouldFallbackOffline = (error: unknown) => {
+      if (typeof navigator === 'undefined') return false;
+      if (navigator.onLine) {
+        if (error instanceof Error) {
+          const msg = error.message.toLowerCase();
+          return msg.includes('fetch') || msg.includes('network') || msg.includes('failed to load');
+        }
+      }
+      return false;
+    };
+
+    try {
+      if (navigator.onLine) {
+        const newLot = await MedicationService.createInventoryItem(lot);
+        setInventory(prev => [...prev, newLot]);
+
+        const updatedMedications = await MedicationService.getAllMedications();
+        setMedications(updatedMedications);
+      } else {
+        await queueLotOffline();
+      }
     } catch (err) {
+      if (shouldFallbackOffline(err)) {
+        console.warn('Online lot creation failed, queuing offline instead.', err);
+        try {
+          await queueLotOffline();
+          return;
+        } catch (offlineErr) {
+          console.error('Offline fallback for lot failed:', offlineErr);
+        }
+      }
       console.error('Error adding lot:', err);
       setError('Failed to add lot. Please try again.');
-      showErrorToast(
-        'Failed to add inventory lot',
-        'Please check the information and try again.'
-      );
     }
   };
 
-  const handleUpdateLot = async (
-    id: string,
-    updates: Partial<Pick<InventoryItem, 'quantity' | 'lotNumber' | 'expirationDate'>>,
-    options?: { reason?: string }
-  ) => {
+  const handleUpdateLot = async (id: string, updates: Partial<Pick<InventoryItem, 'quantity' | 'lotNumber' | 'expirationDate'>>) => {
     try {
       const updatedLot = await MedicationService.updateInventoryItem(id, updates);
       setInventory(prev => prev.map(lot => lot.id === id ? updatedLot : lot));
@@ -341,61 +321,68 @@ export default function App() {
       // Reload medications to update total stock count
       const updatedMedications = await MedicationService.getAllMedications();
       setMedications(updatedMedications);
-
-      const detailParts: string[] = [`Lot ${updatedLot.lotNumber}`];
-      if (updates.quantity !== undefined) {
-        detailParts.push(`Quantity: ${updatedLot.quantity} units`);
-      }
-      if (updates.lotNumber !== undefined) {
-        detailParts.push(`Lot #: ${updatedLot.lotNumber}`);
-      }
-      if (updates.expirationDate !== undefined) {
-        detailParts.push(`Expires ${formatDateEST(updatedLot.expirationDate)}`);
-      }
-      const details = detailParts.join(' • ');
-      const reasonSuffix = options?.reason ? ` • Reason: ${options.reason}` : '';
-
-      showSuccessToast(
-        'Updated inventory lot',
-        `${details}${reasonSuffix}`
-      );
     } catch (err) {
       console.error('Error updating lot:', err);
       setError('Failed to update lot. Please try again.');
-      showErrorToast(
-        'Failed to update inventory lot',
-        'Please try again or contact support.'
-      );
     }
-  };
-
-  const handleSetLotQuantity = async (lotId: string, newQuantity: number, reason: string) => {
-    await handleUpdateLot(lotId, { quantity: newQuantity }, { reason });
   };
 
   const handleDeleteLot = async (id: string) => {
     try {
-      // Get lot info before deletion for toast message
-      const lotToDelete = inventory.find(lot => lot.id === id);
-      
       await MedicationService.deleteInventoryItem(id);
       setInventory(prev => prev.filter(lot => lot.id !== id));
 
       // Reload medications to update total stock count
       const updatedMedications = await MedicationService.getAllMedications();
       setMedications(updatedMedications);
-      
-      showSuccessToast(
-        'Deleted inventory lot',
-        lotToDelete ? `Lot ${lotToDelete.lotNumber} • ${lotToDelete.quantity} units removed` : 'Inventory lot removed successfully'
-      );
     } catch (err) {
       console.error('Error deleting lot:', err);
       setError('Failed to delete lot. Please try again.');
-      showErrorToast(
-        'Failed to delete inventory lot',
-        'Please try again or contact support.'
-      );
+    }
+  };
+
+  const handleUpdateStock = async (medicationId: string, newQuantity: number, reason: string) => {
+    try {
+      setError(null);
+      const medication = medications.find(m => m.id === medicationId);
+      if (!medication) {
+        throw new Error('Medication not found.');
+      }
+
+      const currentStock = medication.currentStock;
+      const difference = newQuantity - currentStock;
+
+      if (difference === 0) return;
+
+      if (difference > 0) {
+        const lotData: Omit<InventoryItem, 'id' | 'isExpired'> = {
+          medicationId,
+          lotNumber: `ADJ-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`,
+          quantity: difference,
+          expirationDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+        };
+
+        await handleAddLot(lotData);
+        console.log(`Added ${difference} units to ${medication.name} (${reason})`);
+      } else {
+        if (!navigator.onLine) {
+          throw new Error('Reducing stock requires an internet connection so the central inventory stays accurate.');
+        }
+
+        const amountToRemove = Math.abs(difference);
+        await MedicationService.reduceInventoryStock(medicationId, amountToRemove);
+
+        const [updatedMedications, updatedInventory] = await Promise.all([
+          MedicationService.getAllMedications(),
+          MedicationService.getAllInventory()
+        ]);
+        setMedications(updatedMedications);
+        setInventory(updatedInventory);
+        console.log(`Removed ${amountToRemove} units from ${medication.name} (${reason})`);
+      }
+    } catch (err) {
+      console.error('Error updating stock:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update stock. Please try again.');
     }
   };
 
@@ -422,10 +409,7 @@ export default function App() {
   const UserSelector = () => (
     <div className="flex items-center gap-2">
       <User className="size-4 flex-shrink-0" />
-      <Select value={currentUser?.id || ''} onValueChange={(value: string) => {
-        const user = users.find((u: UserType) => u.id === value);
-        if (user) setCurrentUser(user);
-      }}>
+      <Select value={currentUser?.id || ''} onValueChange={handleUserSwitch}>
         <SelectTrigger className="w-full min-w-0">
           <SelectValue />
         </SelectTrigger>
@@ -610,9 +594,8 @@ export default function App() {
               {canAccessStockManagement ? (
                 <StockManagement
                   medications={medications}
-                  inventory={inventory}
                   currentUser={currentUser!}
-                  onUpdateLot={handleSetLotQuantity}
+                  onUpdateStock={handleUpdateStock}
                   onAddLot={handleAddLot}
                 />
               ) : (
@@ -635,8 +618,7 @@ export default function App() {
         onSave={handleSaveEditedRecord}
       />
 
-      {/* Toast Notifications */}
-      <Toaster position="top-right" />
+      {/* Toaster temporarily disabled to fix import conflicts */}
     </div>
   );
 }

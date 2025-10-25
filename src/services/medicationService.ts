@@ -30,48 +30,32 @@ export class MedicationService {
     }
 
     // Group inventory by medication_id
-    type InventoryAggregate = {
-      total: number
-      latestUpdated: Date | null
-    }
-    const inventoryMap = new Map<string, InventoryAggregate>()
+    const inventoryMap = new Map<string, { quantity: number; lastUpdated?: string }>()
     console.log('Total inventory items fetched:', inventory?.length)
     inventory?.forEach(inv => {
-      const current = inventoryMap.get(inv.medication_id) || { total: 0, latestUpdated: null }
-      const nextTotal = current.total + (inv.qty_units || 0)
-      const candidateDates = [inv.updated_at, inv.created_at]
-        .filter(Boolean)
-        .map(dateString => new Date(dateString as string))
-        .filter(date => !Number.isNaN(date.getTime()))
+      const entry = inventoryMap.get(inv.medication_id) || { quantity: 0, lastUpdated: undefined }
+      const qty = inv.qty_units || 0
+      entry.quantity += qty
 
-      let latestUpdated = current.latestUpdated
-      candidateDates.forEach(dateValue => {
-        if (!latestUpdated || dateValue > latestUpdated) {
-          latestUpdated = dateValue
+      const candidateTimestamp = inv.updated_at || inv.created_at
+      if (candidateTimestamp) {
+        const currentLatest = entry.lastUpdated ? new Date(entry.lastUpdated).getTime() : 0
+        const candidateTime = new Date(candidateTimestamp).getTime()
+        if (candidateTime > currentLatest) {
+          entry.lastUpdated = candidateTimestamp
         }
-      })
+      }
 
-      inventoryMap.set(inv.medication_id, {
-        total: nextTotal,
-        latestUpdated
-      })
-      // console.log(`Inventory: med_id=${inv.medication_id}, qty=${inv.qty_units}, running_total=${current + inv.qty_units}`)
+      inventoryMap.set(inv.medication_id, entry)
+      // console.log(`Inventory: med_id=${inv.medication_id}, qty=${inv.qty_units}, running_total=${entry.quantity}`)
     })
 
     // console.log('Inventory map:', Array.from(inventoryMap.entries()))
 
     return medications?.map(med => {
-      const aggregate = inventoryMap.get(med.id)
-      const totalStock = aggregate?.total || 0
-      const latestInventoryUpdate = aggregate?.latestUpdated
-      const medicationUpdatedAt = [med.updated_at, med.created_at]
-        .filter(Boolean)
-        .map((dateString: string) => new Date(dateString))
-        .find(date => !Number.isNaN(date.getTime()))
-      const lastUpdated =
-        latestInventoryUpdate && medicationUpdatedAt
-          ? (latestInventoryUpdate > medicationUpdatedAt ? latestInventoryUpdate : medicationUpdatedAt)
-          : latestInventoryUpdate || medicationUpdatedAt || new Date()
+      const inventoryStats = inventoryMap.get(med.id)
+      const totalStock = inventoryStats?.quantity || 0
+      const lastUpdatedSource = inventoryStats?.lastUpdated || med.last_updated || med.updated_at || med.created_at || new Date().toISOString()
 
       // Debug logging
       // if (med.name === 'Acetaminophen') {
@@ -88,17 +72,43 @@ export class MedicationService {
         genericName: med.name,
         strength: med.strength || '',
         dosageForm: med.dosage_form || 'tablet',
-        category: med.category || 'General',
+        category: 'General',
         currentStock: totalStock,
-        minStock: typeof med.min_stock === 'number' ? med.min_stock : 20,
-        maxStock: typeof med.max_stock === 'number' ? med.max_stock : 100,
+        minStock: 20,
+        maxStock: 100,
         isAvailable: med.is_active && totalStock > 0,
-        lastUpdated,
+        lastUpdated: new Date(lastUpdatedSource),
         alternatives: [],
         commonUses: [],
         contraindications: []
       }
     }) || []
+  }
+
+  // Create a new medication (online only)
+  static async createMedication(input: {
+    name: string
+    strength: string
+    dosageForm?: string
+    isActive?: boolean
+  }): Promise<{ id: string }> {
+    const { data, error } = await supabase
+      .from('medications')
+      .insert({
+        name: input.name,
+        strength: input.strength,
+        dosage_form: input.dosageForm || 'tablet',
+        is_active: input.isActive ?? true,
+      })
+      .select('id')
+      .single()
+
+    if (error || !data) {
+      console.error('Error creating medication:', error)
+      throw new Error(error?.message || 'Failed to create medication')
+    }
+
+    return { id: data.id }
   }
 
   static async getMedicationById(id: string): Promise<Medication | null> {
@@ -162,19 +172,14 @@ export class MedicationService {
       throw new Error('Failed to fetch inventory')
     }
 
-    return data?.map(item => {
-      const expirationDate = item.expiration_date
-        ? logDateToUTCNoon(item.expiration_date)
-        : new Date()
-      return {
-        id: item.id,
-        medicationId: item.medication_id,
-        lotNumber: item.lot_number,
-        expirationDate,
-        quantity: item.qty_units,
-        isExpired: expirationDate < new Date()
-      }
-    }) || []
+    return data?.map(item => ({
+      id: item.id,
+      medicationId: item.medication_id,
+      lotNumber: item.lot_number,
+      expirationDate: new Date(item.expiration_date),
+      quantity: item.qty_units,
+      isExpired: new Date(item.expiration_date) < new Date()
+    })) || []
   }
 
   static async getAllInventory(): Promise<InventoryItem[]> {
@@ -188,19 +193,14 @@ export class MedicationService {
       throw new Error('Failed to fetch inventory')
     }
 
-    return data?.map(item => {
-      const expirationDate = item.expiration_date
-        ? logDateToUTCNoon(item.expiration_date)
-        : new Date()
-      return {
-        id: item.id,
-        medicationId: item.medication_id,
-        lotNumber: item.lot_number,
-        expirationDate,
-        quantity: item.qty_units,
-        isExpired: expirationDate < new Date()
-      }
-    }) || []
+    return data?.map(item => ({
+      id: item.id,
+      medicationId: item.medication_id,
+      lotNumber: item.lot_number,
+      expirationDate: new Date(item.expiration_date),
+      quantity: item.qty_units,
+      isExpired: new Date(item.expiration_date) < new Date()
+    })) || []
   }
 
   static async createInventoryItem(item: Omit<InventoryItem, 'id' | 'isExpired'>): Promise<InventoryItem> {
@@ -221,48 +221,16 @@ export class MedicationService {
       throw new Error('Failed to create inventory item')
     }
 
-    const expirationDate = data.expiration_date
-      ? logDateToUTCNoon(data.expiration_date)
-      : new Date()
-
     return {
       id: data.id,
       medicationId: data.medication_id,
       lotNumber: data.lot_number,
-      expirationDate,
+      expirationDate: new Date(data.expiration_date),
       quantity: data.qty_units,
-      isExpired: expirationDate < new Date()
+      isExpired: new Date(data.expiration_date) < new Date()
     }
   }
 
-
-
-    // Create a new medication (online only)
-    static async createMedication(input: {
-      name: string
-      strength: string
-      dosageForm?: string
-      isActive?: boolean
-    }): Promise<{ id: string }> {
-      const { data, error } = await supabase
-        .from('medications')
-        .insert({
-          name: input.name,
-          strength: input.strength,
-          dosage_form: input.dosageForm || 'tablet',
-          is_active: input.isActive ?? true,
-        })
-        .select('id')
-        .single()
-  
-      if (error || !data) {
-        console.error('Error creating medication:', error)
-        throw new Error(error?.message || 'Failed to create medication')
-      }
-  
-      return { id: data.id }
-    }
-    
   static async updateInventoryItem(id: string, updates: Partial<Pick<InventoryItem, 'quantity' | 'lotNumber' | 'expirationDate'>>): Promise<InventoryItem> {
     const updateData: any = {}
 
@@ -282,17 +250,13 @@ export class MedicationService {
       throw new Error('Failed to update inventory item')
     }
 
-    const expirationDate = data.expiration_date
-      ? logDateToUTCNoon(data.expiration_date)
-      : new Date()
-
     return {
       id: data.id,
       medicationId: data.medication_id,
       lotNumber: data.lot_number,
-      expirationDate,
+      expirationDate: new Date(data.expiration_date),
       quantity: data.qty_units,
-      isExpired: expirationDate < new Date()
+      isExpired: new Date(data.expiration_date) < new Date()
     }
   }
 
@@ -305,6 +269,29 @@ export class MedicationService {
     if (error) {
       console.error('Error deleting inventory item:', error)
       throw new Error('Failed to delete inventory item')
+    }
+  }
+
+  static async reduceInventoryStock(medicationId: string, amount: number): Promise<void> {
+    if (amount <= 0) return
+
+    const lots = await MedicationService.getInventoryByMedicationId(medicationId)
+    if (!lots || lots.length === 0) {
+      throw new Error('No inventory lots available for this medication.')
+    }
+
+    let remaining = amount
+    for (const lot of lots) {
+      if (remaining <= 0) break
+      if (lot.quantity <= 0) continue
+
+      const deduction = Math.min(remaining, lot.quantity)
+      await MedicationService.updateInventoryItem(lot.id, { quantity: lot.quantity - deduction })
+      remaining -= deduction
+    }
+
+    if (remaining > 0) {
+      throw new Error('Unable to remove the requested quantity because stock is outdated. Refresh and try again.')
     }
   }
 
@@ -346,8 +333,7 @@ export class MedicationService {
       // Anchor at UTC noon to ensure EST display matches calendar date; fallback to created_at if needed
       dispensedAt,
       indication: record.dose_instructions || '',
-      notes: record.notes || undefined,
-      clinicSite: record.clinic_site || undefined
+      notes: record.notes || undefined
     })}) || []
   }
 
@@ -363,7 +349,6 @@ export class MedicationService {
     if (updates.studentName !== undefined) updateData.student_name = updates.studentName
     if (updates.indication !== undefined) updateData.dose_instructions = updates.indication
     if (updates.notes !== undefined) updateData.notes = updates.notes
-  if (updates.clinicSite !== undefined) updateData.clinic_site = updates.clinicSite
 
   // Supabase stores UTC; keep updated_at in UTC
   updateData.updated_at = new Date().toISOString()
@@ -402,8 +387,7 @@ export class MedicationService {
       // Anchor at UTC noon; fallback if log_date missing
       dispensedAt: data.log_date ? logDateToUTCNoon(data.log_date) : (data.created_at ? new Date(data.created_at) : new Date()),
       indication: data.dose_instructions,
-      notes: data.notes || undefined,
-      clinicSite: data.clinic_site || undefined
+      notes: data.notes || undefined
     }
   }
 
@@ -434,8 +418,7 @@ export class MedicationService {
         physician_name: record.physicianName,
         student_name: record.studentName || null,
         entered_by: enteredBy,
-        notes: record.notes || null,
-        clinic_site: record.clinicSite || null
+        notes: record.notes || null
       })
       .select()
       .single()
@@ -461,20 +444,7 @@ export class MedicationService {
       // Anchor at UTC noon; fallback if log_date missing
       dispensedAt: data.log_date ? logDateToUTCNoon(data.log_date) : (data.created_at ? new Date(data.created_at) : record.dispensedAt),
       indication: record.indication,
-      notes: data.notes || undefined,
-      clinicSite: data.clinic_site || record.clinicSite
-    }
-  }
-
-  static async deleteDispensingRecord(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('dispensing_logs')
-      .delete()
-      .eq('id', id)
-
-    if (error) {
-      console.error('Error deleting dispensing record:', error)
-      throw new Error('Failed to delete dispensing record')
+      notes: data.notes || undefined
     }
   }
 
@@ -500,13 +470,13 @@ export class MedicationService {
 
   // Bulk Import for Inventory
   static async bulkImportInventory(items: Array<{
-    name: string
-    strength: string
-    quantity: number
-    lotNumber?: string
-    expirationDate?: string
-    dosageForm?: string
-  }>, p0: string, id: string): Promise<{ success: number; failed: number; errors: string[] }> {
+  name: string
+  strength: string
+  quantity: number
+  lotNumber?: string
+  expirationDate?: string
+  dosageForm?: string
+}>, p0: string, id: string): Promise<{ success: number; failed: number; errors: string[] }> {
     const results = {
       success: 0,
       failed: 0,

@@ -4,16 +4,17 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Pill, AlertCircle } from 'lucide-react';
-
+import type { UserRole } from '../types/medication';
 
 interface LoginPageProps {
-  onLogin: (netId: string) => void;
+  onLogin: (netId: string, preferredRole: UserRole) => void;
 }
 
 export function LoginPage({ onLogin }: LoginPageProps) {
   const [netId, setNetId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [rolePreference, setRolePreference] = useState<UserRole>('pharmacy_staff');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,7 +31,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
     await new Promise(resolve => setTimeout(resolve, 800));
     
     try {
-      onLogin(netId.trim());
+      onLogin(netId.trim(), rolePreference);
     } catch (err) {
       setError('Login failed. Please try again.');
     } finally {
@@ -75,6 +76,28 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                   autoComplete="username"
                   autoFocus
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Role for this session (dev only)</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    variant={rolePreference === 'pharmacy_staff' ? 'default' : 'outline'}
+                    onClick={() => setRolePreference('pharmacy_staff')}
+                    disabled={isLoading}
+                  >
+                    Pharmacy Staff
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={rolePreference === 'provider' ? 'default' : 'outline'}
+                    onClick={() => setRolePreference('provider')}
+                    disabled={isLoading}
+                  >
+                    Provider
+                  </Button>
+                </div>
               </div>
 
               {error && (

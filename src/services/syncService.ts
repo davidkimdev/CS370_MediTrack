@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase'
 import type { Medication, DispensingRecord } from '../types/medication'
-import { OfflineStore, type PendingDispense } from '../utils/offlineStore'
+import { OfflineStore, type PendingDispense, type PendingLot } from '../utils/offlineStore'
 
 import { toESTDateString } from '../utils/timezone'
 import { MedicationService } from './medicationService'
@@ -83,18 +83,29 @@ export class SyncService {
       studentName: rec.studentName,
       dispensedAt: rec.dispensedAt,
       indication: rec.indication,
-      clinicSite: rec.clinicSite,
     })
   }
 
-  // Process pending dispenses: create rows in dispensing_logs and adjust stock server-side
+  // Queue a lot while offline: update local stock and add to pending queue
+  async queueOfflineLot(lot: Omit<PendingLot, 'id'>): Promise<PendingLot> {
+    await OfflineStore.incrementMedicationStock(lot.medicationId, lot.quantity)
+    return OfflineStore.enqueueLot(lot)
+  }
+
+  // Process pending dispenses and lots: create rows in database
   async flushQueue(): Promise<{ processed: number; failed: number }> {
-    const pendings = await OfflineStore.getPendingDispenses()
-    if (pendings.length === 0) return { processed: 0, failed: 0 }
+    const pendingDispenses = await OfflineStore.getPendingDispenses()
+    const pendingLots = await OfflineStore.getPendingLots()
+    
+    if (pendingDispenses.length === 0 && pendingLots.length === 0) {
+      return { processed: 0, failed: 0 }
+    }
 
     let processed = 0
     let failed = 0
-    for (const pending of pendings) {
+
+    // Process pending dispenses
+    for (const pending of pendingDispenses) {
       try {
         await this.createDispenseRemote(pending)
         await OfflineStore.removePendingDispense(pending.id)
@@ -104,6 +115,19 @@ export class SyncService {
         failed++
       }
     }
+
+    // Process pending lots
+    for (const pending of pendingLots) {
+      try {
+        await this.createLotRemote(pending)
+        await OfflineStore.removePendingLot(pending.id)
+        processed++
+      } catch (e) {
+        console.error('Failed to sync pending lot', pending, e)
+        failed++
+      }
+    }
+
     if (processed > 0) await OfflineStore.setLastSync(new Date())
     return { processed, failed }
   }
@@ -123,7 +147,6 @@ export class SyncService {
       physician_name: p.physicianName,
       student_name: 'Offline Sync',
       entered_by: null,
-      clinic_site: p.clinicSite || null,
     })
     if (insertError) throw insertError
 
@@ -172,6 +195,20 @@ export class SyncService {
     } catch (e) {
       console.warn('Inventory decrement failed (server)', e)
     }
+  }
+
+  private async createLotRemote(p: PendingLot): Promise<void> {
+    // Create inventory record in database
+    const { error: insertError } = await supabase.from('inventory').insert({
+      medication_id: p.medicationId,
+      lot_number: p.lotNumber,
+      expiration_date: p.expirationDate.toISOString().split('T')[0],
+      qty_units: p.quantity,
+      low_stock_threshold: 10,
+      notes: 'Offline sync - added lot'
+    })
+
+    if (insertError) throw insertError
   }
 }
 
