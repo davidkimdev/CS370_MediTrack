@@ -72,8 +72,12 @@ export function AddLotDialog({ open, onOpenChange, medication, medications, onAd
 
     if (!expirationDate) {
       newErrors.expirationDate = 'Expiration date is required';
-    } else if (expirationDate <= new Date()) {
-      newErrors.expirationDate = 'Expiration date must be in the future';
+    } else {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (expirationDate < today) {
+        newErrors.expirationDate = 'Expiration date cannot be in the past';
+      }
     }
 
     setErrors(newErrors);
@@ -299,7 +303,11 @@ export function AddLotDialog({ open, onOpenChange, medication, medications, onAd
                   mode="single"
                   selected={expirationDate}
                   onSelect={setExpirationDate}
-                  disabled={(date) => date <= new Date()}
+                  disabled={(date) => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    return date < today;
+                  }}
                   initialFocus
                 />
               </PopoverContent>

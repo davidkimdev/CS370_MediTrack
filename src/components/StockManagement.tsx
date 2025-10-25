@@ -433,7 +433,7 @@ const medicationLots = useMemo(() => {
                 {medicationLots.length > 0 ? (
                   <Select
                     value={selectedLotId}
-                    onValueChange={(value) => {
+                    onValueChange={(value: string) => {
                       setSelectedLotId(value);
                       const lot = medicationLots.find((item) => item.id === value);
                       setNewQuantity(lot ? lot.quantity.toString() : '');
