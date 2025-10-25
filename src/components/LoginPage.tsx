@@ -5,6 +5,7 @@ import { Label } from './ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Pill, AlertCircle } from 'lucide-react';
 
+
 interface LoginPageProps {
   onLogin: (netId: string) => void;
 }

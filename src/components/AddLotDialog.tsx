@@ -4,9 +4,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Calendar } from './ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
-import { CalendarIcon, Package, AlertCircle } from 'lucide-react';
+import { Package, AlertCircle } from 'lucide-react';
 import { cn } from './ui/utils';
 import { Medication, InventoryItem } from '../types/medication';
 
@@ -27,9 +25,23 @@ export function AddLotDialog({ open, onOpenChange, medication, medications, onAd
   const [lotNumber, setLotNumber] = useState('');
   const [quantity, setQuantity] = useState('');
   const [expirationDate, setExpirationDate] = useState<Date | undefined>(undefined);
+  const [expYear, setExpYear] = useState<number | undefined>();
+  const [expMonth, setExpMonth] = useState<number | undefined>();
+  const [expDay, setExpDay] = useState<number | undefined>();
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Update expirationDate when year, month, or day changes
+  useEffect(() => {
+    if (expYear && expMonth && expDay) {
+      // Create date in UTC to avoid timezone issues
+      const newDate = new Date(Date.UTC(expYear, expMonth - 1, expDay));
+      setExpirationDate(newDate);
+    } else {
+      setExpirationDate(undefined);
+    }
+  }, [expYear, expMonth, expDay]);
 
   // Reset form when dialog opens/closes or medication changes
   useEffect(() => {
@@ -42,6 +54,9 @@ export function AddLotDialog({ open, onOpenChange, medication, medications, onAd
       setLotNumber('');
       setQuantity('');
       setExpirationDate(undefined);
+      setExpYear(undefined);
+      setExpMonth(undefined);
+      setExpDay(undefined);
       setNotes('');
       setErrors({});
     }
@@ -72,12 +87,8 @@ export function AddLotDialog({ open, onOpenChange, medication, medications, onAd
 
     if (!expirationDate) {
       newErrors.expirationDate = 'Expiration date is required';
-    } else {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      if (expirationDate < today) {
-        newErrors.expirationDate = 'Expiration date cannot be in the past';
-      }
+    } else if (expirationDate <= new Date()) {
+      newErrors.expirationDate = 'Expiration date must be in the future';
     }
 
     setErrors(newErrors);
@@ -284,34 +295,44 @@ export function AddLotDialog({ open, onOpenChange, medication, medications, onAd
           {/* Expiration Date */}
           <div className="space-y-2">
             <Label>Expiration Date *</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !expirationDate && "text-muted-foreground",
-                    errors.expirationDate && "border-red-500"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {expirationDate ? expirationDate.toLocaleDateString() : "Pick a date"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={expirationDate}
-                  onSelect={setExpirationDate}
-                  disabled={(date) => {
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
-                    return date < today;
-                  }}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-1">
+                <Select value={expYear?.toString()} onValueChange={(v: string) => setExpYear(parseInt(v))}>
+                  <SelectTrigger className={cn(errors.expirationDate && "border-red-500")}>
+                    <SelectValue placeholder="Year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 16 }, (_, i) => new Date().getFullYear() + i).map(year => (
+                      <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Select value={expMonth?.toString()} onValueChange={(v: string) => setExpMonth(parseInt(v))} disabled={!expYear}>
+                  <SelectTrigger className={cn(errors.expirationDate && "border-red-500")}>
+                    <SelectValue placeholder="Month" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
+                      <SelectItem key={month} value={month.toString()}>{month}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Select value={expDay?.toString()} onValueChange={(v: string) => setExpDay(parseInt(v))} disabled={!expYear || !expMonth}>
+                  <SelectTrigger className={cn(errors.expirationDate && "border-red-500")}>
+                    <SelectValue placeholder="Day" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: new Date(expYear || 0, expMonth || 0, 0).getDate() }, (_, i) => i + 1).map(day => (
+                      <SelectItem key={day} value={day.toString()}>{day}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
             {errors.expirationDate && (
               <p className="text-sm text-red-500 flex items-center gap-1">
                 <AlertCircle className="size-4" />
