@@ -149,12 +149,13 @@
     button {
       min-height: 44px;
     }
-    
-    input, select {
+
+    input,
+    select {
       min-height: 44px;
     }
-    
-    [role="tab"] {
+
+    [role='tab'] {
       min-height: 44px;
     }
   }
@@ -175,7 +176,7 @@
  * Base typography. This is not applied to elements which have an ancestor with a Tailwind text class.
  */
 @layer base {
-  :where(:not(:has([class*=" text-"]), :not(:has([class^="text-"])))) {
+  :where(:not(:has([class*=' text-']), :not(:has([class^='text-'])))) {
     h1 {
       font-size: var(--text-2xl);
       font-weight: var(--font-weight-medium);
@@ -235,15 +236,15 @@ html {
   .touch-action-manipulation {
     touch-action: manipulation;
   }
-  
+
   .tap-highlight-transparent {
     -webkit-tap-highlight-color: transparent;
   }
-  
+
   .safe-area-inset-top {
     padding-top: env(safe-area-inset-top);
   }
-  
+
   .safe-area-inset-bottom {
     padding-bottom: env(safe-area-inset-bottom);
   }

@@ -9,10 +9,22 @@ import { OfflineSync } from './components/OfflineSync';
 import { LoginPage } from './components/LoginPage';
 import { Badge } from './components/ui/badge';
 import { Button } from './components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './components/ui/select';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './components/ui/sheet';
 import { Pill, ClipboardList, Settings, User, Menu, LogOut } from 'lucide-react';
-import { Medication, DispensingRecord, InventoryItem, User as UserType, UserRole } from './types/medication';
+import {
+  Medication,
+  DispensingRecord,
+  InventoryItem,
+  User as UserType,
+  UserRole,
+} from './types/medication';
 import { MedicationService } from './services/medicationService';
 import { syncService } from './services/syncService';
 import { OfflineStore } from './utils/offlineStore';
@@ -77,7 +89,7 @@ export default function App() {
             MedicationService.getAllMedications(),
             MedicationService.getAllDispensingRecords(),
             MedicationService.getAllInventory(),
-            MedicationService.getAllUsers()
+            MedicationService.getAllUsers(),
           ]);
           syncService.startMedicationsRealtime();
         } else {
@@ -124,7 +136,7 @@ export default function App() {
       }
     };
 
-  loadData();
+    loadData();
     // Initialize pending changes count from offline queue
     (async () => {
       const count = await OfflineStore.getPendingCount();
@@ -138,7 +150,7 @@ export default function App() {
       window.removeEventListener('online', updatePending);
       window.removeEventListener('offline', updatePending);
       syncService.stopRealtime();
-    }
+    };
   }, []);
 
   const handleLogin = (netId: string, preferredRole: UserRole) => {
@@ -166,18 +178,19 @@ export default function App() {
   useEffect(() => {
     if (!isLoggedIn || users.length === 0) return;
 
-    setCurrentUser(prev => {
+    setCurrentUser((prev) => {
       if (prev) return prev;
 
-      const storedUserId = typeof window !== 'undefined' ? window.localStorage.getItem(USER_STORAGE_KEY) : null;
-      let nextUser = storedUserId ? users.find(u => u.id === storedUserId) : undefined;
+      const storedUserId =
+        typeof window !== 'undefined' ? window.localStorage.getItem(USER_STORAGE_KEY) : null;
+      let nextUser = storedUserId ? users.find((u) => u.id === storedUserId) : undefined;
 
       if (!nextUser && preferredRoleRef.current) {
-        nextUser = users.find(u => u.role === preferredRoleRef.current);
+        nextUser = users.find((u) => u.role === preferredRoleRef.current);
       }
 
       if (!nextUser) {
-        nextUser = users.find(u => u.role === 'pharmacy_staff') || users[0];
+        nextUser = users.find((u) => u.role === 'pharmacy_staff') || users[0];
       }
 
       if (nextUser && typeof window !== 'undefined') {
@@ -190,7 +203,7 @@ export default function App() {
   }, [isLoggedIn, users]);
 
   const handleUserSwitch = (userId: string) => {
-    const user = users.find(u => u.id === userId);
+    const user = users.find((u) => u.id === userId);
     if (!user) return;
     setCurrentUser(user);
     preferredRoleRef.current = user.role;
@@ -222,21 +235,61 @@ export default function App() {
         setDispensingRecords((prev: DispensingRecord[]) => [newRecord, ...prev]);
 
         // Update inventory lot quantity in database
-        const inventoryLot = inventory.find(inv => inv.lotNumber === record.lotNumber && inv.medicationId === record.medicationId);
+        const inventoryLot = inventory.find(
+          (inv) => inv.lotNumber === record.lotNumber && inv.medicationId === record.medicationId,
+        );
         if (inventoryLot) {
           const newQuantity = Math.max(0, inventoryLot.quantity - record.quantity);
           await MedicationService.updateInventoryItem(inventoryLot.id, { quantity: newQuantity });
         }
 
         // Update local state
-        const newStock = Math.max(0, (medications.find((m: Medication) => m.id === record.medicationId)?.currentStock || 0) - record.quantity);
-        setMedications((prev: Medication[]) => prev.map((med: Medication) => med.id === record.medicationId ? { ...med, currentStock: newStock, isAvailable: newStock > 0, lastUpdated: new Date() } : med));
-        setInventory(prev => prev.map(inv => inv.lotNumber === record.lotNumber ? { ...inv, quantity: Math.max(0, inv.quantity - record.quantity) } : inv));
+        const newStock = Math.max(
+          0,
+          (medications.find((m: Medication) => m.id === record.medicationId)?.currentStock || 0) -
+            record.quantity,
+        );
+        setMedications((prev: Medication[]) =>
+          prev.map((med: Medication) =>
+            med.id === record.medicationId
+              ? {
+                  ...med,
+                  currentStock: newStock,
+                  isAvailable: newStock > 0,
+                  lastUpdated: new Date(),
+                }
+              : med,
+          ),
+        );
+        setInventory((prev) =>
+          prev.map((inv) =>
+            inv.lotNumber === record.lotNumber
+              ? { ...inv, quantity: Math.max(0, inv.quantity - record.quantity) }
+              : inv,
+          ),
+        );
       } else {
         // Offline: queue and update local stock/cache immediately
         await syncService.queueOfflineDispense(record);
-        setMedications((prev: Medication[]) => prev.map((med: Medication) => med.id === record.medicationId ? { ...med, currentStock: Math.max(0, med.currentStock - record.quantity), isAvailable: med.currentStock - record.quantity > 0, lastUpdated: new Date() } : med));
-        setInventory(prev => prev.map(inv => inv.lotNumber === record.lotNumber ? { ...inv, quantity: Math.max(0, inv.quantity - record.quantity) } : inv));
+        setMedications((prev: Medication[]) =>
+          prev.map((med: Medication) =>
+            med.id === record.medicationId
+              ? {
+                  ...med,
+                  currentStock: Math.max(0, med.currentStock - record.quantity),
+                  isAvailable: med.currentStock - record.quantity > 0,
+                  lastUpdated: new Date(),
+                }
+              : med,
+          ),
+        );
+        setInventory((prev) =>
+          prev.map((inv) =>
+            inv.lotNumber === record.lotNumber
+              ? { ...inv, quantity: Math.max(0, inv.quantity - record.quantity) }
+              : inv,
+          ),
+        );
         setPendingChanges((prev: number) => prev + 1);
       }
     } catch (err) {
@@ -250,10 +303,13 @@ export default function App() {
     setIsEditDialogOpen(true);
   };
 
-  const handleSaveEditedRecord = async (id: string, updates: Partial<Omit<DispensingRecord, 'id'>>) => {
+  const handleSaveEditedRecord = async (
+    id: string,
+    updates: Partial<Omit<DispensingRecord, 'id'>>,
+  ) => {
     try {
       const updatedRecord = await MedicationService.updateDispensingRecord(id, updates);
-      setDispensingRecords(prev => prev.map(rec => rec.id === id ? updatedRecord : rec));
+      setDispensingRecords((prev) => prev.map((rec) => (rec.id === id ? updatedRecord : rec)));
     } catch (err) {
       console.error('Error updating dispensing record:', err);
       throw err; // Re-throw to let dialog handle error display
@@ -264,14 +320,21 @@ export default function App() {
     const queueLotOffline = async () => {
       await syncService.queueOfflineLot(lot);
 
-      const medication = medications.find(m => m.id === lot.medicationId);
+      const medication = medications.find((m) => m.id === lot.medicationId);
       if (medication) {
         const newStock = medication.currentStock + lot.quantity;
-        setMedications((prev: Medication[]) => prev.map((med: Medication) =>
-          med.id === lot.medicationId
-            ? { ...med, currentStock: newStock, isAvailable: newStock > 0, lastUpdated: new Date() }
-            : med
-        ));
+        setMedications((prev: Medication[]) =>
+          prev.map((med: Medication) =>
+            med.id === lot.medicationId
+              ? {
+                  ...med,
+                  currentStock: newStock,
+                  isAvailable: newStock > 0,
+                  lastUpdated: new Date(),
+                }
+              : med,
+          ),
+        );
       }
 
       setPendingChanges((prev: number) => prev + 1);
@@ -291,7 +354,7 @@ export default function App() {
     try {
       if (navigator.onLine) {
         const newLot = await MedicationService.createInventoryItem(lot);
-        setInventory(prev => [...prev, newLot]);
+        setInventory((prev) => [...prev, newLot]);
 
         const updatedMedications = await MedicationService.getAllMedications();
         setMedications(updatedMedications);
@@ -313,10 +376,13 @@ export default function App() {
     }
   };
 
-  const handleUpdateLot = async (id: string, updates: Partial<Pick<InventoryItem, 'quantity' | 'lotNumber' | 'expirationDate'>>) => {
+  const handleUpdateLot = async (
+    id: string,
+    updates: Partial<Pick<InventoryItem, 'quantity' | 'lotNumber' | 'expirationDate'>>,
+  ) => {
     try {
       const updatedLot = await MedicationService.updateInventoryItem(id, updates);
-      setInventory(prev => prev.map(lot => lot.id === id ? updatedLot : lot));
+      setInventory((prev) => prev.map((lot) => (lot.id === id ? updatedLot : lot)));
 
       // Reload medications to update total stock count
       const updatedMedications = await MedicationService.getAllMedications();
@@ -330,7 +396,7 @@ export default function App() {
   const handleDeleteLot = async (id: string) => {
     try {
       await MedicationService.deleteInventoryItem(id);
-      setInventory(prev => prev.filter(lot => lot.id !== id));
+      setInventory((prev) => prev.filter((lot) => lot.id !== id));
 
       // Reload medications to update total stock count
       const updatedMedications = await MedicationService.getAllMedications();
@@ -341,10 +407,16 @@ export default function App() {
     }
   };
 
+  // Adapter for StockManagement signature (lotId, newQuantity, reason)
+  const handleUpdateLotQuantity = async (lotId: string, newQuantity: number) => {
+    await handleUpdateLot(lotId, { quantity: newQuantity });
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleUpdateStock = async (medicationId: string, newQuantity: number, reason: string) => {
     try {
       setError(null);
-      const medication = medications.find(m => m.id === medicationId);
+      const medication = medications.find((m) => m.id === medicationId);
       if (!medication) {
         throw new Error('Medication not found.');
       }
@@ -366,7 +438,9 @@ export default function App() {
         console.log(`Added ${difference} units to ${medication.name} (${reason})`);
       } else {
         if (!navigator.onLine) {
-          throw new Error('Reducing stock requires an internet connection so the central inventory stays accurate.');
+          throw new Error(
+            'Reducing stock requires an internet connection so the central inventory stays accurate.',
+          );
         }
 
         const amountToRemove = Math.abs(difference);
@@ -374,7 +448,7 @@ export default function App() {
 
         const [updatedMedications, updatedInventory] = await Promise.all([
           MedicationService.getAllMedications(),
-          MedicationService.getAllInventory()
+          MedicationService.getAllInventory(),
         ]);
         setMedications(updatedMedications);
         setInventory(updatedInventory);
@@ -398,8 +472,8 @@ export default function App() {
   };
 
   const getAlternatives = (medication: Medication): Medication[] => {
-    return medications.filter((med: Medication) => 
-      medication.alternatives.includes(med.id) && med.isAvailable
+    return medications.filter(
+      (med: Medication) => medication.alternatives.includes(med.id) && med.isAvailable,
     );
   };
 
@@ -470,7 +544,7 @@ export default function App() {
               <h1 className="text-lg font-bold truncate">EFWP Formulary</h1>
               <p className="text-sm text-muted-foreground truncate">Mobile Clinic</p>
             </div>
-            
+
             <Sheet>
               <SheetTrigger asChild>
                 <Button variant="outline" size="icon" className="flex-shrink-0">
@@ -487,8 +561,8 @@ export default function App() {
                     <p className="text-sm text-muted-foreground">{loggedInNetId}</p>
                   </div>
                   <UserSelector />
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     onClick={handleLogout}
                     className="w-full flex items-center gap-2"
                   >
@@ -507,7 +581,7 @@ export default function App() {
             <h1 className="text-2xl font-bold">EFWP Medication Formulary</h1>
             <p className="text-muted-foreground">Emory Farmworker Project Mobile Clinic</p>
           </div>
-          
+
           <div className="flex items-center gap-3">
             <div className="text-right">
               <p className="text-sm font-medium">{loggedInNetId}</p>
@@ -516,8 +590,8 @@ export default function App() {
             <div className="w-48">
               <UserSelector />
             </div>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="sm"
               onClick={handleLogout}
               className="flex items-center gap-2"
@@ -550,18 +624,24 @@ export default function App() {
         ) : (
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-3 mb-4 sm:mb-6">
-              <TabsTrigger value="formulary" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+              <TabsTrigger
+                value="formulary"
+                className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
+              >
                 <Pill className="size-3 sm:size-4" />
                 <span className="hidden xs:inline">Formulary</span>
                 <span className="xs:hidden">Drugs</span>
               </TabsTrigger>
-              <TabsTrigger value="log" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+              <TabsTrigger
+                value="log"
+                className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
+              >
                 <ClipboardList className="size-3 sm:size-4" />
                 <span className="hidden xs:inline">Dispensing Log</span>
                 <span className="xs:hidden">Log</span>
               </TabsTrigger>
-              <TabsTrigger 
-                value="stock" 
+              <TabsTrigger
+                value="stock"
                 className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
                 disabled={!canAccessStockManagement}
               >
@@ -569,7 +649,10 @@ export default function App() {
                 <span className="hidden sm:inline">Stock Management</span>
                 <span className="sm:hidden">Stock</span>
                 {!canAccessStockManagement && (
-                  <Badge variant="outline" className="text-[10px] sm:text-xs ml-1 hidden sm:inline-flex">
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] sm:text-xs ml-1 hidden sm:inline-flex"
+                  >
                     Staff Only
                   </Badge>
                 )}
@@ -594,8 +677,9 @@ export default function App() {
               {canAccessStockManagement ? (
                 <StockManagement
                   medications={medications}
+                  inventory={inventory}
                   currentUser={currentUser!}
-                  onUpdateStock={handleUpdateStock}
+                  onUpdateLot={handleUpdateLotQuantity}
                   onAddLot={handleAddLot}
                 />
               ) : (
