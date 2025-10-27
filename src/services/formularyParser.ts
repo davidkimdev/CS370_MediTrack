@@ -80,9 +80,7 @@ async function parseWordFile(file: File): Promise<ImportedMedicationRow[]> {
         const lines: string[] = text.split('\n').filter((line: string) => line.trim().length > 0);
         const rows: string[][] = lines.map((line: string) => {
           // Try to split by tab first, then by multiple spaces
-          const parts = line.includes('\t')
-            ? line.split('\t')
-            : line.split(/\s{2,}/);
+          const parts = line.includes('\t') ? line.split('\t') : line.split(/\s{2,}/);
           return parts.map((p: string) => p.trim());
         });
 
@@ -113,8 +111,9 @@ function parseFormularyRows(rows: any[][]): ImportedMedicationRow[] {
 
   // Check if first row is a header (contains keywords like "name", "strength", "quantity")
   const firstRow = rows[0].map((cell: any) => String(cell).toLowerCase());
-  const hasHeader = firstRow.some((cell: string) =>
-    cell.includes('name') || cell.includes('strength') || cell.includes('quantity')
+  const hasHeader = firstRow.some(
+    (cell: string) =>
+      cell.includes('name') || cell.includes('strength') || cell.includes('quantity'),
   );
 
   if (hasHeader) {
@@ -202,7 +201,12 @@ function parseQuantity(quantityStr: string): number | null {
   const lower = quantityStr.toLowerCase().trim();
 
   // Handle special cases
-  if (lower === 'x' || lower === 'n/a' || lower === 'dispense on-site' || lower === 'dispense on site') {
+  if (
+    lower === 'x' ||
+    lower === 'n/a' ||
+    lower === 'dispense on-site' ||
+    lower === 'dispense on site'
+  ) {
     return 0;
   }
 
@@ -250,7 +254,20 @@ function normalizeExpirationDate(dateStr: string): string {
   }
 
   // Format: "Dec 2025" or "December 2025"
-  const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+  const monthNames = [
+    'jan',
+    'feb',
+    'mar',
+    'apr',
+    'may',
+    'jun',
+    'jul',
+    'aug',
+    'sep',
+    'oct',
+    'nov',
+    'dec',
+  ];
   const monthMatch = dateStr.match(/^([a-zA-Z]+)\s+(\d{4})$/);
   if (monthMatch) {
     const monthStr = monthMatch[1].toLowerCase().substring(0, 3);

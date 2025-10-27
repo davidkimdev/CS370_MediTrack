@@ -28,19 +28,19 @@ export interface DispensingRecord {
   id: string;
   medicationId: string;
   medicationName: string;
-  patientId: string;              // e.g., "2025-196", "2635-140"
-  patientInitials: string;        // Still keep for quick reference
+  patientId: string; // e.g., "2025-196", "2635-140"
+  patientInitials: string; // Still keep for quick reference
   quantity: number;
-  dose: string;                   // e.g., "1 tab", "PRN", "1 gtt"
+  dose: string; // e.g., "1 tab", "PRN", "1 gtt"
   lotNumber: string;
   expirationDate?: Date;
-  dispensedBy: string;            // Pharmacy staff who dispensed
-  physicianName: string;          // Physician who prescribed
-  studentName?: string;           // Student observer/trainee
+  dispensedBy: string; // Pharmacy staff who dispensed
+  physicianName: string; // Physician who prescribed
+  studentName?: string; // Student observer/trainee
   dispensedAt: Date;
   indication: string;
   notes?: string;
-  clinicSite?: string;            // Free-text clinic site where dispensed
+  clinicSite?: string; // Free-text clinic site where dispensed
 }
 
 export interface StockUpdate {
