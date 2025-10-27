@@ -18,7 +18,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    
     if (!netId.trim()) {
       setError('Please enter your Net ID');
       return;
@@ -28,8 +28,8 @@ export function LoginPage({ onLogin }: LoginPageProps) {
     setError('');
 
     // Simulate login delay
-    await new Promise((resolve) => setTimeout(resolve, 800));
-
+    await new Promise(resolve => setTimeout(resolve, 800));
+    
     try {
       onLogin(netId.trim(), rolePreference);
     } catch (err) {
@@ -74,6 +74,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                   disabled={isLoading}
                   className="w-full"
                   autoComplete="username"
+                  autoFocus
                 />
               </div>
 
@@ -106,7 +107,11 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                 </div>
               )}
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <Button 
+                type="submit" 
+                className="w-full" 
+                disabled={isLoading}
+              >
                 {isLoading ? (
                   <div className="flex items-center gap-2">
                     <div className="size-4 border-2 border-current border-t-transparent rounded-full animate-spin" />

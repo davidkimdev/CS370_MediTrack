@@ -6,25 +6,8 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from './ui/dialog';
-import {
-  AlertTriangle,
-  CheckCircle,
-  ArrowLeft,
-  Package,
-  Clock,
-  AlertCircle,
-  Plus,
-  Edit2,
-  Trash2,
-} from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { AlertTriangle, CheckCircle, ArrowLeft, Package, Clock, AlertCircle, Plus, Edit2, Trash2 } from 'lucide-react';
 import { Medication, DispensingRecord, InventoryItem, User } from '../types/medication';
 import { showErrorToast } from '../utils/toastUtils';
 
@@ -37,10 +20,7 @@ interface MedicationDetailProps {
   onDispense: (record: Omit<DispensingRecord, 'id'>) => void;
   onSelectAlternative: (medication: Medication) => void;
   onAddLot?: (lot: Omit<InventoryItem, 'id' | 'isExpired'>) => void;
-  onUpdateLot?: (
-    id: string,
-    updates: Partial<Pick<InventoryItem, 'quantity' | 'lotNumber' | 'expirationDate'>>,
-  ) => void;
+  onUpdateLot?: (id: string, updates: Partial<Pick<InventoryItem, 'quantity' | 'lotNumber' | 'expirationDate'>>) => void;
   onDeleteLot?: (id: string) => void;
 }
 
@@ -60,15 +40,13 @@ export function MedicationDetail({
   onSelectAlternative,
   onAddLot,
   onUpdateLot,
-  onDeleteLot,
+  onDeleteLot
 }: MedicationDetailProps) {
   const [isDispenseDialogOpen, setIsDispenseDialogOpen] = useState(false);
   const [patientId, setPatientId] = useState('');
   const [patientInitials, setPatientInitials] = useState('');
   const [dose, setDose] = useState('');
-  const [selectedLots, setSelectedLots] = useState<LotSelection[]>([
-    { lotNumber: '', quantity: 0 },
-  ]);
+  const [selectedLots, setSelectedLots] = useState<LotSelection[]>([{ lotNumber: '', quantity: 0 }]);
   const [physicianName, setPhysicianName] = useState('');
   const [studentName, setStudentName] = useState('');
   const [clinicSite, setClinicSite] = useState('');
@@ -81,8 +59,8 @@ export function MedicationDetail({
   const [lotQuantity, setLotQuantity] = useState('');
   const [lotExpiration, setLotExpiration] = useState('');
 
-  const medicationInventory = inventory.filter((inv) => inv.medicationId === medication.id);
-  const availableLots = medicationInventory.filter((inv) => !inv.isExpired && inv.quantity > 0);
+  const medicationInventory = inventory.filter(inv => inv.medicationId === medication.id);
+  const availableLots = medicationInventory.filter(inv => !inv.isExpired && inv.quantity > 0);
 
   const getStockStatus = () => {
     if (!medication.isAvailable) {
@@ -96,36 +74,40 @@ export function MedicationDetail({
 
   const handleDispense = () => {
     // Validate required fields
-    if (!patientId.trim() || !patientInitials.trim() || !dose.trim() || !physicianName.trim()) {
+    if (!patientId.trim() || !patientInitials.trim() || !dose.trim() ||
+        !physicianName.trim()) {
       showErrorToast(
         'Missing required fields',
-        'Please fill in all required fields (marked with *)',
+        'Please fill in all required fields (marked with *)'
       );
       return;
     }
 
     // Validate lots
-    const validLots = selectedLots.filter((lot) => lot.lotNumber && lot.quantity > 0);
+    const validLots = selectedLots.filter(lot => lot.lotNumber && lot.quantity > 0);
     if (validLots.length === 0) {
-      showErrorToast('No lots selected', 'Please select at least one lot with quantity > 0');
+      showErrorToast(
+        'No lots selected',
+        'Please select at least one lot with quantity > 0'
+      );
       return;
     }
 
     // Validate each lot has sufficient quantity
     for (const selectedLot of validLots) {
-      const inventoryLot = availableLots.find((lot) => lot.lotNumber === selectedLot.lotNumber);
+      const inventoryLot = availableLots.find(lot => lot.lotNumber === selectedLot.lotNumber);
       if (inventoryLot && selectedLot.quantity > inventoryLot.quantity) {
         showErrorToast(
           'Insufficient inventory',
-          `Lot ${selectedLot.lotNumber} only has ${inventoryLot.quantity} units available (you entered ${selectedLot.quantity})`,
+          `Lot ${selectedLot.lotNumber} only has ${inventoryLot.quantity} units available (you entered ${selectedLot.quantity})`
         );
         return;
       }
     }
 
     // Create one dispensing record per lot
-    validLots.forEach((selectedLot) => {
-      const inventoryLot = availableLots.find((lot) => lot.lotNumber === selectedLot.lotNumber);
+    validLots.forEach(selectedLot => {
+      const inventoryLot = availableLots.find(lot => lot.lotNumber === selectedLot.lotNumber);
 
       const record: Omit<DispensingRecord, 'id'> = {
         medicationId: medication.id,
@@ -173,16 +155,12 @@ export function MedicationDetail({
     }
   };
 
-  const updateLotSelection = (
-    index: number,
-    field: 'lotNumber' | 'quantity',
-    value: string | number,
-  ) => {
+  const updateLotSelection = (index: number, field: 'lotNumber' | 'quantity', value: string | number) => {
     const updated = [...selectedLots];
     if (field === 'lotNumber') {
       updated[index].lotNumber = value as string;
       // Auto-fill expiration date when lot is selected
-      const lot = availableLots.find((l) => l.lotNumber === value);
+      const lot = availableLots.find(l => l.lotNumber === value);
       if (lot) {
         updated[index].expirationDate = lot.expirationDate;
       }
@@ -192,9 +170,9 @@ export function MedicationDetail({
     setSelectedLots(updated);
   };
 
-  // const totalQuantity = useMemo(() => {
-  //   return selectedLots.reduce((sum, lot) => sum + (lot.quantity || 0), 0);
-  // }, [selectedLots]);
+  const totalQuantity = useMemo(() => {
+    return selectedLots.reduce((sum, lot) => sum + (lot.quantity || 0), 0);
+  }, [selectedLots]);
 
   const handleAddLot = () => {
     setEditingLot(null);
@@ -214,13 +192,19 @@ export function MedicationDetail({
 
   const handleSaveLot = () => {
     if (!lotNumber.trim() || !lotQuantity || !lotExpiration) {
-      showErrorToast('Missing lot information', 'Please fill in all lot fields');
+      showErrorToast(
+        'Missing lot information',
+        'Please fill in all lot fields'
+      );
       return;
     }
 
     const qty = parseInt(lotQuantity);
     if (qty < 0) {
-      showErrorToast('Invalid quantity', 'Quantity must be positive');
+      showErrorToast(
+        'Invalid quantity',
+        'Quantity must be positive'
+      );
       return;
     }
 
@@ -229,7 +213,7 @@ export function MedicationDetail({
       onUpdateLot?.(editingLot.id, {
         lotNumber: lotNumber.trim(),
         quantity: qty,
-        expirationDate: new Date(lotExpiration),
+        expirationDate: new Date(lotExpiration)
       });
     } else {
       // Add new lot
@@ -237,7 +221,7 @@ export function MedicationDetail({
         medicationId: medication.id,
         lotNumber: lotNumber.trim(),
         quantity: qty,
-        expirationDate: new Date(lotExpiration),
+        expirationDate: new Date(lotExpiration)
       });
     }
 
@@ -280,7 +264,7 @@ export function MedicationDetail({
                 </p>
               </div>
             </div>
-
+            
             {medication.isAvailable && (
               <Dialog open={isDispenseDialogOpen} onOpenChange={setIsDispenseDialogOpen}>
                 <DialogTrigger asChild>
@@ -296,188 +280,170 @@ export function MedicationDetail({
                   </DialogHeader>
                   <div className="max-h-[60vh] overflow-y-auto -mx-6 px-6">
                     <div className="space-y-4 py-2">
-                      {/* Patient Information */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-2">
-                          <Label htmlFor="patientId">Patient ID *</Label>
-                          <Input
-                            id="patientId"
-                            placeholder="e.g., 2025-196"
-                            value={patientId}
-                            onChange={(e) => setPatientId(e.target.value)}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="initials">Patient Initials *</Label>
-                          <Input
-                            id="initials"
-                            placeholder="e.g., J.D."
-                            value={patientInitials}
-                            onChange={(e) => setPatientInitials(e.target.value)}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Dose Instructions */}
+                    {/* Patient Information */}
+                    <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-2">
-                        <Label htmlFor="dose">Dose Instructions *</Label>
+                        <Label htmlFor="patientId">Patient ID *</Label>
                         <Input
-                          id="dose"
-                          placeholder="e.g., 1 tab, PRN, 1 gtt"
-                          value={dose}
-                          onChange={(e) => setDose(e.target.value)}
+                          id="patientId"
+                          placeholder="e.g., 2025-196"
+                          value={patientId}
+                          onChange={(e) => setPatientId(e.target.value)}
                         />
                       </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="initials">Patient Initials *</Label>
+                        <Input
+                          id="initials"
+                          placeholder="e.g., J.D."
+                          value={patientInitials}
+                          onChange={(e) => setPatientInitials(e.target.value)}
+                        />
+                      </div>
+                    </div>
 
-                      {/* Multi-Lot Selection */}
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <Label>Lots to Dispense *</Label>
-                          <p className="text-sm text-muted-foreground">
-                            Total: {medication.currentStock} units
-                          </p>
-                        </div>
+                    {/* Dose Instructions */}
+                    <div className="space-y-2">
+                      <Label htmlFor="dose">Dose Instructions *</Label>
+                      <Input
+                        id="dose"
+                        placeholder="e.g., 1 tab, PRN, 1 gtt"
+                        value={dose}
+                        onChange={(e) => setDose(e.target.value)}
+                      />
+                    </div>
 
-                        {selectedLots.map((lot, index) => {
-                          const inventoryLot = availableLots.find(
-                            (l) => l.lotNumber === lot.lotNumber,
-                          );
-                          const lotSelectId = `lot-select-${index}`;
-                          const lotQuantityId = `lot-quantity-${index}`;
-                          return (
-                            <div
-                              key={index}
-                              className="flex gap-2 items-start p-3 border rounded-md bg-muted/30"
-                            >
-                              <div className="flex-1 space-y-2">
+                    {/* Multi-Lot Selection */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label>Lots to Dispense *</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Total: {medication.currentStock} units
+                        </p>
+                      </div>
+
+                      {selectedLots.map((lot, index) => {
+                        const inventoryLot = availableLots.find(l => l.lotNumber === lot.lotNumber);
+                        const lotSelectId = `lot-select-${index}`;
+                        const lotQuantityId = `lot-quantity-${index}`;
+                        return (
+                          <div key={index} className="flex gap-2 items-start p-3 border rounded-md bg-muted/30">
+                            <div className="flex-1 space-y-2">
+                              <div className="space-y-1">
+                                <Label htmlFor={lotSelectId} className="text-xs">Lot Number</Label>
+                                <Select
+                                  value={lot.lotNumber}
+                                  onValueChange={(value: string) => updateLotSelection(index, 'lotNumber', value)}
+                                >
+                                  <SelectTrigger id={lotSelectId} className="h-9">
+                                    <SelectValue placeholder="Select lot" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {availableLots.map(availLot => (
+                                      <SelectItem key={availLot.lotNumber} value={availLot.lotNumber}>
+                                        {availLot.lotNumber} - Exp: {availLot.expirationDate.toLocaleDateString()} - Qty: {availLot.quantity}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
                                 <div className="space-y-1">
-                                  <Label htmlFor={lotSelectId} className="text-xs">
-                                    Lot Number
-                                  </Label>
-                                  <Select
-                                    value={lot.lotNumber}
-                                    onValueChange={(value: string) =>
-                                      updateLotSelection(index, 'lotNumber', value)
-                                    }
-                                  >
-                                    <SelectTrigger id={lotSelectId} className="h-9">
-                                      <SelectValue placeholder="Select lot" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {availableLots.map((availLot) => (
-                                        <SelectItem
-                                          key={availLot.lotNumber}
-                                          value={availLot.lotNumber}
-                                        >
-                                          {availLot.lotNumber} - Exp:{' '}
-                                          {availLot.expirationDate.toLocaleDateString()} - Qty:{' '}
-                                          {availLot.quantity}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
+                                  <Label htmlFor={lotQuantityId} className="text-xs">Quantity</Label>
+                                  <Input
+                                    id={lotQuantityId}
+                                    type="number"
+                                    min="0"
+                                    max={inventoryLot?.quantity || 9999}
+                                    value={lot.quantity || ''}
+                                    onChange={(e) => updateLotSelection(index, 'quantity', e.target.value)}
+                                    placeholder="0"
+                                    className="h-9"
+                                  />
                                 </div>
-                                <div className="grid grid-cols-2 gap-2">
-                                  <div className="space-y-1">
-                                    <Label htmlFor={lotQuantityId} className="text-xs">
-                                      Quantity
-                                    </Label>
-                                    <Input
-                                      id={lotQuantityId}
-                                      type="number"
-                                      min="0"
-                                      max={inventoryLot?.quantity || 9999}
-                                      value={lot.quantity || ''}
-                                      onChange={(e) =>
-                                        updateLotSelection(index, 'quantity', e.target.value)
-                                      }
-                                      placeholder="0"
-                                      className="h-9"
-                                    />
-                                  </div>
-                                  <div className="space-y-1">
-                                    <Label className="text-xs">Available</Label>
-                                    <p className="text-sm font-medium py-2">
-                                      {inventoryLot ? `${inventoryLot.quantity} units` : '-'}
-                                    </p>
-                                  </div>
+                                <div className="space-y-1">
+                                  <Label className="text-xs">Available</Label>
+                                  <p className="text-sm font-medium py-2">
+                                    {inventoryLot ? `${inventoryLot.quantity} units` : '-'}
+                                  </p>
                                 </div>
                               </div>
-                              {selectedLots.length > 1 && (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => removeLotSelection(index)}
-                                  className="h-9 px-2 text-destructive hover:text-destructive"
-                                >
-                                  <Trash2 className="size-4" />
-                                </Button>
-                              )}
                             </div>
-                          );
-                        })}
+                            {selectedLots.length > 1 && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeLotSelection(index)}
+                                className="h-9 px-2 text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="size-4" />
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })}
 
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={addLotSelection}
-                          className="w-full"
-                        >
-                          <Plus className="size-4 mr-2" />
-                          Add Another Lot
-                        </Button>
-                      </div>
-
-                      {/* Provider Information */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-2">
-                          <Label htmlFor="physician">Physician Name *</Label>
-                          <Input
-                            id="physician"
-                            placeholder="e.g., Dr. Smith"
-                            value={physicianName}
-                            onChange={(e) => setPhysicianName(e.target.value)}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="student">Student Name</Label>
-                          <Input
-                            id="student"
-                            placeholder="e.g., Jane Doe (optional)"
-                            value={studentName}
-                            onChange={(e) => setStudentName(e.target.value)}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Clinic Site */}
-                      <div className="space-y-2">
-                        <Label htmlFor="clinic-site">Clinic Site</Label>
-                        <Input
-                          id="clinic-site"
-                          placeholder="e.g., Bainbridge, Moultrie, etc."
-                          value={clinicSite}
-                          onChange={(e) => setClinicSite(e.target.value)}
-                        />
-                      </div>
-
-                      {/* Notes */}
-                      <div className="space-y-2">
-                        <Label htmlFor="notes">Notes</Label>
-                        <Textarea
-                          id="notes"
-                          placeholder="Optional notes..."
-                          value={notes}
-                          onChange={(e) => setNotes(e.target.value)}
-                          rows={2}
-                        />
-                      </div>
-
-                      <Button onClick={handleDispense} className="w-full">
-                        Confirm Dispensing
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={addLotSelection}
+                        className="w-full"
+                      >
+                        <Plus className="size-4 mr-2" />
+                        Add Another Lot
                       </Button>
+                    </div>
+
+                    {/* Provider Information */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="physician">Physician Name *</Label>
+                        <Input
+                          id="physician"
+                          placeholder="e.g., Dr. Smith"
+                          value={physicianName}
+                          onChange={(e) => setPhysicianName(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="student">Student Name</Label>
+                        <Input
+                          id="student"
+                          placeholder="e.g., Jane Doe (optional)"
+                          value={studentName}
+                          onChange={(e) => setStudentName(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Clinic Site */}
+                    <div className="space-y-2">
+                      <Label htmlFor="clinic-site">Clinic Site</Label>
+                      <Input
+                        id="clinic-site"
+                        placeholder="e.g., Bainbridge, Moultrie, etc."
+                        value={clinicSite}
+                        onChange={(e) => setClinicSite(e.target.value)}
+                      />
+                    </div>
+
+                    {/* Notes */}
+                    <div className="space-y-2">
+                      <Label htmlFor="notes">Notes</Label>
+                      <Textarea
+                        id="notes"
+                        placeholder="Optional notes..."
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        rows={2}
+                      />
+                    </div>
+
+                    <Button onClick={handleDispense} className="w-full">
+                      Confirm Dispensing
+                    </Button>
                     </div>
                   </div>
                 </DialogContent>
@@ -523,7 +489,7 @@ export function MedicationDetail({
             <div>
               <Label className="text-sm font-medium">Common Uses</Label>
               <div className="flex flex-wrap gap-1 mt-1">
-                {medication.commonUses.map((use) => (
+                {medication.commonUses.map(use => (
                   <Badge key={use} variant="secondary" className="text-xs">
                     {use}
                   </Badge>
@@ -533,7 +499,7 @@ export function MedicationDetail({
             <div>
               <Label className="text-sm font-medium">Contraindications</Label>
               <div className="space-y-1 mt-1">
-                {medication.contraindications.map((contra) => (
+                {medication.contraindications.map(contra => (
                   <div key={contra} className="flex items-center gap-2">
                     <AlertCircle className="size-3 text-amber-500" />
                     <span className="text-sm">{contra}</span>
@@ -564,11 +530,13 @@ export function MedicationDetail({
         <CardContent>
           {medicationInventory.length > 0 ? (
             <div className="space-y-2">
-              {medicationInventory.map((inv) => (
+              {medicationInventory.map(inv => (
                 <div key={inv.id} className="flex items-center justify-between p-3 border rounded">
                   <div className="flex-1">
                     <p className="font-medium">Lot: {inv.lotNumber}</p>
-                    <p className="text-sm text-muted-foreground">Quantity: {inv.quantity} units</p>
+                    <p className="text-sm text-muted-foreground">
+                      Quantity: {inv.quantity} units
+                    </p>
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="text-right">
@@ -624,36 +592,33 @@ export function MedicationDetail({
       </Card>
 
       {/* Alternatives */}
-      {(!medication.isAvailable || medication.currentStock <= medication.minStock) &&
-        alternatives.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Alternative Medications</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {alternatives.map((alt) => (
-                  <div
-                    key={alt.id}
-                    className="flex items-center justify-between p-3 border rounded cursor-pointer hover:bg-muted/50"
-                    onClick={() => onSelectAlternative(alt)}
-                  >
-                    <div>
-                      <p className="font-medium">
-                        {alt.name} {alt.strength}
-                      </p>
-                      <p className="text-sm text-muted-foreground">{alt.genericName}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium text-green-600">{alt.currentStock} available</p>
-                      <p className="text-xs text-muted-foreground">Click to view</p>
-                    </div>
+      {(!medication.isAvailable || medication.currentStock <= medication.minStock) && alternatives.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Alternative Medications</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {alternatives.map(alt => (
+                <div 
+                  key={alt.id}
+                  className="flex items-center justify-between p-3 border rounded cursor-pointer hover:bg-muted/50"
+                  onClick={() => onSelectAlternative(alt)}
+                >
+                  <div>
+                    <p className="font-medium">{alt.name} {alt.strength}</p>
+                    <p className="text-sm text-muted-foreground">{alt.genericName}</p>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                  <div className="text-right">
+                    <p className="font-medium text-green-600">{alt.currentStock} available</p>
+                    <p className="text-xs text-muted-foreground">Click to view</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Lot Edit/Add Dialog */}
       <Dialog open={isLotDialogOpen} onOpenChange={setIsLotDialogOpen}>
@@ -695,7 +660,9 @@ export function MedicationDetail({
               <Button variant="outline" onClick={() => setIsLotDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleSaveLot}>{editingLot ? 'Update' : 'Add'} Lot</Button>
+              <Button onClick={handleSaveLot}>
+                {editingLot ? 'Update' : 'Add'} Lot
+              </Button>
             </div>
           </div>
         </DialogContent>

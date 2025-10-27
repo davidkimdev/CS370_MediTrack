@@ -3,7 +3,6 @@ import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
 import { Wifi, WifiOff, RefreshCw, Check, AlertCircle } from 'lucide-react';
-import { logger } from '../utils/logger';
 // Temporarily disabled problematic sonner import
 // import { toast } from 'sonner@2.0.3';
 
@@ -20,8 +19,8 @@ export function OfflineSync({ pendingChanges, onSync }: OfflineSyncProps) {
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
-      logger.info('Connection restored');
-
+      console.log('Connection restored');
+      
       // Auto-sync when coming back online if there are pending changes
       if (pendingChanges > 0) {
         handleSync();
@@ -30,7 +29,7 @@ export function OfflineSync({ pendingChanges, onSync }: OfflineSyncProps) {
 
     const handleOffline = () => {
       setIsOnline(false);
-      logger.info('Connection lost - working offline');
+      console.log('Connection lost - working offline');
     };
 
     window.addEventListener('online', handleOnline);
@@ -44,7 +43,7 @@ export function OfflineSync({ pendingChanges, onSync }: OfflineSyncProps) {
 
   const handleSync = async () => {
     if (!isOnline) {
-      logger.warn('Cannot sync while offline');
+      console.log('Cannot sync while offline');
       return;
     }
 
@@ -52,9 +51,9 @@ export function OfflineSync({ pendingChanges, onSync }: OfflineSyncProps) {
     try {
       await onSync();
       setLastSyncTime(new Date());
-      logger.info('Data synced successfully');
+      console.log('Data synced successfully');
     } catch (error) {
-      logger.warn('Sync failed - will retry automatically', error);
+      console.log('Sync failed - will retry automatically');
     } finally {
       setIsSyncing(false);
     }
@@ -64,13 +63,13 @@ export function OfflineSync({ pendingChanges, onSync }: OfflineSyncProps) {
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / (1000 * 60));
-
+    
     if (diffMins < 1) return 'Just now';
     if (diffMins < 60) return `${diffMins}m ago`;
-
+    
     const diffHours = Math.floor(diffMins / 60);
     if (diffHours < 24) return `${diffHours}h ago`;
-
+    
     return date.toLocaleDateString();
   };
 
@@ -89,7 +88,7 @@ export function OfflineSync({ pendingChanges, onSync }: OfflineSyncProps) {
                 {isOnline ? 'Online' : 'Offline'}
               </span>
             </div>
-
+            
             <div className="flex items-center gap-2 min-w-0">
               {pendingChanges > 0 && (
                 <Badge variant="secondary" className="flex items-center gap-1 text-xs">
@@ -98,7 +97,7 @@ export function OfflineSync({ pendingChanges, onSync }: OfflineSyncProps) {
                   <span className="xs:hidden">{pendingChanges}</span>
                 </Badge>
               )}
-
+              
               {lastSyncTime && (
                 <span className="text-xs sm:text-sm text-muted-foreground truncate">
                   <span className="hidden sm:inline">Last sync: </span>
@@ -107,7 +106,7 @@ export function OfflineSync({ pendingChanges, onSync }: OfflineSyncProps) {
               )}
             </div>
           </div>
-
+          
           <div className="flex items-center gap-2 flex-shrink-0">
             {isOnline && pendingChanges > 0 && (
               <Button
@@ -126,7 +125,7 @@ export function OfflineSync({ pendingChanges, onSync }: OfflineSyncProps) {
                 <span className="sm:hidden">Sync</span>
               </Button>
             )}
-
+            
             {isOnline && pendingChanges === 0 && (
               <div className="flex items-center text-green-600 text-xs sm:text-sm">
                 <Check className="size-3 sm:size-4 mr-1" />
@@ -136,7 +135,7 @@ export function OfflineSync({ pendingChanges, onSync }: OfflineSyncProps) {
             )}
           </div>
         </div>
-
+        
         {!isOnline && (
           <div className="mt-2 text-xs sm:text-sm text-muted-foreground">
             Changes will be saved locally and synced when connection is restored.

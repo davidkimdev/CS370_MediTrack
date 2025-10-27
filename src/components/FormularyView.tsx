@@ -1,11 +1,11 @@
 import { useState, useMemo } from 'react';
-import { Card, CardContent } from './ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Skeleton } from './ui/skeleton';
-import { AlertTriangle, CheckCircle, Package, Search, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Package, Search, Filter, X } from 'lucide-react';
 import { Medication } from '../types/medication';
 
 interface FormularyViewProps {
@@ -20,22 +20,20 @@ export function FormularyView({ medications, onMedicationSelect }: FormularyView
   const [isLoading, setIsLoading] = useState(false);
 
   const categories = useMemo(() => {
-    const cats = Array.from(new Set(medications.map((med) => med.category)));
+    const cats = Array.from(new Set(medications.map(med => med.category)));
     return cats.sort();
   }, [medications]);
 
   const filteredMedications = useMemo(() => {
-    return medications.filter((med) => {
-      const matchesSearch =
-        searchTerm === '' ||
+    return medications.filter(med => {
+      const matchesSearch = searchTerm === '' || 
         med.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         med.genericName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        med.commonUses.some((use) => use.toLowerCase().includes(searchTerm.toLowerCase()));
-
+        med.commonUses.some(use => use.toLowerCase().includes(searchTerm.toLowerCase()));
+      
       const matchesCategory = categoryFilter === 'all' || med.category === categoryFilter;
-
-      const matchesAvailability =
-        availabilityFilter === 'all' ||
+      
+      const matchesAvailability = availabilityFilter === 'all' ||
         (availabilityFilter === 'available' && med.isAvailable) ||
         (availabilityFilter === 'low' && med.isAvailable && med.currentStock <= med.minStock) ||
         (availabilityFilter === 'out' && !med.isAvailable);
@@ -66,17 +64,14 @@ export function FormularyView({ medications, onMedicationSelect }: FormularyView
     setAvailabilityFilter('all');
   };
 
-  const hasActiveFilters =
-    searchTerm !== '' || categoryFilter !== 'all' || availabilityFilter !== 'all';
+  const hasActiveFilters = searchTerm !== '' || categoryFilter !== 'all' || availabilityFilter !== 'all';
 
   // Quick stats
   const stats = useMemo(() => {
-    const available = medications.filter((med) => med.isAvailable).length;
-    const lowStock = medications.filter(
-      (med) => med.isAvailable && med.currentStock <= med.minStock,
-    ).length;
-    const outOfStock = medications.filter((med) => !med.isAvailable).length;
-
+    const available = medications.filter(med => med.isAvailable).length;
+    const lowStock = medications.filter(med => med.isAvailable && med.currentStock <= med.minStock).length;
+    const outOfStock = medications.filter(med => !med.isAvailable).length;
+    
     return { available, lowStock, outOfStock, total: medications.length };
   }, [medications]);
 
@@ -159,7 +154,7 @@ export function FormularyView({ medications, onMedicationSelect }: FormularyView
             </Button>
           )}
         </div>
-
+        
         <div className="flex flex-col sm:flex-row gap-2">
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
             <SelectTrigger className="w-full sm:w-[140px]">
@@ -167,14 +162,12 @@ export function FormularyView({ medications, onMedicationSelect }: FormularyView
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Categories</SelectItem>
-              {categories.map((category) => (
-                <SelectItem key={category} value={category}>
-                  {category}
-                </SelectItem>
+              {categories.map(category => (
+                <SelectItem key={category} value={category}>{category}</SelectItem>
               ))}
             </SelectContent>
           </Select>
-
+          
           <Select value={availabilityFilter} onValueChange={setAvailabilityFilter}>
             <SelectTrigger className="w-full sm:w-[120px]">
               <SelectValue placeholder="Status" />
@@ -188,7 +181,12 @@ export function FormularyView({ medications, onMedicationSelect }: FormularyView
           </Select>
 
           {hasActiveFilters && (
-            <Button variant="outline" size="icon" onClick={clearFilters} className="flex-shrink-0">
+            <Button 
+              variant="outline" 
+              size="icon"
+              onClick={clearFilters}
+              className="flex-shrink-0"
+            >
               <X className="size-4" />
             </Button>
           )}
@@ -199,9 +197,7 @@ export function FormularyView({ medications, onMedicationSelect }: FormularyView
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Package className="size-4" />
-          <span>
-            {filteredMedications.length} of {medications.length} medications
-          </span>
+          <span>{filteredMedications.length} of {medications.length} medications</span>
         </div>
         {hasActiveFilters && (
           <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs">
@@ -212,13 +208,13 @@ export function FormularyView({ medications, onMedicationSelect }: FormularyView
 
       {/* Medication List */}
       <div className="space-y-2">
-        {filteredMedications.map((medication) => {
+        {filteredMedications.map(medication => {
           const stockStatus = getStockStatus(medication);
           const StockIcon = stockStatus.icon;
 
           return (
-            <Card
-              key={medication.id}
+            <Card 
+              key={medication.id} 
               className="cursor-pointer hover:shadow-md transition-all duration-200 active:scale-[0.98]"
               onClick={() => onMedicationSelect(medication)}
             >
@@ -226,28 +222,22 @@ export function FormularyView({ medications, onMedicationSelect }: FormularyView
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-medium truncate text-sm sm:text-base">
-                        {medication.name}
-                      </h3>
+                      <h3 className="font-medium truncate text-sm sm:text-base">{medication.name}</h3>
                       <Badge variant="secondary" className="text-xs flex-shrink-0">
                         {medication.strength}
                       </Badge>
                     </div>
-
+                    
                     <p className="text-xs sm:text-sm text-muted-foreground mb-2 truncate">
                       {medication.genericName} • {medication.dosageForm}
                     </p>
-
+                    
                     <div className="flex flex-wrap items-center gap-1 mb-2">
                       <Badge variant="outline" className="text-xs">
                         {medication.category}
                       </Badge>
-                      {medication.commonUses.slice(0, 1).map((use) => (
-                        <Badge
-                          key={use}
-                          variant="outline"
-                          className="text-xs bg-blue-50 hidden sm:inline-flex"
-                        >
+                      {medication.commonUses.slice(0, 1).map(use => (
+                        <Badge key={use} variant="outline" className="text-xs bg-blue-50 hidden sm:inline-flex">
                           {use}
                         </Badge>
                       ))}
@@ -263,13 +253,11 @@ export function FormularyView({ medications, onMedicationSelect }: FormularyView
                       )}
                     </div>
                   </div>
-
+                  
                   <div className="flex flex-col items-end gap-1 flex-shrink-0">
                     <div className="flex items-center gap-1">
                       <StockIcon className="size-3 sm:size-4" />
-                      <span
-                        className={`font-bold text-sm sm:text-base ${getStockColor(medication)}`}
-                      >
+                      <span className={`font-bold text-sm sm:text-base ${getStockColor(medication)}`}>
                         {medication.currentStock}
                       </span>
                     </div>
@@ -283,7 +271,7 @@ export function FormularyView({ medications, onMedicationSelect }: FormularyView
           );
         })}
       </div>
-
+      
       {filteredMedications.length === 0 && (
         <div className="text-center py-12 text-muted-foreground">
           <Package className="size-16 mx-auto mb-4 opacity-30" />

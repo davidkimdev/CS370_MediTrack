@@ -1,22 +1,13 @@
 import { useState, useMemo } from 'react';
-import { Card, CardContent } from './ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import {
-  AlertTriangle,
-  CheckCircle,
-  Edit,
-  Package,
-  Plus,
-  Search,
-  TrendingDown,
-  Upload,
-} from 'lucide-react';
+import { AlertTriangle, CheckCircle, Edit, Package, Plus, Search, TrendingDown, TrendingUp, Upload } from 'lucide-react';
 import { Medication, User, InventoryItem } from '../types/medication';
 import { formatDateEST } from '../utils/timezone';
 import { BulkImportDialog, ImportedMedicationRow } from './BulkImportDialog';
@@ -33,13 +24,7 @@ interface StockManagementProps {
   onAddLot: (lot: Omit<InventoryItem, 'id' | 'isExpired'>) => Promise<void>;
 }
 
-export function StockManagement({
-  medications,
-  inventory,
-  currentUser,
-  onUpdateLot,
-  onAddLot,
-}: StockManagementProps) {
+export function StockManagement({ medications, inventory, currentUser, onUpdateLot, onAddLot }: StockManagementProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedMedication, setSelectedMedication] = useState<Medication | null>(null);
@@ -56,7 +41,7 @@ export function StockManagement({
     { value: 'all', label: 'All Items' },
     { value: 'low', label: 'Low Stock' },
     { value: 'out', label: 'Out of Stock' },
-    { value: 'good', label: 'Good Stock' },
+    { value: 'good', label: 'Good Stock' }
   ];
 
   const reasonOptions = [
@@ -65,23 +50,22 @@ export function StockManagement({
     'Expired medications removed',
     'Damaged items removed',
     'Inventory count correction',
-    'Other',
+    'Other'
   ];
 
   const filteredMedications = useMemo(() => {
     let filtered = medications;
 
     if (searchTerm) {
-      filtered = filtered.filter(
-        (med) =>
-          med.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          med.genericName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          med.category.toLowerCase().includes(searchTerm.toLowerCase()),
+      filtered = filtered.filter(med =>
+        med.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        med.genericName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        med.category.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
     if (statusFilter !== 'all') {
-      filtered = filtered.filter((med) => {
+      filtered = filtered.filter(med => {
         switch (statusFilter) {
           case 'low':
             return med.isAvailable && med.currentStock <= med.minStock;
@@ -99,17 +83,17 @@ export function StockManagement({
       // Sort by urgency: out of stock first, then low stock, then by name
       if (!a.isAvailable && b.isAvailable) return -1;
       if (a.isAvailable && !b.isAvailable) return 1;
-
+      
       const aLow = a.currentStock <= a.minStock;
       const bLow = b.currentStock <= b.minStock;
       if (aLow && !bLow) return -1;
       if (!aLow && bLow) return 1;
-
+      
       return a.name.localeCompare(b.name);
     });
   }, [medications, searchTerm, statusFilter]);
 
-  const medicationLots = useMemo(() => {
+const medicationLots = useMemo(() => {
     if (!selectedMedication) return [] as InventoryItem[];
     return inventory
       .filter((lot) => lot.medicationId === selectedMedication.id)
@@ -186,22 +170,20 @@ export function StockManagement({
     try {
       // Call the database service to bulk import inventory
       const result = await MedicationService.bulkImportInventory(
-        items.map((item) => ({
+        items.map(item => ({
           name: item.name,
           strength: item.strength,
           quantity: item.quantity,
           lotNumber: item.lotNumber,
           expirationDate: item.expirationDate,
-          dosageForm: 'tablet', // Default, can be extracted from file if needed
+          dosageForm: 'tablet' // Default, can be extracted from file if needed
         })),
         '', // siteId - will use default active site
-        currentUser.id, // userId
+        currentUser.id // userId
       );
 
       if (result.success > 0) {
-        alert(
-          `Successfully imported ${result.success} items!\n${result.failed > 0 ? `Failed: ${result.failed} items` : ''}`,
-        );
+        alert(`Successfully imported ${result.success} items!\n${result.failed > 0 ? `Failed: ${result.failed} items` : ''}`);
 
         // Refresh the page to show updated inventory
         window.location.reload();
@@ -214,10 +196,8 @@ export function StockManagement({
     }
   };
 
-  const lowStockCount = medications.filter(
-    (med) => med.isAvailable && med.currentStock <= med.minStock,
-  ).length;
-  const outOfStockCount = medications.filter((med) => !med.isAvailable).length;
+  const lowStockCount = medications.filter(med => med.isAvailable && med.currentStock <= med.minStock).length;
+  const outOfStockCount = medications.filter(med => !med.isAvailable).length;
   const totalMedications = medications.length;
 
   return (
@@ -237,7 +217,11 @@ export function StockManagement({
             <Plus className="size-4" />
             Add New Lot
           </Button>
-          <Button variant="default" onClick={() => setIsImportDialogOpen(true)} className="gap-2">
+          <Button
+            variant="default"
+            onClick={() => setIsImportDialogOpen(true)}
+            className="gap-2"
+          >
             <Upload className="size-4" />
             Bulk Import
           </Button>
@@ -260,7 +244,7 @@ export function StockManagement({
             </div>
           </CardContent>
         </Card>
-
+        
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -272,7 +256,7 @@ export function StockManagement({
             </div>
           </CardContent>
         </Card>
-
+        
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -302,7 +286,7 @@ export function StockManagement({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {statusOptions.map((option) => (
+            {statusOptions.map(option => (
               <SelectItem key={option.value} value={option.value}>
                 {option.label}
               </SelectItem>
@@ -328,10 +312,10 @@ export function StockManagement({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredMedications.map((medication) => {
+                {filteredMedications.map(medication => {
                   const stockStatus = getStockStatus(medication);
                   const StatusIcon = stockStatus.icon;
-
+                  
                   return (
                     <TableRow key={medication.id}>
                       <TableCell>
@@ -349,7 +333,9 @@ export function StockManagement({
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <span className="text-lg font-bold">{medication.currentStock}</span>
+                          <span className="text-lg font-bold">
+                            {medication.currentStock}
+                          </span>
                           {medication.currentStock <= medication.minStock && (
                             <TrendingDown className="size-4 text-orange-500" />
                           )}
@@ -365,7 +351,9 @@ export function StockManagement({
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <StatusIcon className="size-4" />
-                          <Badge variant={stockStatus.color as any}>{stockStatus.status}</Badge>
+                          <Badge variant={stockStatus.color as any}>
+                            {stockStatus.status}
+                          </Badge>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -374,7 +362,7 @@ export function StockManagement({
                           <br />
                           {medication.lastUpdated.toLocaleTimeString([], {
                             hour: '2-digit',
-                            minute: '2-digit',
+                            minute: '2-digit'
                           })}
                         </div>
                       </TableCell>
@@ -394,7 +382,7 @@ export function StockManagement({
               </TableBody>
             </Table>
           </div>
-
+          
           {filteredMedications.length === 0 && (
             <div className="text-center py-8 text-muted-foreground">
               <Package className="size-12 mx-auto mb-2 opacity-50" />
@@ -420,21 +408,22 @@ export function StockManagement({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Update Stock - {selectedMedication?.name}</DialogTitle>
+            <DialogTitle>
+              Update Stock - {selectedMedication?.name}
+            </DialogTitle>
           </DialogHeader>
           {selectedMedication && (
             <div className="space-y-4">
               <div className="p-3 bg-muted rounded-md">
                 <p className="text-sm font-medium">Current Information</p>
                 <p className="text-sm text-muted-foreground">
-                  Current Stock: {selectedMedication.currentStock} • Min:{' '}
-                  {selectedMedication.minStock} • Max: {selectedMedication.maxStock}
+                  Current Stock: {selectedMedication.currentStock} • 
+                  Min: {selectedMedication.minStock} • 
+                  Max: {selectedMedication.maxStock}
                 </p>
                 {selectedLot && (
                   <p className="text-sm text-muted-foreground mt-1">
-                    Selected Lot: {selectedLot.lotNumber} • Expires{' '}
-                    {formatDateEST(selectedLot.expirationDate)} • Current Quantity:{' '}
-                    {selectedLot.quantity}
+                    Selected Lot: {selectedLot.lotNumber} • Expires {formatDateEST(selectedLot.expirationDate)} • Current Quantity: {selectedLot.quantity}
                   </p>
                 )}
               </div>
@@ -469,10 +458,7 @@ export function StockManagement({
                   </Select>
                 ) : (
                   <div className="p-3 bg-muted rounded-md text-sm text-muted-foreground space-y-2">
-                    <p>
-                      No inventory lots available for this medication. Add a lot before updating its
-                      quantity.
-                    </p>
+                    <p>No inventory lots available for this medication. Add a lot before updating its quantity.</p>
                     <Button
                       variant="outline"
                       size="sm"
@@ -502,19 +488,15 @@ export function StockManagement({
                   disabled={!selectedLot || isUpdatingStock}
                 />
               </div>
-
+              
               <div className="space-y-2">
                 <Label htmlFor="reason">Reason for Update *</Label>
-                <Select
-                  value={updateReason}
-                  onValueChange={setUpdateReason}
-                  disabled={!selectedLot}
-                >
+                <Select value={updateReason} onValueChange={setUpdateReason} disabled={!selectedLot}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select reason" />
                   </SelectTrigger>
                   <SelectContent>
-                    {reasonOptions.map((reason) => (
+                    {reasonOptions.map(reason => (
                       <SelectItem key={reason} value={reason}>
                         {reason}
                       </SelectItem>
@@ -522,7 +504,7 @@ export function StockManagement({
                   </SelectContent>
                 </Select>
               </div>
-
+              
               <div className="flex gap-2">
                 <Button
                   onClick={handleUpdateStock}
@@ -531,8 +513,8 @@ export function StockManagement({
                 >
                   {isUpdatingStock ? 'Updating...' : 'Update Stock'}
                 </Button>
-                <Button
-                  variant="outline"
+                <Button 
+                  variant="outline" 
                   onClick={() => setIsUpdateDialogOpen(false)}
                   disabled={isUpdatingStock}
                 >

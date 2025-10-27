@@ -3,24 +3,18 @@ import { RotateCcw } from 'lucide-react';
 import React from 'react';
 
 // Professional toast utilities using default Sonner icons (clean black icons)
-export const showSuccessToast = (
-  message: string,
-  description?: string,
-  action?: { label: string; onClick: () => void },
-) => {
+export const showSuccessToast = (message: string, description?: string, action?: { label: string; onClick: () => void }) => {
   toast.success(message, {
     description,
-    action: action
-      ? {
-          label: (
-            <div className="flex items-center gap-2">
-              <RotateCcw className="w-3 h-3" />
-              {action.label}
-            </div>
-          ),
-          onClick: action.onClick,
-        }
-      : undefined,
+    action: action ? {
+      label: (
+        <div className="flex items-center gap-2">
+          <RotateCcw className="w-3 h-3" />
+          {action.label}
+        </div>
+      ),
+      onClick: action.onClick
+    } : undefined,
     duration: action ? 10000 : 4000, // 10 seconds if action available, 4 seconds otherwise
   });
 };

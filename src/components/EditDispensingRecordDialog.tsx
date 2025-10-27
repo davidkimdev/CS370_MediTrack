@@ -18,7 +18,7 @@ export function EditDispensingRecordDialog({
   record,
   open,
   onOpenChange,
-  onSave,
+  onSave
 }: EditDispensingRecordDialogProps) {
   const [patientId, setPatientId] = useState('');
   const [dose, setDose] = useState('');
@@ -55,7 +55,7 @@ export function EditDispensingRecordDialog({
     if (lotNumber !== record.lotNumber) updates.lotNumber = lotNumber;
     if (physicianName !== record.physicianName) updates.physicianName = physicianName;
     if (studentName !== record.studentName) updates.studentName = studentName || undefined;
-    if (clinicSite !== record.clinicSite) updates.clinicSite = clinicSite || undefined;
+  if (clinicSite !== record.clinicSite) updates.clinicSite = clinicSite || undefined;
     if (notes !== record.notes) updates.notes = notes || undefined;
 
     if (Object.keys(updates).length === 0) {
@@ -88,9 +88,7 @@ export function EditDispensingRecordDialog({
           {/* Read-only fields */}
           <div className="p-3 bg-muted rounded-md space-y-2">
             <div>
-              <Label className="text-xs text-muted-foreground">
-                Medication (cannot be changed)
-              </Label>
+              <Label className="text-xs text-muted-foreground">Medication (cannot be changed)</Label>
               <p className="text-sm font-medium">{record.medicationName}</p>
             </div>
             <div>
@@ -188,7 +186,11 @@ export function EditDispensingRecordDialog({
 
           {/* Action buttons */}
           <div className="flex justify-end gap-3 pt-4">
-            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
+            <Button
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isSaving}
+            >
               Cancel
             </Button>
             <Button

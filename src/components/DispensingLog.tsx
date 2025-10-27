@@ -1,15 +1,10 @@
 import { useState, useMemo } from 'react';
-import { Card, CardContent } from './ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from './ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Search, Download, Calendar, Package, User, ChevronDown, Edit } from 'lucide-react';
 import { DispensingRecord } from '../types/medication';
@@ -30,7 +25,7 @@ export function DispensingLog({ records, onEditRecord }: DispensingLogProps) {
     { value: 'all', label: 'All Time' },
     { value: 'today', label: 'Today' },
     { value: 'week', label: 'This Week' },
-    { value: 'month', label: 'This Month' },
+    { value: 'month', label: 'This Month' }
   ];
 
   const filteredRecords = useMemo(() => {
@@ -38,20 +33,14 @@ export function DispensingLog({ records, onEditRecord }: DispensingLogProps) {
 
     // Filter by search term
     if (searchTerm) {
-      const q = searchTerm.toLowerCase();
-      filtered = filtered.filter((record) => {
-        const med = (record.medicationName || '').toLowerCase();
-        const initials = (record.patientInitials || '').toLowerCase();
-        const by = (record.dispensedBy || '').toLowerCase();
-        const ind = (record.indication || '').toLowerCase();
-        const site = (record.clinicSite || '').toLowerCase();
-        return (
-          med.includes(q) ||
-          initials.includes(q) ||
-          by.includes(q) ||
-          ind.includes(q) ||
-          site.includes(q)
-        );
+      const q = searchTerm.toLowerCase()
+      filtered = filtered.filter(record => {
+        const med = (record.medicationName || '').toLowerCase()
+        const initials = (record.patientInitials || '').toLowerCase()
+        const by = (record.dispensedBy || '').toLowerCase()
+        const ind = (record.indication || '').toLowerCase()
+        const site = (record.clinicSite || '').toLowerCase()
+        return med.includes(q) || initials.includes(q) || by.includes(q) || ind.includes(q) || site.includes(q)
       });
     }
 
@@ -61,7 +50,7 @@ export function DispensingLog({ records, onEditRecord }: DispensingLogProps) {
       const estTodayStr = toESTDateString(new Date());
       const estToday = logDateToUTCNoon(estTodayStr);
 
-      filtered = filtered.filter((record) => {
+      filtered = filtered.filter(record => {
         const recordDate = record.dispensedAt; // already anchored for EST display
 
         switch (dateFilter) {
@@ -83,21 +72,15 @@ export function DispensingLog({ records, onEditRecord }: DispensingLogProps) {
     }
 
     return filtered.sort((a, b) => {
-      const ta =
-        a.dispensedAt instanceof Date
-          ? a.dispensedAt.getTime()
-          : new Date(a.dispensedAt as any).getTime();
-      const tb =
-        b.dispensedAt instanceof Date
-          ? b.dispensedAt.getTime()
-          : new Date(b.dispensedAt as any).getTime();
-      return tb - ta;
+      const ta = a.dispensedAt instanceof Date ? a.dispensedAt.getTime() : new Date(a.dispensedAt as any).getTime()
+      const tb = b.dispensedAt instanceof Date ? b.dispensedAt.getTime() : new Date(b.dispensedAt as any).getTime()
+      return tb - ta
     });
   }, [records, searchTerm, dateFilter]);
 
   const totalDispensed = filteredRecords.reduce((sum, record) => sum + record.quantity, 0);
-  const uniquePatients = new Set(filteredRecords.map((record) => record.patientInitials)).size;
-  const uniqueMedications = new Set(filteredRecords.map((record) => record.medicationId)).size;
+  const uniquePatients = new Set(filteredRecords.map(record => record.patientInitials)).size;
+  const uniqueMedications = new Set(filteredRecords.map(record => record.medicationId)).size;
 
   const exportToCSV = () => {
     const headers = [
@@ -113,10 +96,10 @@ export function DispensingLog({ records, onEditRecord }: DispensingLogProps) {
       'Dispensed By',
       'Clinic Site',
       'Indication',
-      'Notes',
+      'Notes'
     ];
 
-    const csvData = filteredRecords.map((record) => [
+    const csvData = filteredRecords.map(record => [
       formatDateEST(record.dispensedAt),
       record.patientId,
       record.medicationName,
@@ -129,11 +112,11 @@ export function DispensingLog({ records, onEditRecord }: DispensingLogProps) {
       record.dispensedBy,
       record.clinicSite || '',
       record.indication,
-      record.notes || '',
+      record.notes || ''
     ]);
 
     const csvContent = [headers, ...csvData]
-      .map((row) => row.map((field) => `"${field}"`).join(','))
+      .map(row => row.map(field => `"${field}"`).join(','))
       .join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -148,20 +131,20 @@ export function DispensingLog({ records, onEditRecord }: DispensingLogProps) {
   };
 
   const exportToExcel = () => {
-    const excelData = filteredRecords.map((record) => ({
-      Date: formatDateEST(record.dispensedAt),
+    const excelData = filteredRecords.map(record => ({
+      'Date': formatDateEST(record.dispensedAt),
       'Patient ID': record.patientId,
-      Medication: record.medicationName,
-      Dose: record.dose,
+      'Medication': record.medicationName,
+      'Dose': record.dose,
       'Lot Number': record.lotNumber,
-      Expiration: record.expirationDate ? formatDateEST(record.expirationDate) : '',
+      'Expiration': record.expirationDate ? formatDateEST(record.expirationDate) : '',
       'Amount Dispensed': record.quantity,
       'Physician Name': record.physicianName,
       'Student Name': record.studentName || '',
       'Dispensed By': record.dispensedBy,
       'Clinic Site': record.clinicSite || '',
-      Indication: record.indication,
-      Notes: record.notes || '',
+      'Indication': record.indication,
+      'Notes': record.notes || ''
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(excelData);
@@ -180,7 +163,7 @@ export function DispensingLog({ records, onEditRecord }: DispensingLogProps) {
       { wch: 15 }, // Lot Number
       { wch: 20 }, // Dispensed By
       { wch: 20 }, // Indication
-      { wch: 30 }, // Notes
+      { wch: 30 }  // Notes
     ];
 
     XLSX.writeFile(workbook, `dispensing-log-${new Date().toISOString().split('T')[0]}.xlsx`);
@@ -225,7 +208,7 @@ export function DispensingLog({ records, onEditRecord }: DispensingLogProps) {
             </div>
           </CardContent>
         </Card>
-
+        
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -237,7 +220,7 @@ export function DispensingLog({ records, onEditRecord }: DispensingLogProps) {
             </div>
           </CardContent>
         </Card>
-
+        
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -267,7 +250,7 @@ export function DispensingLog({ records, onEditRecord }: DispensingLogProps) {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {dateFilterOptions.map((option) => (
+            {dateFilterOptions.map(option => (
               <SelectItem key={option.value} value={option.value}>
                 {option.label}
               </SelectItem>
@@ -303,9 +286,11 @@ export function DispensingLog({ records, onEditRecord }: DispensingLogProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredRecords.map((record) => (
+                {filteredRecords.map(record => (
                   <TableRow key={record.id}>
-                    <TableCell className="text-sm">{formatDateEST(record.dispensedAt)}</TableCell>
+                    <TableCell className="text-sm">
+                      {formatDateEST(record.dispensedAt)}
+                    </TableCell>
                     <TableCell>
                       <Badge variant="outline" className="text-xs font-mono">
                         {record.patientId}
@@ -316,7 +301,9 @@ export function DispensingLog({ records, onEditRecord }: DispensingLogProps) {
                         <p className="font-medium">{record.medicationName}</p>
                       </div>
                     </TableCell>
-                    <TableCell className="text-sm">{record.dose}</TableCell>
+                    <TableCell className="text-sm">
+                      {record.dose}
+                    </TableCell>
                     <TableCell>
                       <span className="text-sm font-mono">{record.lotNumber}</span>
                     </TableCell>
@@ -326,11 +313,15 @@ export function DispensingLog({ records, onEditRecord }: DispensingLogProps) {
                     <TableCell>
                       <span className="font-medium">{record.quantity}</span>
                     </TableCell>
-                    <TableCell className="text-sm">{record.physicianName}</TableCell>
+                    <TableCell className="text-sm">
+                      {record.physicianName}
+                    </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {record.studentName || '-'}
                     </TableCell>
-                    <TableCell className="text-sm">{record.clinicSite || '-'}</TableCell>
+                    <TableCell className="text-sm">
+                      {record.clinicSite || '-'}
+                    </TableCell>
                     <TableCell className="max-w-[150px]">
                       {record.notes && (
                         <p className="text-sm text-muted-foreground truncate" title={record.notes}>
@@ -355,7 +346,7 @@ export function DispensingLog({ records, onEditRecord }: DispensingLogProps) {
               </TableBody>
             </Table>
           </div>
-
+          
           {filteredRecords.length === 0 && (
             <div className="text-center py-8 text-muted-foreground">
               <Package className="size-12 mx-auto mb-2 opacity-50" />

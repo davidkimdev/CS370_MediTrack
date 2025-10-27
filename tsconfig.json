@@ -16,12 +16,12 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "allowImportingTsExtensions": true,
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["src/*"]
-    },
-    "types": ["vite/client", "react", "react-dom"]
+  "types": ["vite/client", "react", "react-dom"]
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "src/supabase/functions/server/**"]
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 }

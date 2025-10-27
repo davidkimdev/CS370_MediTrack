@@ -16,13 +16,7 @@ interface AddLotDialogProps {
   onAddLot: (lot: Omit<InventoryItem, 'id' | 'isExpired'>) => Promise<void>;
 }
 
-export function AddLotDialog({
-  open,
-  onOpenChange,
-  medication,
-  medications,
-  onAddLot,
-}: AddLotDialogProps) {
+export function AddLotDialog({ open, onOpenChange, medication, medications, onAddLot }: AddLotDialogProps) {
   const [selectedMedication, setSelectedMedication] = useState<Medication | null>(medication);
   const [createNew, setCreateNew] = useState(false);
   const [newMedName, setNewMedName] = useState('');
@@ -165,26 +159,21 @@ export function AddLotDialog({
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <Label htmlFor="medication-select">Medication *</Label>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setCreateNew(!createNew)}
-              >
+              <Button type="button" variant="outline" size="sm" onClick={() => setCreateNew(!createNew)}>
                 {createNew ? 'Select Existing' : 'Create New'}
               </Button>
             </div>
 
             {!createNew ? (
               <div className="space-y-2">
-                <Select
-                  value={selectedMedication?.id || ''}
+                <Select 
+                  value={selectedMedication?.id || ''} 
                   onValueChange={(value: string) => {
-                    const med = medications.find((m) => m.id === value);
+                    const med = medications.find(m => m.id === value);
                     setSelectedMedication(med || null);
                   }}
                 >
-                  <SelectTrigger className={cn(errors.medication && 'border-red-500')}>
+                  <SelectTrigger className={cn(errors.medication && "border-red-500")}>
                     <SelectValue placeholder="Choose a medication" />
                   </SelectTrigger>
                   <SelectContent>
@@ -211,40 +200,21 @@ export function AddLotDialog({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-2 sm:col-span-1">
                   <Label htmlFor="new-med-name">Name *</Label>
-                  <Input
-                    id="new-med-name"
-                    value={newMedName}
-                    onChange={(e) => setNewMedName(e.target.value)}
-                    className={cn(errors.newMedName && 'border-red-500')}
-                  />
+                  <Input id="new-med-name" value={newMedName} onChange={(e) => setNewMedName(e.target.value)} className={cn(errors.newMedName && 'border-red-500')} />
                   {errors.newMedName && (
-                    <p className="text-sm text-red-500 flex items-center gap-1">
-                      <AlertCircle className="size-4" />
-                      {errors.newMedName}
-                    </p>
+                    <p className="text-sm text-red-500 flex items-center gap-1"><AlertCircle className="size-4" />{errors.newMedName}</p>
                   )}
                 </div>
                 <div className="space-y-2 sm:col-span-1">
                   <Label htmlFor="new-med-strength">Strength *</Label>
-                  <Input
-                    id="new-med-strength"
-                    value={newMedStrength}
-                    onChange={(e) => setNewMedStrength(e.target.value)}
-                    className={cn(errors.newMedStrength && 'border-red-500')}
-                  />
+                  <Input id="new-med-strength" value={newMedStrength} onChange={(e) => setNewMedStrength(e.target.value)} className={cn(errors.newMedStrength && 'border-red-500')} />
                   {errors.newMedStrength && (
-                    <p className="text-sm text-red-500 flex items-center gap-1">
-                      <AlertCircle className="size-4" />
-                      {errors.newMedStrength}
-                    </p>
+                    <p className="text-sm text-red-500 flex items-center gap-1"><AlertCircle className="size-4" />{errors.newMedStrength}</p>
                   )}
                 </div>
                 <div className="space-y-2 sm:col-span-1">
                   <Label htmlFor="new-med-form">Dosage Form</Label>
-                  <Select
-                    value={newMedDosageForm}
-                    onValueChange={(v: string) => setNewMedDosageForm(v)}
-                  >
+                  <Select value={newMedDosageForm} onValueChange={(v: string) => setNewMedDosageForm(v)}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -266,8 +236,7 @@ export function AddLotDialog({
             <div className="p-3 bg-muted rounded-md">
               <p className="text-sm font-medium">Medication Details</p>
               <p className="text-sm text-muted-foreground">
-                {selectedMedication.name} • {selectedMedication.strength} •{' '}
-                {selectedMedication.dosageForm}
+                {selectedMedication.name} • {selectedMedication.strength} • {selectedMedication.dosageForm}
               </p>
               <p className="text-sm text-muted-foreground">
                 Current Total Stock: {selectedMedication.currentStock} units
@@ -284,7 +253,7 @@ export function AddLotDialog({
                 value={lotNumber}
                 onChange={(e) => setLotNumber(e.target.value.toUpperCase())}
                 placeholder="e.g., LOT-123456-ABC"
-                className={cn(errors.lotNumber && 'border-red-500')}
+                className={cn(errors.lotNumber && "border-red-500")}
               />
               <Button
                 type="button"
@@ -313,7 +282,7 @@ export function AddLotDialog({
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
               placeholder="Enter quantity"
-              className={cn(errors.quantity && 'border-red-500')}
+              className={cn(errors.quantity && "border-red-500")}
             />
             {errors.quantity && (
               <p className="text-sm text-red-500 flex items-center gap-1">
@@ -328,59 +297,37 @@ export function AddLotDialog({
             <Label>Expiration Date *</Label>
             <div className="grid grid-cols-3 gap-2">
               <div className="space-y-1">
-                <Select
-                  value={expYear?.toString()}
-                  onValueChange={(v: string) => setExpYear(parseInt(v))}
-                >
-                  <SelectTrigger className={cn(errors.expirationDate && 'border-red-500')}>
+                <Select value={expYear?.toString()} onValueChange={(v: string) => setExpYear(parseInt(v))}>
+                  <SelectTrigger className={cn(errors.expirationDate && "border-red-500")}>
                     <SelectValue placeholder="Year" />
                   </SelectTrigger>
                   <SelectContent>
-                    {Array.from({ length: 16 }, (_, i) => new Date().getFullYear() + i).map(
-                      (year) => (
-                        <SelectItem key={year} value={year.toString()}>
-                          {year}
-                        </SelectItem>
-                      ),
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Select
-                  value={expMonth?.toString()}
-                  onValueChange={(v: string) => setExpMonth(parseInt(v))}
-                  disabled={!expYear}
-                >
-                  <SelectTrigger className={cn(errors.expirationDate && 'border-red-500')}>
-                    <SelectValue placeholder="Month" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
-                      <SelectItem key={month} value={month.toString()}>
-                        {month}
-                      </SelectItem>
+                    {Array.from({ length: 16 }, (_, i) => new Date().getFullYear() + i).map(year => (
+                      <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1">
-                <Select
-                  value={expDay?.toString()}
-                  onValueChange={(v: string) => setExpDay(parseInt(v))}
-                  disabled={!expYear || !expMonth}
-                >
-                  <SelectTrigger className={cn(errors.expirationDate && 'border-red-500')}>
+                <Select value={expMonth?.toString()} onValueChange={(v: string) => setExpMonth(parseInt(v))} disabled={!expYear}>
+                  <SelectTrigger className={cn(errors.expirationDate && "border-red-500")}>
+                    <SelectValue placeholder="Month" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
+                      <SelectItem key={month} value={month.toString()}>{month}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Select value={expDay?.toString()} onValueChange={(v: string) => setExpDay(parseInt(v))} disabled={!expYear || !expMonth}>
+                  <SelectTrigger className={cn(errors.expirationDate && "border-red-500")}>
                     <SelectValue placeholder="Day" />
                   </SelectTrigger>
                   <SelectContent>
-                    {Array.from(
-                      { length: new Date(expYear || 0, expMonth || 0, 0).getDate() },
-                      (_, i) => i + 1,
-                    ).map((day) => (
-                      <SelectItem key={day} value={day.toString()}>
-                        {day}
-                      </SelectItem>
+                    {Array.from({ length: new Date(expYear || 0, expMonth || 0, 0).getDate() }, (_, i) => i + 1).map(day => (
+                      <SelectItem key={day} value={day.toString()}>{day}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -417,10 +364,18 @@ export function AddLotDialog({
 
           {/* Actions */}
           <div className="flex gap-2 pt-4">
-            <Button onClick={handleSubmit} disabled={isSubmitting} className="flex-1">
+            <Button
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className="flex-1"
+            >
               {isSubmitting ? 'Adding...' : 'Add Lot'}
             </Button>
-            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+            <Button
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isSubmitting}
+            >
               Cancel
             </Button>
           </div>
