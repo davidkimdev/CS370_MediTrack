@@ -1,4 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
+import { useAuth } from './contexts/AuthContext';
+import { AuthenticationPage } from './components/auth/AuthenticationPage';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs';
 import { FormularyView } from './components/FormularyView';
 import { MedicationDetail } from './components/MedicationDetail';
@@ -6,47 +8,17 @@ import { DispensingLog } from './components/DispensingLog';
 import { EditDispensingRecordDialog } from './components/EditDispensingRecordDialog';
 import { StockManagement } from './components/StockManagement';
 import { OfflineSync } from './components/OfflineSync';
-import { LoginPage } from './components/LoginPage';
-import { Badge } from './components/ui/badge';
 import { Button } from './components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from './components/ui/select';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './components/ui/sheet';
-import { Pill, ClipboardList, Settings, User, Menu, LogOut } from 'lucide-react';
-import {
-  Medication,
-  DispensingRecord,
-  InventoryItem,
-  User as UserType,
-  UserRole,
-} from './types/medication';
+import { Pill, ClipboardList, Package, Menu, LogOut, User } from 'lucide-react';
+import { Medication, DispensingRecord, InventoryItem, User as UserType } from './types/medication';
 import { MedicationService } from './services/medicationService';
 import { syncService } from './services/syncService';
 import { OfflineStore } from './utils/offlineStore';
-
-const LOGIN_STORAGE_KEY = 'medtrack-net-id';
-const USER_STORAGE_KEY = 'medtrack-user-id';
-const USER_SNAPSHOT_KEY = 'medtrack-user-snapshot';
-
-const getStoredUserSnapshot = (): UserType | null => {
-  if (typeof window === 'undefined') return null;
-  const raw = window.localStorage.getItem(USER_SNAPSHOT_KEY);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as UserType;
-  } catch {
-    return null;
-  }
-};
+import { logger } from './utils/logger';
 
 export default function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [loggedInNetId, setLoggedInNetId] = useState('');
+  const { user, isLoading, signOut } = useAuth();
   const [currentView, setCurrentView] = useState<'formulary' | 'detail'>('formulary');
   const [selectedMedication, setSelectedMedication] = useState<Medication | null>(null);
   const [medications, setMedications] = useState<Medication[]>([]);
@@ -56,35 +28,46 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<UserType | null>(null);
   const [pendingChanges, setPendingChanges] = useState(0);
   const [activeTab, setActiveTab] = useState('formulary');
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingData, setIsLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingRecord, setEditingRecord] = useState<DispensingRecord | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const preferredRoleRef = useRef<UserRole | null>(null);
 
+  // Initialize currentUser when authentication completes
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const storedNetId = window.localStorage.getItem(LOGIN_STORAGE_KEY);
-    if (storedNetId) {
-      setLoggedInNetId(storedNetId);
-      setIsLoggedIn(true);
+    if (user && !currentUser) {
+      const defaultUser: UserType = {
+        id: user.id,
+        name: user.email?.split('@')[0] || 'User',
+        role: 'pharmacy_staff', // Default to pharmacy_staff for now
+        initials: user.email?.substring(0, 2).toUpperCase() || 'US'
+      };
+      setCurrentUser(defaultUser);
     }
-  }, []);
+  }, [user, currentUser]);
 
-  // Load initial data from Supabase (online) or IndexedDB (offline fallback)
+  // Load medications when user is authenticated
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
+    if (user && !isLoading) {
+      loadInitialData();
+    }
+  }, [user, isLoading]);
 
-        let medicationsData: Medication[] = [];
-        let dispensingData: DispensingRecord[] = [];
-        let inventoryData: InventoryItem[] = [];
-        let usersData: UserType[] = [];
+  const loadInitialData = async () => {
+    try {
+      setIsLoadingData(true);
+      setError(null);
+      
+      console.log('🔄 Loading all data...');
+      
+      let medicationsData: Medication[] = [];
+      let dispensingData: DispensingRecord[] = [];
+      let inventoryData: InventoryItem[] = [];
+      let usersData: UserType[] = [];
 
-        if (navigator.onLine) {
-          // Online: fetch fresh and prime cache; start realtime
+      if (navigator.onLine) {
+        // Online: fetch fresh data and start realtime sync
+        try {
           [medicationsData, dispensingData, inventoryData, usersData] = await Promise.all([
             MedicationService.getAllMedications(),
             MedicationService.getAllDispensingRecords(),
@@ -92,130 +75,42 @@ export default function App() {
             MedicationService.getAllUsers(),
           ]);
           syncService.startMedicationsRealtime();
-        } else {
-          // Offline: use cached meds and empty logs/inventory/users (or keep last)
+        } catch (err) {
+          console.warn('Online fetch failed, trying offline cache:', err);
+          // Fallback to offline data
           medicationsData = await OfflineStore.getAllMedications();
           dispensingData = [];
           inventoryData = [];
           usersData = [];
         }
-
-        if (usersData.length === 0) {
-          const storedUser = getStoredUserSnapshot();
-          if (storedUser) {
-            usersData = [storedUser];
-          }
-        }
-
-        setMedications(medicationsData);
-        setDispensingRecords(dispensingData);
-        setInventory(inventoryData);
-        setUsers(usersData);
-
-        setPendingChanges(0);
-      } catch (err) {
-        console.error('Error loading data:', err);
-        // Offline fallback if network error: try cache
-        try {
-          const cachedMeds = await OfflineStore.getAllMedications();
-          if (cachedMeds.length > 0) {
-            setMedications(cachedMeds);
-            setDispensingRecords([]);
-            setInventory([]);
-            const fallbackUser = getStoredUserSnapshot();
-            setUsers(fallbackUser ? [fallbackUser] : []);
-            setError(null);
-          } else {
-            setError('Failed to load data from database. Please try again.');
-          }
-        } catch (e) {
-          setError('Failed to load data from database. Please try again.');
-        }
-      } finally {
-        setIsLoading(false);
+      } else {
+        // Offline: use cached data
+        medicationsData = await OfflineStore.getAllMedications();
+        dispensingData = [];
+        inventoryData = [];
+        usersData = [];
       }
-    };
-
-    loadData();
-    // Initialize pending changes count from offline queue
-    (async () => {
-      const count = await OfflineStore.getPendingCount();
-      setPendingChanges(count);
-    })();
-    // Update pending count on connectivity changes
-    const updatePending = async () => setPendingChanges(await OfflineStore.getPendingCount());
-    window.addEventListener('online', updatePending);
-    window.addEventListener('offline', updatePending);
-    return () => {
-      window.removeEventListener('online', updatePending);
-      window.removeEventListener('offline', updatePending);
-      syncService.stopRealtime();
-    };
-  }, []);
-
-  const handleLogin = (netId: string, preferredRole: UserRole) => {
-    setLoggedInNetId(netId);
-    setIsLoggedIn(true);
-    preferredRoleRef.current = preferredRole;
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(LOGIN_STORAGE_KEY, netId);
-    }
-    console.log(`User logged in: ${netId}`);
-  };
-
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-    setLoggedInNetId('');
-    setCurrentView('formulary');
-    setSelectedMedication(null);
-    setActiveTab('formulary');
-    if (typeof window !== 'undefined') {
-      window.localStorage.removeItem(LOGIN_STORAGE_KEY);
-    }
-    console.log('User logged out');
-  };
-
-  useEffect(() => {
-    if (!isLoggedIn || users.length === 0) return;
-
-    setCurrentUser((prev) => {
-      if (prev) return prev;
-
-      const storedUserId =
-        typeof window !== 'undefined' ? window.localStorage.getItem(USER_STORAGE_KEY) : null;
-      let nextUser = storedUserId ? users.find((u) => u.id === storedUserId) : undefined;
-
-      if (!nextUser && preferredRoleRef.current) {
-        nextUser = users.find((u) => u.role === preferredRoleRef.current);
-      }
-
-      if (!nextUser) {
-        nextUser = users.find((u) => u.role === 'pharmacy_staff') || users[0];
-      }
-
-      if (nextUser && typeof window !== 'undefined') {
-        window.localStorage.setItem(USER_STORAGE_KEY, nextUser.id);
-      }
-
-      preferredRoleRef.current = nextUser?.role ?? preferredRoleRef.current;
-      return nextUser || null;
-    });
-  }, [isLoggedIn, users]);
-
-  const handleUserSwitch = (userId: string) => {
-    const user = users.find((u) => u.id === userId);
-    if (!user) return;
-    setCurrentUser(user);
-    preferredRoleRef.current = user.role;
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(USER_STORAGE_KEY, user.id);
+      
+      setMedications(medicationsData);
+      setDispensingRecords(dispensingData);
+      setInventory(inventoryData);
+      setUsers(usersData);
+      setPendingChanges(0);
+      
+      logger.info('All data loaded successfully', { 
+        medications: medicationsData.length,
+        dispensingRecords: dispensingData.length,
+        inventory: inventoryData.length,
+        users: usersData.length
+      });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load data';
+      setError(errorMessage);
+      logger.error('Failed to load initial data', err instanceof Error ? err : new Error(String(err)));
+    } finally {
+      setIsLoadingData(false);
     }
   };
-
-  useEffect(() => {
-    if (!currentUser || typeof window === 'undefined') return;
-    window.localStorage.setItem(USER_SNAPSHOT_KEY, JSON.stringify(currentUser));
-  }, [currentUser]);
 
   const handleMedicationSelect = (medication: Medication) => {
     setSelectedMedication(medication);
@@ -227,7 +122,14 @@ export default function App() {
     setSelectedMedication(null);
   };
 
-  const handleDispense = async (record: Omit<DispensingRecord, 'id'>) => {
+  const getAlternatives = (medication: Medication): Medication[] => {
+    return medications.filter(m => 
+      medication.alternatives.includes(m.id) || 
+      m.category === medication.category && m.id !== medication.id
+    ).slice(0, 3); // Limit to 3 alternatives
+  };
+
+  const handleDispense = async (record: Omit<DispensingRecord, "id">) => {
     try {
       if (navigator.onLine) {
         // Online: write-through to server then update local/cache
@@ -283,18 +185,15 @@ export default function App() {
               : med,
           ),
         );
-        setInventory((prev) =>
-          prev.map((inv) =>
-            inv.lotNumber === record.lotNumber
-              ? { ...inv, quantity: Math.max(0, inv.quantity - record.quantity) }
-              : inv,
-          ),
-        );
-        setPendingChanges((prev: number) => prev + 1);
+        // Create temporary record for offline display
+        const tempRecord: DispensingRecord = {
+          ...record,
+          id: `temp-${Date.now()}`, // Temporary ID for offline records
+        };
+        setDispensingRecords((prev: DispensingRecord[]) => [tempRecord, ...prev]);
       }
-    } catch (err) {
-      console.error('Error dispensing medication:', err);
-      setError('Failed to record dispensing. Please try again.');
+    } catch (error) {
+      console.error('Error dispensing medication:', error);
     }
   };
 
@@ -303,267 +202,219 @@ export default function App() {
     setIsEditDialogOpen(true);
   };
 
-  const handleSaveEditedRecord = async (
-    id: string,
-    updates: Partial<Omit<DispensingRecord, 'id'>>,
-  ) => {
+  const handleUpdateDispensingRecord = async (id: string, updates: Partial<DispensingRecord>) => {
     try {
       const updatedRecord = await MedicationService.updateDispensingRecord(id, updates);
       setDispensingRecords((prev) => prev.map((rec) => (rec.id === id ? updatedRecord : rec)));
     } catch (err) {
       console.error('Error updating dispensing record:', err);
-      throw err; // Re-throw to let dialog handle error display
+      throw err;
+    }
+  };
+
+  // Handler for StockManagement component (with reason parameter)
+  const handleUpdateLotWithReason = async (lotId: string, newQuantity: number, reason: string) => {
+    try {
+      if (navigator.onLine) {
+        await MedicationService.updateInventoryItem(lotId, { quantity: newQuantity });
+        setInventory(prev => prev.map(item => 
+          item.id === lotId 
+            ? { ...item, quantity: newQuantity }
+            : item
+        ));
+        
+        // Update medication stock total
+        const lot = inventory.find(inv => inv.id === lotId);
+        if (lot) {
+          const medication = medications.find(m => m.id === lot.medicationId);
+          if (medication) {
+            const totalStock = inventory
+              .filter(inv => inv.medicationId === lot.medicationId)
+              .reduce((sum, inv) => sum + (inv.id === lotId ? newQuantity : inv.quantity), 0);
+            
+            setMedications(prev => prev.map(med => 
+              med.id === lot.medicationId 
+                ? { ...med, currentStock: totalStock, isAvailable: totalStock > 0 }
+                : med
+            ));
+          }
+        }
+      } else {
+        // Handle offline
+        setPendingChanges(prev => prev + 1);
+      }
+    } catch (err) {
+      console.error('Error updating lot:', err);
+      throw err;
+    }
+  };
+
+  // Handler for MedicationDetail component (with updates object)
+  const handleUpdateLot = (id: string, updates: Partial<Pick<InventoryItem, 'quantity' | 'lotNumber' | 'expirationDate'>>) => {
+    // For now, just handle quantity updates
+    if (updates.quantity !== undefined) {
+      handleUpdateLotWithReason(id, updates.quantity, 'Updated from detail view');
     }
   };
 
   const handleAddLot = async (lot: Omit<InventoryItem, 'id' | 'isExpired'>) => {
-    const queueLotOffline = async () => {
-      await syncService.queueOfflineLot(lot);
-
-      const medication = medications.find((m) => m.id === lot.medicationId);
-      if (medication) {
-        const newStock = medication.currentStock + lot.quantity;
-        setMedications((prev: Medication[]) =>
-          prev.map((med: Medication) =>
-            med.id === lot.medicationId
-              ? {
-                  ...med,
-                  currentStock: newStock,
-                  isAvailable: newStock > 0,
-                  lastUpdated: new Date(),
-                }
-              : med,
-          ),
-        );
-      }
-
-      setPendingChanges((prev: number) => prev + 1);
-    };
-
-    const shouldFallbackOffline = (error: unknown) => {
-      if (typeof navigator === 'undefined') return false;
-      if (navigator.onLine) {
-        if (error instanceof Error) {
-          const msg = error.message.toLowerCase();
-          return msg.includes('fetch') || msg.includes('network') || msg.includes('failed to load');
-        }
-      }
-      return false;
-    };
-
     try {
       if (navigator.onLine) {
         const newLot = await MedicationService.createInventoryItem(lot);
-        setInventory((prev) => [...prev, newLot]);
-
-        const updatedMedications = await MedicationService.getAllMedications();
-        setMedications(updatedMedications);
-      } else {
-        await queueLotOffline();
-      }
-    } catch (err) {
-      if (shouldFallbackOffline(err)) {
-        console.warn('Online lot creation failed, queuing offline instead.', err);
-        try {
-          await queueLotOffline();
-          return;
-        } catch (offlineErr) {
-          console.error('Offline fallback for lot failed:', offlineErr);
+        setInventory(prev => [...prev, newLot]);
+        
+        // Update medication stock
+        const medication = medications.find(m => m.id === lot.medicationId);
+        if (medication) {
+          const newStock = medication.currentStock + lot.quantity;
+          setMedications(prev => prev.map(med => 
+            med.id === lot.medicationId 
+              ? { ...med, currentStock: newStock, isAvailable: newStock > 0 }
+              : med
+          ));
         }
+      } else {
+        // Handle offline
+        await syncService.queueOfflineLot(lot);
+        setPendingChanges(prev => prev + 1);
       }
-      console.error('Error adding lot:', err);
-      setError('Failed to add lot. Please try again.');
-    }
-  };
-
-  const handleUpdateLot = async (
-    id: string,
-    updates: Partial<Pick<InventoryItem, 'quantity' | 'lotNumber' | 'expirationDate'>>,
-  ) => {
-    try {
-      const updatedLot = await MedicationService.updateInventoryItem(id, updates);
-      setInventory((prev) => prev.map((lot) => (lot.id === id ? updatedLot : lot)));
-
-      // Reload medications to update total stock count
-      const updatedMedications = await MedicationService.getAllMedications();
-      setMedications(updatedMedications);
     } catch (err) {
-      console.error('Error updating lot:', err);
-      setError('Failed to update lot. Please try again.');
+      console.error('Error adding lot:', err);
+      throw err;
     }
   };
 
   const handleDeleteLot = async (id: string) => {
     try {
-      await MedicationService.deleteInventoryItem(id);
-      setInventory((prev) => prev.filter((lot) => lot.id !== id));
-
-      // Reload medications to update total stock count
-      const updatedMedications = await MedicationService.getAllMedications();
-      setMedications(updatedMedications);
+      if (navigator.onLine) {
+        await MedicationService.deleteInventoryItem(id);
+        const lot = inventory.find(inv => inv.id === id);
+        setInventory(prev => prev.filter(item => item.id !== id));
+        
+        // Update medication stock
+        if (lot) {
+          const medication = medications.find(m => m.id === lot.medicationId);
+          if (medication) {
+            const newStock = Math.max(0, medication.currentStock - lot.quantity);
+            setMedications(prev => prev.map(med => 
+              med.id === lot.medicationId 
+                ? { ...med, currentStock: newStock, isAvailable: newStock > 0 }
+                : med
+            ));
+          }
+        }
+      } else {
+        setPendingChanges(prev => prev + 1);
+      }
     } catch (err) {
       console.error('Error deleting lot:', err);
-      setError('Failed to delete lot. Please try again.');
-    }
-  };
-
-  // Adapter for StockManagement signature (lotId, newQuantity, reason)
-  const handleUpdateLotQuantity = async (lotId: string, newQuantity: number) => {
-    await handleUpdateLot(lotId, { quantity: newQuantity });
-  };
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleUpdateStock = async (medicationId: string, newQuantity: number, reason: string) => {
-    try {
-      setError(null);
-      const medication = medications.find((m) => m.id === medicationId);
-      if (!medication) {
-        throw new Error('Medication not found.');
-      }
-
-      const currentStock = medication.currentStock;
-      const difference = newQuantity - currentStock;
-
-      if (difference === 0) return;
-
-      if (difference > 0) {
-        const lotData: Omit<InventoryItem, 'id' | 'isExpired'> = {
-          medicationId,
-          lotNumber: `ADJ-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`,
-          quantity: difference,
-          expirationDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-        };
-
-        await handleAddLot(lotData);
-        console.log(`Added ${difference} units to ${medication.name} (${reason})`);
-      } else {
-        if (!navigator.onLine) {
-          throw new Error(
-            'Reducing stock requires an internet connection so the central inventory stays accurate.',
-          );
-        }
-
-        const amountToRemove = Math.abs(difference);
-        await MedicationService.reduceInventoryStock(medicationId, amountToRemove);
-
-        const [updatedMedications, updatedInventory] = await Promise.all([
-          MedicationService.getAllMedications(),
-          MedicationService.getAllInventory(),
-        ]);
-        setMedications(updatedMedications);
-        setInventory(updatedInventory);
-        console.log(`Removed ${amountToRemove} units from ${medication.name} (${reason})`);
-      }
-    } catch (err) {
-      console.error('Error updating stock:', err);
-      setError(err instanceof Error ? err.message : 'Failed to update stock. Please try again.');
+      throw err;
     }
   };
 
   const handleSync = async () => {
-    if (!navigator.onLine) return;
-    // Process pending queue and refresh meds from server
-    const result = await syncService.flushQueue();
-    const freshMeds = await syncService.primeMedicationsCache();
-    const freshLogs = await MedicationService.getAllDispensingRecords();
-    setMedications(freshMeds);
-    setDispensingRecords(freshLogs);
-    if (result.processed > 0) setPendingChanges(0);
+    try {
+      // Simple sync: just reload data
+      await loadInitialData();
+      setPendingChanges(0);
+    } catch (err) {
+      console.error('Sync failed:', err);
+    }
   };
 
-  const getAlternatives = (medication: Medication): Medication[] => {
-    return medications.filter(
-      (med: Medication) => medication.alternatives.includes(med.id) && med.isAvailable,
-    );
-  };
-
-  const canAccessStockManagement = currentUser?.role === 'pharmacy_staff';
-
-  // User selection component for mobile
-  const UserSelector = () => (
-    <div className="flex items-center gap-2">
-      <User className="size-4 flex-shrink-0" />
-      <Select value={currentUser?.id || ''} onValueChange={handleUserSwitch}>
-        <SelectTrigger className="w-full min-w-0">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {users.map((user: UserType) => (
-            <SelectItem key={user.id} value={user.id}>
-              <div className="flex items-center gap-2">
-                <span className="truncate">{user.name}</span>
-                <Badge variant="outline" className="text-xs flex-shrink-0">
-                  {user.role === 'pharmacy_staff' ? 'Pharmacy' : 'Provider'}
-                </Badge>
-              </div>
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
-
-  // Show login page if not logged in
-  if (!isLoggedIn) {
-    return <LoginPage onLogin={handleLogin} />;
-  }
-
+  // Show loading screen while checking authentication
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="size-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          <p className="text-muted-foreground">Loading formulary...</p>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
     );
   }
 
+  // Show login page if not authenticated
+  if (!user) {
+    return <AuthenticationPage />;
+  }
+
+  // Show error if data loading failed
   if (error) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4 text-center max-w-md">
-          <div className="size-16 rounded-full bg-destructive/10 flex items-center justify-center">
-            <Settings className="size-8 text-destructive" />
-          </div>
-          <h1 className="text-lg font-semibold">Connection Error</h1>
-          <p className="text-muted-foreground">{error}</p>
-          <Button onClick={() => window.location.reload()}>Retry</Button>
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
+          <div className="text-destructive mb-4">⚠️ Error Loading Data</div>
+          <p className="text-muted-foreground mb-4">{error}</p>
+          <Button onClick={loadInitialData} variant="outline">
+            Try Again
+          </Button>
         </div>
       </div>
     );
   }
 
+  // Show detail view if medication is selected
+  if (currentView === 'detail' && selectedMedication && currentUser) {
+    return (
+      <MedicationDetail
+        medication={selectedMedication}
+        alternatives={getAlternatives(selectedMedication)}
+        inventory={inventory}
+        currentUser={currentUser}
+        onBack={handleBackToFormulary}
+        onDispense={handleDispense}
+        onSelectAlternative={handleMedicationSelect}
+        onAddLot={handleAddLot}
+        onUpdateLot={handleUpdateLot}
+        onDeleteLot={handleDeleteLot}
+      />
+    );
+  }
+
+  // Show main app with tabs
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-6xl">
-        {/* Mobile Header */}
-        <div className="block sm:hidden mb-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="min-w-0 flex-1">
-              <h1 className="text-lg font-bold truncate">EFWP Formulary</h1>
-              <p className="text-sm text-muted-foreground truncate">Mobile Clinic</p>
+      {/* Header */}
+      <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+          {/* Logo */}
+          <div className="flex items-center gap-2">
+            <div className="size-8 bg-primary rounded-lg flex items-center justify-center">
+              <Pill className="size-4 text-primary-foreground" />
             </div>
+            <div>
+              <h1 className="text-lg font-semibold">EFWP Formulary</h1>
+            </div>
+          </div>
 
+          {/* User Menu */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground hidden sm:block">
+              {user.email}
+            </span>
+            
+            {/* Mobile Menu */}
             <Sheet>
               <SheetTrigger asChild>
-                <Button variant="outline" size="icon" className="flex-shrink-0">
+                <Button variant="ghost" size="sm" className="sm:hidden">
                   <Menu className="size-4" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-80">
+              <SheetContent>
                 <SheetHeader>
-                  <SheetTitle>User Settings</SheetTitle>
+                  <SheetTitle className="flex items-center gap-2">
+                    <User className="size-4" />
+                    Account
+                  </SheetTitle>
                 </SheetHeader>
                 <div className="mt-6 space-y-4">
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">Logged in as:</p>
-                    <p className="text-sm text-muted-foreground">{loggedInNetId}</p>
+                  <div className="text-sm text-muted-foreground">
+                    Signed in as: {user.email}
                   </div>
-                  <UserSelector />
-                  <Button
+                  <Button 
+                    onClick={() => signOut()} 
                     variant="outline"
-                    onClick={handleLogout}
                     className="w-full flex items-center gap-2"
                   >
                     <LogOut className="size-4" />
@@ -572,137 +423,95 @@ export default function App() {
                 </div>
               </SheetContent>
             </Sheet>
-          </div>
-        </div>
 
-        {/* Desktop Header */}
-        <div className="hidden sm:flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold">EFWP Medication Formulary</h1>
-            <p className="text-muted-foreground">Emory Farmworker Project Mobile Clinic</p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="text-right">
-              <p className="text-sm font-medium">{loggedInNetId}</p>
-              <p className="text-xs text-muted-foreground">Signed in</p>
-            </div>
-            <div className="w-48">
-              <UserSelector />
-            </div>
-            <Button
-              variant="outline"
+            {/* Desktop Sign Out */}
+            <Button 
+              onClick={() => signOut()} 
+              variant="ghost" 
               size="sm"
-              onClick={handleLogout}
-              className="flex items-center gap-2"
+              className="hidden sm:flex items-center gap-2"
             >
               <LogOut className="size-4" />
               Sign Out
             </Button>
           </div>
         </div>
+      </header>
 
+      {/* Main Content */}
+      <main className="container mx-auto p-4">
         {/* Offline Sync Status */}
-        <div className="mb-4 sm:mb-6">
+        <div className="mb-4">
           <OfflineSync pendingChanges={pendingChanges} onSync={handleSync} />
         </div>
 
-        {/* Main Content */}
-        {currentView === 'detail' && selectedMedication ? (
-          <MedicationDetail
-            medication={selectedMedication}
-            alternatives={getAlternatives(selectedMedication)}
-            inventory={inventory}
-            currentUser={currentUser!}
-            onBack={handleBackToFormulary}
-            onDispense={handleDispense}
-            onSelectAlternative={handleMedicationSelect}
-            onAddLot={handleAddLot}
-            onUpdateLot={handleUpdateLot}
-            onDeleteLot={handleDeleteLot}
-          />
+        {isLoadingData ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading medications...</p>
+          </div>
         ) : (
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-3 mb-4 sm:mb-6">
-              <TabsTrigger
-                value="formulary"
-                className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
-              >
-                <Pill className="size-3 sm:size-4" />
-                <span className="hidden xs:inline">Formulary</span>
-                <span className="xs:hidden">Drugs</span>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="formulary" className="flex items-center gap-2">
+                <Pill className="size-4" />
+                <span className="hidden sm:inline">Formulary</span>
               </TabsTrigger>
-              <TabsTrigger
-                value="log"
-                className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
-              >
-                <ClipboardList className="size-3 sm:size-4" />
-                <span className="hidden xs:inline">Dispensing Log</span>
-                <span className="xs:hidden">Log</span>
+              <TabsTrigger value="dispensing" className="flex items-center gap-2">
+                <ClipboardList className="size-4" />
+                <span className="hidden sm:inline">Dispensing</span>
               </TabsTrigger>
-              <TabsTrigger
-                value="stock"
-                className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
-                disabled={!canAccessStockManagement}
-              >
-                <Settings className="size-3 sm:size-4" />
-                <span className="hidden sm:inline">Stock Management</span>
-                <span className="sm:hidden">Stock</span>
-                {!canAccessStockManagement && (
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] sm:text-xs ml-1 hidden sm:inline-flex"
-                  >
-                    Staff Only
-                  </Badge>
-                )}
+              <TabsTrigger value="inventory" className="flex items-center gap-2">
+                <Package className="size-4" />
+                <span className="hidden sm:inline">Inventory</span>
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="formulary" className="mt-0">
+            <TabsContent value="formulary" className="space-y-4">
               <FormularyView
                 medications={medications}
                 onMedicationSelect={handleMedicationSelect}
               />
             </TabsContent>
 
-            <TabsContent value="log" className="mt-0">
+            <TabsContent value="dispensing" className="space-y-4">
               <DispensingLog
                 records={dispensingRecords}
                 onEditRecord={handleEditDispensingRecord}
               />
             </TabsContent>
 
-            <TabsContent value="stock" className="mt-0">
-              {canAccessStockManagement ? (
+            <TabsContent value="inventory" className="space-y-4">
+              {currentUser ? (
                 <StockManagement
                   medications={medications}
                   inventory={inventory}
-                  currentUser={currentUser!}
-                  onUpdateLot={handleUpdateLotQuantity}
+                  currentUser={currentUser}
+                  onUpdateLot={handleUpdateLotWithReason}
                   onAddLot={handleAddLot}
                 />
               ) : (
-                <div className="text-center py-12 text-muted-foreground">
-                  <Settings className="size-16 mx-auto mb-4 opacity-30" />
-                  <p className="text-lg mb-2">Access Restricted</p>
-                  <p className="text-sm">Stock management is available to pharmacy staff only</p>
+                <div className="text-center py-8">
+                  <div className="animate-pulse">Loading user data...</div>
                 </div>
               )}
             </TabsContent>
           </Tabs>
         )}
-      </div>
+      </main>
 
       {/* Edit Dispensing Record Dialog */}
       <EditDispensingRecordDialog
         record={editingRecord}
         open={isEditDialogOpen}
-        onOpenChange={setIsEditDialogOpen}
-        onSave={handleSaveEditedRecord}
+        onOpenChange={(open) => {
+          setIsEditDialogOpen(open);
+          if (!open) {
+            setEditingRecord(null);
+          }
+        }}
+        onSave={handleUpdateDispensingRecord}
       />
-
-      {/* Toaster temporarily disabled to fix import conflicts */}
     </div>
   );
 }
