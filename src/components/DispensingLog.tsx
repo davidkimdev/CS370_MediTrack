@@ -288,6 +288,7 @@ export function DispensingLog({ records, onEditRecord }: DispensingLogProps) {
             <Table>
               <TableHeader>
                 <TableRow>
+                  {onEditRecord && <TableHead className="w-[80px]">Actions</TableHead>}
                   <TableHead>Date</TableHead>
                   <TableHead>Patient ID</TableHead>
                   <TableHead>Medication</TableHead>
@@ -299,12 +300,23 @@ export function DispensingLog({ records, onEditRecord }: DispensingLogProps) {
                   <TableHead>Student</TableHead>
                   <TableHead>Clinic Site</TableHead>
                   <TableHead>Notes</TableHead>
-                  {onEditRecord && <TableHead className="w-[80px]">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredRecords.map((record) => (
                   <TableRow key={record.id}>
+                    {onEditRecord && (
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onEditRecord(record)}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Edit className="size-4" />
+                        </Button>
+                      </TableCell>
+                    )}
                     <TableCell className="text-sm">{formatDateEST(record.dispensedAt)}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className="text-xs font-mono">
@@ -338,18 +350,6 @@ export function DispensingLog({ records, onEditRecord }: DispensingLogProps) {
                         </p>
                       )}
                     </TableCell>
-                    {onEditRecord && (
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onEditRecord(record)}
-                          className="h-8 w-8 p-0"
-                        >
-                          <Edit className="size-4" />
-                        </Button>
-                      </TableCell>
-                    )}
                   </TableRow>
                 ))}
               </TableBody>

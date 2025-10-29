@@ -148,6 +148,31 @@ export class MedicationService {
     }
   }
 
+  static async deleteMedication(medicationId: string): Promise<void> {
+    // First, delete all inventory items for this medication
+    const { error: inventoryError } = await supabase
+      .from('inventory')
+      .delete()
+      .eq('medication_id', medicationId);
+
+    if (inventoryError) {
+      logger.error('Error deleting medication inventory', inventoryError);
+      throw new Error('Failed to delete medication inventory');
+    }
+
+    // Then, soft delete the medication by setting is_active to false
+    // We don't hard delete to preserve dispensing log history
+    const { error: medicationError } = await supabase
+      .from('medications')
+      .update({ is_active: false })
+      .eq('id', medicationId);
+
+    if (medicationError) {
+      logger.error('Error deleting medication', medicationError);
+      throw new Error('Failed to delete medication');
+    }
+  }
+
   // Inventory
   static async getInventoryByMedicationId(medicationId: string): Promise<InventoryItem[]> {
     const { data, error } = await supabase

@@ -15,6 +15,7 @@ import {
   Plus,
   Search,
   TrendingDown,
+  Trash2,
   Upload,
 } from 'lucide-react';
 import { Medication, User, InventoryItem } from '../types/medication';
@@ -31,6 +32,7 @@ interface StockManagementProps {
   currentUser: User;
   onUpdateLot: (lotId: string, newQuantity: number, reason: string) => Promise<void>;
   onAddLot: (lot: Omit<InventoryItem, 'id' | 'isExpired'>) => Promise<void>;
+  onDeleteMedication?: (medicationId: string) => Promise<void>;
 }
 
 export function StockManagement({
@@ -39,6 +41,7 @@ export function StockManagement({
   currentUser,
   onUpdateLot,
   onAddLot,
+  onDeleteMedication,
 }: StockManagementProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -51,6 +54,9 @@ export function StockManagement({
   const [selectedMedicationForLot, setSelectedMedicationForLot] = useState<Medication | null>(null);
   const [isUpdatingStock, setIsUpdatingStock] = useState(false);
   const [selectedLotId, setSelectedLotId] = useState<string>('');
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [medicationToDelete, setMedicationToDelete] = useState<Medication | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const statusOptions = [
     { value: 'all', label: 'All Items' },
@@ -212,6 +218,29 @@ export function StockManagement({
       console.error('Bulk import error:', error);
       alert(`Import failed: ${error}`);
     }
+  };
+
+  const handleDeleteMedication = async () => {
+    if (!medicationToDelete || !onDeleteMedication) return;
+
+    setIsDeleting(true);
+    try {
+      await onDeleteMedication(medicationToDelete.id);
+      setIsDeleteDialogOpen(false);
+      setMedicationToDelete(null);
+      // Refresh the page to show updated list
+      window.location.reload();
+    } catch (error) {
+      console.error('Failed to delete medication:', error);
+      alert('Failed to delete medication. Please try again.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const openDeleteDialog = (medication: Medication) => {
+    setMedicationToDelete(medication);
+    setIsDeleteDialogOpen(true);
   };
 
   const lowStockCount = medications.filter(
@@ -379,14 +408,26 @@ export function StockManagement({
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openUpdateDialog(medication)}
-                        >
-                          <Edit className="size-4 mr-1" />
-                          Update
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openUpdateDialog(medication)}
+                          >
+                            <Edit className="size-4 mr-1" />
+                            Update
+                          </Button>
+                          {onDeleteMedication && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openDeleteDialog(medication)}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -559,6 +600,55 @@ export function StockManagement({
         medications={medications}
         onAddLot={onAddLot}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={isDeleteDialogOpen}
+        onOpenChange={(open) => {
+          setIsDeleteDialogOpen(open);
+          if (!open) {
+            setMedicationToDelete(null);
+            setIsDeleting(false);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Medication</DialogTitle>
+          </DialogHeader>
+          {medicationToDelete && (
+            <div className="space-y-4">
+              <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-md">
+                <p className="text-sm font-medium mb-2">Are you sure you want to delete this medication?</p>
+                <p className="text-sm font-medium">
+                  {medicationToDelete.name} - {medicationToDelete.strength} ({medicationToDelete.dosageForm})
+                </p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  This will permanently remove the medication and all its inventory lots. This action cannot be undone.
+                </p>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="destructive"
+                  onClick={handleDeleteMedication}
+                  className="flex-1"
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? 'Deleting...' : 'Delete Medication'}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsDeleteDialogOpen(false)}
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

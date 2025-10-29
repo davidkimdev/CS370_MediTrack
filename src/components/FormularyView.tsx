@@ -25,7 +25,7 @@ export function FormularyView({ medications, onMedicationSelect }: FormularyView
   }, [medications]);
 
   const filteredMedications = useMemo(() => {
-    return medications.filter((med) => {
+    const filtered = medications.filter((med) => {
       const matchesSearch =
         searchTerm === '' ||
         med.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -41,6 +41,28 @@ export function FormularyView({ medications, onMedicationSelect }: FormularyView
         (availabilityFilter === 'out' && !med.isAvailable);
 
       return matchesSearch && matchesCategory && matchesAvailability;
+    });
+
+    // Sort by name, then by dosage form, then by strength (numerically)
+    return filtered.sort((a, b) => {
+      // First sort by name
+      const nameCompare = a.name.localeCompare(b.name);
+      if (nameCompare !== 0) return nameCompare;
+
+      // Then sort by dosage form
+      const formCompare = a.dosageForm.localeCompare(b.dosageForm);
+      if (formCompare !== 0) return formCompare;
+
+      // Finally sort by strength (extract numeric value)
+      const extractNumeric = (strength: string) => {
+        const match = strength.match(/(\d+\.?\d*)/);
+        return match ? parseFloat(match[1]) : 0;
+      };
+
+      const strengthA = extractNumeric(a.strength);
+      const strengthB = extractNumeric(b.strength);
+
+      return strengthA - strengthB;
     });
   }, [medications, searchTerm, categoryFilter, availabilityFilter]);
 

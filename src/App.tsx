@@ -290,14 +290,14 @@ export default function App() {
         await MedicationService.deleteInventoryItem(id);
         const lot = inventory.find(inv => inv.id === id);
         setInventory(prev => prev.filter(item => item.id !== id));
-        
+
         // Update medication stock
         if (lot) {
           const medication = medications.find(m => m.id === lot.medicationId);
           if (medication) {
             const newStock = Math.max(0, medication.currentStock - lot.quantity);
-            setMedications(prev => prev.map(med => 
-              med.id === lot.medicationId 
+            setMedications(prev => prev.map(med =>
+              med.id === lot.medicationId
                 ? { ...med, currentStock: newStock, isAvailable: newStock > 0 }
                 : med
             ));
@@ -308,6 +308,23 @@ export default function App() {
       }
     } catch (err) {
       console.error('Error deleting lot:', err);
+      throw err;
+    }
+  };
+
+  const handleDeleteMedication = async (medicationId: string) => {
+    try {
+      if (navigator.onLine) {
+        await MedicationService.deleteMedication(medicationId);
+        // Remove medication from local state
+        setMedications(prev => prev.filter(med => med.id !== medicationId));
+        // Remove all inventory for this medication
+        setInventory(prev => prev.filter(inv => inv.medicationId !== medicationId));
+      } else {
+        setPendingChanges(prev => prev + 1);
+      }
+    } catch (err) {
+      console.error('Error deleting medication:', err);
       throw err;
     }
   };
@@ -489,6 +506,7 @@ export default function App() {
                   currentUser={currentUser}
                   onUpdateLot={handleUpdateLotWithReason}
                   onAddLot={handleAddLot}
+                  onDeleteMedication={handleDeleteMedication}
                 />
               ) : (
                 <div className="text-center py-8">
