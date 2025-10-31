@@ -1,107 +1,172 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from './contexts/AuthContext';
 import { AuthenticationPage } from './components/auth/AuthenticationPage';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs';
 import { FormularyView } from './components/FormularyView';
 import { MedicationDetail } from './components/MedicationDetail';
 import { DispensingLog } from './components/DispensingLog';
 import { EditDispensingRecordDialog } from './components/EditDispensingRecordDialog';
 import { StockManagement } from './components/StockManagement';
 import { OfflineSync } from './components/OfflineSync';
+import { ProfilePage } from './components/auth/ProfilePage';
+import { AdminPanel } from './components/AdminPanel';
 import { Button } from './components/ui/button';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './components/ui/sheet';
-import { Pill, ClipboardList, Package, Menu, LogOut, User } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from './components/ui/tabs';
+import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './components/ui/sheet';
+import { cn } from './components/ui/utils';
+import type { LucideIcon } from 'lucide-react';
+import { Pill, ClipboardList, Package, Menu, LogOut, User, ShieldCheck } from 'lucide-react';
 import { Medication, DispensingRecord, InventoryItem, User as UserType } from './types/medication';
 import { MedicationService } from './services/medicationService';
 import { syncService } from './services/syncService';
 import { OfflineStore } from './utils/offlineStore';
 import { logger } from './utils/logger';
 
+type AppSection = 'formulary' | 'dispensing' | 'inventory' | 'profile' | 'admin';
+
 export default function App() {
-  const { user, isLoading, signOut } = useAuth();
+  const { user, profile, isLoading, signOut, isAuthenticated } = useAuth();
   const [currentView, setCurrentView] = useState<'formulary' | 'detail'>('formulary');
   const [selectedMedication, setSelectedMedication] = useState<Medication | null>(null);
   const [medications, setMedications] = useState<Medication[]>([]);
   const [dispensingRecords, setDispensingRecords] = useState<DispensingRecord[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
-  const [users, setUsers] = useState<UserType[]>([]);
   const [currentUser, setCurrentUser] = useState<UserType | null>(null);
   const [pendingChanges, setPendingChanges] = useState(0);
-  const [activeTab, setActiveTab] = useState('formulary');
+  const [activeSection, setActiveSection] = useState<AppSection>('formulary');
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingRecord, setEditingRecord] = useState<DispensingRecord | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [lastLoadedMode, setLastLoadedMode] = useState<'authenticated' | 'public' | null>(null);
+
+  const isAdmin = profile?.role === 'admin';
 
   // Initialize currentUser when authentication completes
   useEffect(() => {
-    if (user && !currentUser) {
-      const defaultUser: UserType = {
-        id: user.id,
-        name: user.email?.split('@')[0] || 'User',
-        role: 'pharmacy_staff', // Default to pharmacy_staff for now
-        initials: user.email?.substring(0, 2).toUpperCase() || 'US'
+    if (profile) {
+      const firstInitial = profile.firstName?.charAt(0)?.toUpperCase() ?? '';
+      const lastInitial = profile.lastName?.charAt(0)?.toUpperCase() ?? '';
+      const displayName = `${profile.firstName ?? ''} ${profile.lastName ?? ''}`.trim() || user?.email || 'User';
+
+      const formattedUser: UserType = {
+        id: profile.id,
+        name: displayName,
+        role: 'pharmacy_staff',
+        initials: `${firstInitial}${lastInitial}` || (user?.email?.substring(0, 2).toUpperCase() ?? 'US'),
       };
-      setCurrentUser(defaultUser);
+      setCurrentUser(formattedUser);
+    } else if (user && !profile) {
+      const fallbackName = user.email?.split('@')[0] || 'User';
+      setCurrentUser({
+        id: user.id,
+        name: fallbackName,
+        role: 'pharmacy_staff',
+        initials: fallbackName.substring(0, 2).toUpperCase() || 'US',
+      });
+    } else if (!user && currentUser) {
+      setCurrentUser(null);
     }
-  }, [user, currentUser]);
+  }, [user, profile]);
+
+  useEffect(() => {
+    if (user) {
+      setShowAuthModal(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      setCurrentView('formulary');
+      setSelectedMedication(null);
+      setActiveSection('formulary');
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setActiveSection('formulary');
+    }
+  }, [isAuthenticated]);
 
   // Load medications when user is authenticated
   useEffect(() => {
-    if (user && !isLoading) {
-      loadInitialData();
+    if (isLoading) {
+      return;
     }
-  }, [user, isLoading]);
 
-  const loadInitialData = async () => {
+    const desiredMode = isAuthenticated ? 'authenticated' : 'public';
+    if (lastLoadedMode === desiredMode) {
+      return;
+    }
+
+    void loadInitialData(isAuthenticated);
+  }, [isLoading, isAuthenticated, lastLoadedMode]);
+
+  const loadInitialData = async (authenticated: boolean, force = false) => {
     try {
+      const mode = authenticated ? 'authenticated' : 'public';
+      if (!force && lastLoadedMode === mode) {
+        return;
+      }
+
       setIsLoadingData(true);
       setError(null);
-      
-      console.log('🔄 Loading all data...');
-      
+
+      console.log(`🔄 Loading ${mode} data...`);
+
       let medicationsData: Medication[] = [];
       let dispensingData: DispensingRecord[] = [];
       let inventoryData: InventoryItem[] = [];
-      let usersData: UserType[] = [];
+
+      if (!authenticated) {
+        syncService.stopRealtime();
+      }
 
       if (navigator.onLine) {
-        // Online: fetch fresh data and start realtime sync
-        try {
-          [medicationsData, dispensingData, inventoryData, usersData] = await Promise.all([
-            MedicationService.getAllMedications(),
-            MedicationService.getAllDispensingRecords(),
-            MedicationService.getAllInventory(),
-            MedicationService.getAllUsers(),
-          ]);
-          syncService.startMedicationsRealtime();
-        } catch (err) {
-          console.warn('Online fetch failed, trying offline cache:', err);
-          // Fallback to offline data
-          medicationsData = await OfflineStore.getAllMedications();
-          dispensingData = [];
-          inventoryData = [];
-          usersData = [];
+        if (authenticated) {
+          try {
+            [medicationsData, dispensingData, inventoryData] = await Promise.all([
+              MedicationService.getAllMedications(),
+              MedicationService.getAllDispensingRecords(),
+              MedicationService.getAllInventory(),
+            ]);
+            syncService.startMedicationsRealtime();
+          } catch (err) {
+            console.warn('Online fetch failed, trying offline cache:', err);
+            medicationsData = await OfflineStore.getAllMedications();
+            dispensingData = [];
+            inventoryData = [];
+          }
+        } else {
+          try {
+            [medicationsData, inventoryData] = await Promise.all([
+              MedicationService.getAllMedications(),
+              MedicationService.getAllInventory(),
+            ]);
+          } catch (err) {
+            console.warn('Public data fetch failed, trying offline cache:', err);
+            medicationsData = await OfflineStore.getAllMedications();
+            inventoryData = [];
+          }
         }
       } else {
-        // Offline: use cached data
         medicationsData = await OfflineStore.getAllMedications();
-        dispensingData = [];
         inventoryData = [];
-        usersData = [];
+        dispensingData = [];
       }
-      
+
       setMedications(medicationsData);
-      setDispensingRecords(dispensingData);
+      setDispensingRecords(authenticated ? dispensingData : []);
       setInventory(inventoryData);
-      setUsers(usersData);
       setPendingChanges(0);
-      
-      logger.info('All data loaded successfully', { 
+      setLastLoadedMode(mode);
+
+      logger.info('All data loaded successfully', {
+        mode,
         medications: medicationsData.length,
         dispensingRecords: dispensingData.length,
         inventory: inventoryData.length,
-        users: usersData.length
       });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load data';
@@ -120,6 +185,7 @@ export default function App() {
   const handleBackToFormulary = () => {
     setCurrentView('formulary');
     setSelectedMedication(null);
+    setActiveSection('formulary');
   };
 
   const getAlternatives = (medication: Medication): Medication[] => {
@@ -312,31 +378,51 @@ export default function App() {
     }
   };
 
-  const handleDeleteMedication = async (medicationId: string) => {
-    try {
-      if (navigator.onLine) {
-        await MedicationService.deleteMedication(medicationId);
-        // Remove medication from local state
-        setMedications(prev => prev.filter(med => med.id !== medicationId));
-        // Remove all inventory for this medication
-        setInventory(prev => prev.filter(inv => inv.medicationId !== medicationId));
-      } else {
-        setPendingChanges(prev => prev + 1);
-      }
-    } catch (err) {
-      console.error('Error deleting medication:', err);
-      throw err;
-    }
-  };
-
   const handleSync = async () => {
     try {
       // Simple sync: just reload data
-      await loadInitialData();
+      await loadInitialData(isAuthenticated, true);
       setPendingChanges(0);
     } catch (err) {
       console.error('Sync failed:', err);
     }
+  };
+
+  const navigationSections = useMemo<Array<{
+    key: Exclude<AppSection, 'profile' | 'admin'>;
+    label: string;
+    icon: LucideIcon;
+    requiresAuth?: boolean;
+  }>>(() => {
+    const baseSections: Array<{
+      key: Exclude<AppSection, 'profile' | 'admin'>;
+      label: string;
+      icon: LucideIcon;
+      requiresAuth?: boolean;
+    }> = [
+      { key: 'formulary', label: 'Formulary', icon: Pill },
+      { key: 'dispensing', label: 'Dispensing Log', icon: ClipboardList, requiresAuth: true },
+      { key: 'inventory', label: 'Inventory', icon: Package, requiresAuth: true },
+    ];
+    return baseSections;
+  }, [isAdmin]);
+
+  const tabValue = navigationSections.some(({ key }) => key === activeSection)
+    ? activeSection
+    : '__none';
+
+  const handleSectionChange = (section: AppSection) => {
+    if (section === 'admin' && !isAdmin) {
+      return;
+    }
+    if (!isAuthenticated && section !== 'formulary') {
+      setShowAuthModal(true);
+      return;
+    }
+
+    setActiveSection(section);
+    setCurrentView('formulary');
+    setSelectedMedication(null);
   };
 
   // Show loading screen while checking authentication
@@ -351,50 +437,73 @@ export default function App() {
     );
   }
 
-  // Show login page if not authenticated
-  if (!user) {
-    return <AuthenticationPage />;
+  if (!isAuthenticated && showAuthModal) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="size-8 bg-primary rounded-lg flex items-center justify-center">
+                <Pill className="size-4 text-primary-foreground" />
+              </div>
+              <h1 className="text-lg font-semibold">EFWP Formulary</h1>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => setShowAuthModal(false)}>
+              Back to formulary
+            </Button>
+          </div>
+        </header>
+        <main className="flex-1">
+          <AuthenticationPage />
+        </main>
+      </div>
+    );
   }
 
   // Show error if data loading failed
   if (error) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="text-center max-w-md">
-          <div className="text-destructive mb-4">⚠️ Error Loading Data</div>
-          <p className="text-muted-foreground mb-4">{error}</p>
-          <Button onClick={loadInitialData} variant="outline">
+        <div className="text-center max-w-md space-y-4">
+          <div className="text-destructive">⚠️ Error Loading Data</div>
+          <p className="text-muted-foreground">{error}</p>
+          <Button onClick={() => loadInitialData(isAuthenticated, true)} variant="outline">
             Try Again
           </Button>
+          {!isAuthenticated && (
+            <Button onClick={() => setShowAuthModal(true)}>Log In</Button>
+          )}
         </div>
       </div>
     );
   }
 
   // Show detail view if medication is selected
-  if (currentView === 'detail' && selectedMedication && currentUser) {
+  if (currentView === 'detail' && selectedMedication) {
     return (
       <MedicationDetail
         medication={selectedMedication}
         alternatives={getAlternatives(selectedMedication)}
         inventory={inventory}
-        currentUser={currentUser}
+        currentUser={currentUser ?? undefined}
+        isReadOnly={!isAuthenticated}
         onBack={handleBackToFormulary}
-        onDispense={handleDispense}
+        onDispense={isAuthenticated ? handleDispense : undefined}
         onSelectAlternative={handleMedicationSelect}
-        onAddLot={handleAddLot}
-        onUpdateLot={handleUpdateLot}
-        onDeleteLot={handleDeleteLot}
+        onAddLot={isAuthenticated ? handleAddLot : undefined}
+        onUpdateLot={isAuthenticated ? handleUpdateLot : undefined}
+        onDeleteLot={isAuthenticated ? handleDeleteLot : undefined}
+        onRequireAuth={() => setShowAuthModal(true)}
       />
     );
   }
 
-  // Show main app with tabs
+  // Show main app layout
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-4">
           {/* Logo */}
           <div className="flex items-center gap-2">
             <div className="size-8 bg-primary rounded-lg flex items-center justify-center">
@@ -402,134 +511,259 @@ export default function App() {
             </div>
             <div>
               <h1 className="text-lg font-semibold">EFWP Formulary</h1>
+              {!isAuthenticated && (
+                <p className="text-xs text-muted-foreground">Viewing limited access</p>
+              )}
             </div>
           </div>
 
           {/* User Menu */}
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground hidden sm:block">
-              {user.email}
-            </span>
-            
-            {/* Mobile Menu */}
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="sm" className="sm:hidden">
-                  <Menu className="size-4" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent>
-                <SheetHeader>
-                  <SheetTitle className="flex items-center gap-2">
-                    <User className="size-4" />
-                    Account
-                  </SheetTitle>
-                </SheetHeader>
-                <div className="mt-6 space-y-4">
-                  <div className="text-sm text-muted-foreground">
-                    Signed in as: {user.email}
-                  </div>
-                  <Button 
-                    onClick={() => signOut()} 
-                    variant="outline"
-                    className="w-full flex items-center gap-2"
+            {isAuthenticated && (
+              <div className="hidden sm:flex items-center overflow-hidden rounded-lg border bg-background/80 shadow-sm">
+                {isAdmin && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-pressed={activeSection === 'admin'}
+                    className={cn(
+                      'rounded-none px-3 h-9 gap-2 text-sm first:rounded-l-lg transition-colors',
+                      activeSection === 'admin'
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:bg-muted/60'
+                    )}
+                    onClick={() => handleSectionChange('admin')}
                   >
-                    <LogOut className="size-4" />
-                    Sign Out
+                    <ShieldCheck className="size-4" />
+                    <span className="hidden lg:inline">Admin</span>
                   </Button>
-                </div>
-              </SheetContent>
-            </Sheet>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-pressed={activeSection === 'profile'}
+                  className={cn(
+                    'rounded-none px-3 h-9 gap-2 text-sm last:rounded-r-lg transition-colors',
+                    isAdmin ? '' : 'first:rounded-l-lg',
+                    activeSection === 'profile'
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'text-muted-foreground hover:bg-muted/60'
+                  )}
+                  onClick={() => handleSectionChange('profile')}
+                >
+                  <User className="size-4" />
+                  <span className="hidden md:inline">Profile</span>
+                </Button>
+              </div>
+            )}
 
-            {/* Desktop Sign Out */}
-            <Button 
-              onClick={() => signOut()} 
-              variant="ghost" 
-              size="sm"
-              className="hidden sm:flex items-center gap-2"
-            >
-              <LogOut className="size-4" />
-              Sign Out
-            </Button>
+            {user ? (
+              <>
+                <span className="text-sm text-muted-foreground hidden lg:block">
+                  {user.email}
+                </span>
+
+                {/* Mobile Menu */}
+                <Sheet>
+                  <SheetTrigger asChild>
+                    <Button variant="ghost" size="sm" className="sm:hidden">
+                      <Menu className="size-4" />
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent className="gap-0">
+                    <SheetHeader className="pb-2">
+                      <SheetTitle className="flex items-center gap-2">
+                        <User className="size-4" />
+                        Account
+                      </SheetTitle>
+                    </SheetHeader>
+                    <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-6">
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
+                          Navigate
+                        </p>
+                        <div className="grid gap-2">
+                          {navigationSections.map(({ key, label, icon: Icon, requiresAuth }) => {
+                            const isActive = activeSection === key;
+                            const isRestricted = requiresAuth && !isAuthenticated;
+
+                            return (
+                              <SheetClose asChild key={key}>
+                                <Button
+                                  variant={isActive ? 'secondary' : 'ghost'}
+                                  size="sm"
+                                  className={`justify-start gap-2 ${isRestricted ? 'opacity-70' : ''}`}
+                                  disabled={isRestricted}
+                                  onClick={() => handleSectionChange(key)}
+                                  title={isRestricted ? 'Log in to access this area' : undefined}
+                                >
+                                  <Icon className="size-4" />
+                                  {label}
+                                </Button>
+                              </SheetClose>
+                            );
+                          })}
+                          {isAdmin && (
+                            <SheetClose asChild>
+                              <Button
+                                variant={activeSection === 'admin' ? 'secondary' : 'ghost'}
+                                size="sm"
+                                className="justify-start gap-2"
+                                onClick={() => handleSectionChange('admin')}
+                              >
+                                <ShieldCheck className="size-4" />
+                                Admin
+                              </Button>
+                            </SheetClose>
+                          )}
+                          <SheetClose asChild>
+                            <Button
+                              variant={activeSection === 'profile' ? 'secondary' : 'ghost'}
+                              size="sm"
+                              className="justify-start gap-2"
+                              onClick={() => handleSectionChange('profile')}
+                            >
+                              <User className="size-4" />
+                              Profile
+                            </Button>
+                          </SheetClose>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div className="text-sm text-muted-foreground">
+                          Signed in as: {user.email}
+                        </div>
+                        <SheetClose asChild>
+                          <Button
+                            onClick={() => signOut()}
+                            variant="outline"
+                            className="w-full flex items-center gap-2"
+                          >
+                            <LogOut className="size-4" />
+                            Sign Out
+                          </Button>
+                        </SheetClose>
+                      </div>
+                    </div>
+                  </SheetContent>
+                </Sheet>
+
+                {/* Desktop Sign Out */}
+                <Button
+                  onClick={() => signOut()}
+                  variant="ghost"
+                  size="sm"
+                  className="hidden sm:flex items-center gap-2"
+                >
+                  <LogOut className="size-4" />
+                  Sign Out
+                </Button>
+              </>
+            ) : (
+              <Button size="sm" onClick={() => setShowAuthModal(true)}>
+                Log In
+              </Button>
+            )}
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto p-4">
-        {/* Offline Sync Status */}
-        <div className="mb-4">
-          <OfflineSync pendingChanges={pendingChanges} onSync={handleSync} />
-        </div>
+      <main className="container mx-auto p-4 space-y-4">
+        {!isAuthenticated && (
+          <div className="rounded-md border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
+            Browse medications and inventory details. Log in to dispense or manage stock.
+          </div>
+        )}
 
-        {isLoadingData ? (
+        <Tabs
+          value={tabValue}
+          onValueChange={(value) => handleSectionChange(value as AppSection)}
+          className="w-full"
+        >
+          <TabsList className="w-full flex flex-wrap justify-start gap-2">
+            {navigationSections.map(({ key, label, icon: Icon, requiresAuth }) => {
+              const isRestricted = requiresAuth && !isAuthenticated;
+
+              return (
+                <TabsTrigger
+                  key={key}
+                  value={key}
+                  className={`flex items-center gap-2 ${isRestricted ? 'opacity-70' : ''}`}
+                  disabled={isRestricted}
+                  title={isRestricted ? 'Log in to access this area' : undefined}
+                >
+                  <Icon className="size-4" />
+                  <span>{label}</span>
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+        </Tabs>
+
+        {isAuthenticated && activeSection !== 'profile' && activeSection !== 'admin' && (
+          <OfflineSync pendingChanges={pendingChanges} onSync={handleSync} />
+        )}
+
+        {isLoadingData && activeSection !== 'profile' && activeSection !== 'admin' ? (
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading medications...</p>
+            <p className="text-muted-foreground">Loading data...</p>
           </div>
         ) : (
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="formulary" className="flex items-center gap-2">
-                <Pill className="size-4" />
-                <span className="hidden sm:inline">Formulary</span>
-              </TabsTrigger>
-              <TabsTrigger value="dispensing" className="flex items-center gap-2">
-                <ClipboardList className="size-4" />
-                <span className="hidden sm:inline">Dispensing</span>
-              </TabsTrigger>
-              <TabsTrigger value="inventory" className="flex items-center gap-2">
-                <Package className="size-4" />
-                <span className="hidden sm:inline">Inventory</span>
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="formulary" className="space-y-4">
+          <div className="space-y-4">
+            {activeSection === 'formulary' && (
               <FormularyView
                 medications={medications}
                 onMedicationSelect={handleMedicationSelect}
               />
-            </TabsContent>
+            )}
 
-            <TabsContent value="dispensing" className="space-y-4">
+            {activeSection === 'dispensing' && isAuthenticated && (
               <DispensingLog
                 records={dispensingRecords}
                 onEditRecord={handleEditDispensingRecord}
               />
-            </TabsContent>
+            )}
 
-            <TabsContent value="inventory" className="space-y-4">
-              {currentUser ? (
+            {activeSection === 'inventory' && isAuthenticated && (
+              currentUser ? (
                 <StockManagement
                   medications={medications}
                   inventory={inventory}
                   currentUser={currentUser}
                   onUpdateLot={handleUpdateLotWithReason}
                   onAddLot={handleAddLot}
-                  onDeleteMedication={handleDeleteMedication}
                 />
               ) : (
                 <div className="text-center py-8">
                   <div className="animate-pulse">Loading user data...</div>
                 </div>
-              )}
-            </TabsContent>
-          </Tabs>
+              )
+            )}
+
+            {activeSection === 'profile' && isAuthenticated && <ProfilePage />}
+
+            {activeSection === 'admin' && isAuthenticated && isAdmin && <AdminPanel />}
+          </div>
         )}
       </main>
 
       {/* Edit Dispensing Record Dialog */}
-      <EditDispensingRecordDialog
-        record={editingRecord}
-        open={isEditDialogOpen}
-        onOpenChange={(open) => {
-          setIsEditDialogOpen(open);
-          if (!open) {
-            setEditingRecord(null);
-          }
-        }}
-        onSave={handleUpdateDispensingRecord}
-      />
+      {isAuthenticated && (
+        <EditDispensingRecordDialog
+          record={editingRecord}
+          open={isEditDialogOpen}
+          onOpenChange={(open) => {
+            setIsEditDialogOpen(open);
+            if (!open) {
+              setEditingRecord(null);
+            }
+          }}
+          onSave={handleUpdateDispensingRecord}
+        />
+      )}
     </div>
   );
 }

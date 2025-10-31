@@ -93,6 +93,7 @@ export class SyncService {
       studentName: rec.studentName,
       dispensedAt: rec.dispensedAt,
       indication: rec.indication,
+      clinicSite: rec.clinicSite,
     });
   }
 
@@ -156,6 +157,7 @@ export class SyncService {
       amount_dispensed: `${p.quantity} tabs`,
       physician_name: p.physicianName,
       student_name: 'Offline Sync',
+      clinic_site: p.clinicSite || null,
       entered_by: null,
     });
     if (insertError) throw insertError;

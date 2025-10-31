@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -32,9 +32,10 @@ interface MedicationDetailProps {
   medication: Medication;
   alternatives: Medication[];
   inventory: InventoryItem[];
-  currentUser: User;
+  currentUser?: User;
+  isReadOnly?: boolean;
   onBack: () => void;
-  onDispense: (record: Omit<DispensingRecord, 'id'>) => void;
+  onDispense?: (record: Omit<DispensingRecord, 'id'>) => void;
   onSelectAlternative: (medication: Medication) => void;
   onAddLot?: (lot: Omit<InventoryItem, 'id' | 'isExpired'>) => void;
   onUpdateLot?: (
@@ -42,6 +43,7 @@ interface MedicationDetailProps {
     updates: Partial<Pick<InventoryItem, 'quantity' | 'lotNumber' | 'expirationDate'>>,
   ) => void;
   onDeleteLot?: (id: string) => void;
+  onRequireAuth?: () => void;
 }
 
 interface LotSelection {
@@ -55,12 +57,14 @@ export function MedicationDetail({
   alternatives,
   inventory,
   currentUser,
+  isReadOnly = false,
   onBack,
   onDispense,
   onSelectAlternative,
   onAddLot,
   onUpdateLot,
   onDeleteLot,
+  onRequireAuth,
 }: MedicationDetailProps) {
   const [isDispenseDialogOpen, setIsDispenseDialogOpen] = useState(false);
   const [patientId, setPatientId] = useState('');
@@ -81,6 +85,12 @@ export function MedicationDetail({
   const [lotQuantity, setLotQuantity] = useState('');
   const [lotExpiration, setLotExpiration] = useState('');
 
+  const readOnly = isReadOnly || !currentUser;
+  useEffect(() => {
+    if (!readOnly && currentUser?.name && !studentName) {
+      setStudentName(currentUser.name);
+    }
+  }, [currentUser?.name, readOnly, studentName]);
   const medicationInventory = inventory.filter((inv) => inv.medicationId === medication.id);
   const availableLots = medicationInventory.filter((inv) => !inv.isExpired && inv.quantity > 0);
 
@@ -95,6 +105,11 @@ export function MedicationDetail({
   };
 
   const handleDispense = () => {
+    if (readOnly || !currentUser || !onDispense) {
+      onRequireAuth?.();
+      return;
+    }
+
     // Validate required fields
     if (!patientId.trim() || !patientInitials.trim() || !dose.trim() || !physicianName.trim()) {
       showErrorToast(
@@ -252,7 +267,7 @@ export function MedicationDetail({
 
   const stockStatus = getStockStatus();
   const StatusIcon = stockStatus.icon;
-  const canEditLots = currentUser.role === 'pharmacy_staff';
+  const canEditLots = !readOnly && currentUser?.role === 'pharmacy_staff';
 
   return (
     <div className="space-y-4">
@@ -265,6 +280,11 @@ export function MedicationDetail({
           <h1 className="text-xl font-semibold">{medication.name}</h1>
           <p className="text-muted-foreground">{medication.genericName}</p>
         </div>
+        {readOnly && (
+          <Button variant="outline" size="sm" onClick={() => onRequireAuth?.()}>
+            Log in
+          </Button>
+        )}
       </div>
 
       {/* Stock Status Card */}
@@ -282,14 +302,19 @@ export function MedicationDetail({
             </div>
 
             {medication.isAvailable && (
-              <Dialog open={isDispenseDialogOpen} onOpenChange={setIsDispenseDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button>
-                    <Plus className="size-4 mr-2" />
-                    Dispense
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-2xl">
+              readOnly ? (
+                <Button variant="outline" onClick={() => onRequireAuth?.()}>
+                  Log in to dispense
+                </Button>
+              ) : (
+                <Dialog open={isDispenseDialogOpen} onOpenChange={setIsDispenseDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button>
+                      <Plus className="size-4 mr-2" />
+                      Dispense
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl">
                   <DialogHeader>
                     <DialogTitle>Dispense {medication.name}</DialogTitle>
                     <DialogDescription>Record medication dispensing for patient</DialogDescription>
@@ -481,7 +506,8 @@ export function MedicationDetail({
                     </div>
                   </div>
                 </DialogContent>
-              </Dialog>
+                </Dialog>
+              )
             )}
           </div>
         </CardContent>
@@ -656,50 +682,52 @@ export function MedicationDetail({
         )}
 
       {/* Lot Edit/Add Dialog */}
-      <Dialog open={isLotDialogOpen} onOpenChange={setIsLotDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingLot ? 'Edit Lot Number' : 'Add Lot Number'}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="lot-number">Lot Number *</Label>
-              <Input
-                id="lot-number"
-                value={lotNumber}
-                onChange={(e) => setLotNumber(e.target.value)}
-                placeholder="e.g., EW0646, 11953A"
-              />
+      {canEditLots && (
+        <Dialog open={isLotDialogOpen} onOpenChange={setIsLotDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{editingLot ? 'Edit Lot Number' : 'Add Lot Number'}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="lot-number">Lot Number *</Label>
+                <Input
+                  id="lot-number"
+                  value={lotNumber}
+                  onChange={(e) => setLotNumber(e.target.value)}
+                  placeholder="e.g., EW0646, 11953A"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lot-quantity">Quantity *</Label>
+                <Input
+                  id="lot-quantity"
+                  type="number"
+                  value={lotQuantity}
+                  onChange={(e) => setLotQuantity(e.target.value)}
+                  min="0"
+                  placeholder="e.g., 100"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lot-expiration">Expiration Date *</Label>
+                <Input
+                  id="lot-expiration"
+                  type="date"
+                  value={lotExpiration}
+                  onChange={(e) => setLotExpiration(e.target.value)}
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-4">
+                <Button variant="outline" onClick={() => setIsLotDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveLot}>{editingLot ? 'Update' : 'Add'} Lot</Button>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="lot-quantity">Quantity *</Label>
-              <Input
-                id="lot-quantity"
-                type="number"
-                value={lotQuantity}
-                onChange={(e) => setLotQuantity(e.target.value)}
-                min="0"
-                placeholder="e.g., 100"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="lot-expiration">Expiration Date *</Label>
-              <Input
-                id="lot-expiration"
-                type="date"
-                value={lotExpiration}
-                onChange={(e) => setLotExpiration(e.target.value)}
-              />
-            </div>
-            <div className="flex justify-end gap-3 pt-4">
-              <Button variant="outline" onClick={() => setIsLotDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleSaveLot}>{editingLot ? 'Update' : 'Add'} Lot</Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

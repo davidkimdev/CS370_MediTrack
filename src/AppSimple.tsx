@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from './contexts/AuthContext';
 import { AuthenticationPage } from './components/auth/AuthenticationPage';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs';
@@ -9,7 +9,7 @@ import { StockManagement } from './components/StockManagement';
 import { Button } from './components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './components/ui/sheet';
 import { Pill, ClipboardList, Package, Menu, LogOut, User } from 'lucide-react';
-import { Medication } from './types/medication';
+import { Medication, InventoryItem, DispensingRecord, User as UserType } from './types/medication';
 import { MedicationService } from './services/medicationService';
 import { logger } from './utils/logger';
 
@@ -18,9 +18,25 @@ export default function App() {
   const [currentView, setCurrentView] = useState<'formulary' | 'detail'>('formulary');
   const [selectedMedication, setSelectedMedication] = useState<Medication | null>(null);
   const [medications, setMedications] = useState<Medication[]>([]);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [dispensingRecords, setDispensingRecords] = useState<DispensingRecord[]>([]);
   const [activeTab, setActiveTab] = useState('formulary');
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const currentUser = useMemo<UserType | null>(() => {
+    if (!user) {
+      return null;
+    }
+
+    const email = user.email ?? 'User';
+    return {
+      id: user.id,
+      name: email,
+      role: 'pharmacy_staff',
+      initials: email.substring(0, 2).toUpperCase(),
+    };
+  }, [user]);
 
   // Load medications when user is authenticated
   useEffect(() => {
@@ -35,8 +51,14 @@ export default function App() {
       setError(null);
       
       console.log('🔄 Loading medications...');
-      const medicationsData = await MedicationService.getAllMedications();
+      const [medicationsData, inventoryData, dispensingData] = await Promise.all([
+        MedicationService.getAllMedications(),
+        MedicationService.getAllInventory(),
+        MedicationService.getAllDispensingRecords(),
+      ]);
       setMedications(medicationsData);
+      setInventory(inventoryData);
+      setDispensingRecords(dispensingData);
       
       logger.info('Medications loaded successfully', { count: medicationsData.length });
     } catch (err) {
@@ -46,6 +68,12 @@ export default function App() {
     } finally {
       setIsLoadingData(false);
     }
+  };
+
+  const getAlternatives = (medication: Medication): Medication[] => {
+    return medications
+      .filter((candidate) => candidate.id !== medication.id && candidate.category === medication.category)
+      .slice(0, 3);
   };
 
   const handleMedicationSelect = (medication: Medication) => {
@@ -95,7 +123,12 @@ export default function App() {
     return (
       <MedicationDetail
         medication={selectedMedication}
+        alternatives={getAlternatives(selectedMedication)}
+        inventory={inventory}
+        currentUser={currentUser ?? undefined}
+        isReadOnly={false}
         onBack={handleBackToFormulary}
+        onSelectAlternative={handleMedicationSelect}
       />
     );
   }
@@ -198,11 +231,21 @@ export default function App() {
             </TabsContent>
 
             <TabsContent value="dispensing" className="space-y-4">
-              <DispensingLog />
+              <DispensingLog records={dispensingRecords} />
             </TabsContent>
 
             <TabsContent value="inventory" className="space-y-4">
-              <StockManagement />
+              {currentUser ? (
+                <StockManagement
+                  medications={medications}
+                  inventory={inventory}
+                  currentUser={currentUser}
+                  onUpdateLot={async () => {}}
+                  onAddLot={async () => {}}
+                />
+              ) : (
+                <div className="text-sm text-muted-foreground">Loading user details…</div>
+              )}
             </TabsContent>
           </Tabs>
         )}

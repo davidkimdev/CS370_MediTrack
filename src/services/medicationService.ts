@@ -359,6 +359,7 @@ export class MedicationService {
           dispensedBy: record.entered_by || 'System',
           physicianName: record.physician_name || '',
           studentName: record.student_name || undefined,
+          clinicSite: record.clinic_site || undefined,
           // Anchor at UTC noon to ensure EST display matches calendar date; fallback to created_at if needed
           dispensedAt,
           indication: record.dose_instructions || '',
@@ -382,6 +383,7 @@ export class MedicationService {
       updateData.expiration_date = updates.expirationDate.toISOString().split('T')[0];
     if (updates.physicianName !== undefined) updateData.physician_name = updates.physicianName;
     if (updates.studentName !== undefined) updateData.student_name = updates.studentName;
+  if (updates.clinicSite !== undefined) updateData.clinic_site = updates.clinicSite ?? null;
     if (updates.indication !== undefined) updateData.dose_instructions = updates.indication;
     if (updates.notes !== undefined) updateData.notes = updates.notes;
 
@@ -425,6 +427,7 @@ export class MedicationService {
       dispensedBy: data.entered_by || 'System',
       physicianName: data.physician_name,
       studentName: data.student_name || undefined,
+      clinicSite: data.clinic_site || undefined,
       // Anchor at UTC noon; fallback if log_date missing
       dispensedAt: data.log_date
         ? logDateToUTCNoon(data.log_date)
@@ -467,6 +470,7 @@ export class MedicationService {
         physician_name: record.physicianName,
         student_name: record.studentName || null,
         entered_by: enteredBy,
+        clinic_site: record.clinicSite || null,
         notes: record.notes || null,
       })
       .select()
@@ -494,6 +498,7 @@ export class MedicationService {
       dispensedBy: record.dispensedBy,
       physicianName: data.physician_name,
       studentName: data.student_name || undefined,
+      clinicSite: data.clinic_site || record.clinicSite || undefined,
       // Anchor at UTC noon; fallback if log_date missing
       dispensedAt: data.log_date
         ? logDateToUTCNoon(data.log_date)

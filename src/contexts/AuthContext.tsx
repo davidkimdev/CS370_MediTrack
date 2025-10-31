@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { AuthService } from '../services/authService';
 import { logger } from '../utils/logger';
@@ -15,6 +16,42 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const loadUserState = useCallback(async (supabaseUser: SupabaseUser | null) => {
+    if (!supabaseUser) {
+      setUser(null);
+      setProfile(null);
+      return;
+    }
+
+    try {
+      const secondaryEmails = Array.isArray(supabaseUser.user_metadata?.secondary_emails)
+        ? (supabaseUser.user_metadata.secondary_emails as string[])
+        : [];
+
+      const loadedProfile = await AuthService.getUserProfile(supabaseUser.id);
+
+      setProfile(loadedProfile);
+      setUser({
+        id: supabaseUser.id,
+        email: supabaseUser.email ?? '',
+        secondaryEmails,
+        profile: loadedProfile ?? undefined,
+      });
+    } catch (error) {
+      logger.error(
+        'Failed to load user state',
+        error instanceof Error ? error : new Error(String(error)),
+      );
+
+      setUser({
+        id: supabaseUser.id,
+        email: supabaseUser.email ?? '',
+        secondaryEmails: [],
+        profile: undefined,
+      });
+    }
+  }, []);
 
   // Fallback timeout to prevent infinite loading
   useEffect(() => {
@@ -34,18 +71,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.log('🔷 AuthContext: Quick initialization starting...');
       
       try {
-        // Quick session check only - no profile fetching
         const { data: { session } } = await supabase.auth.getSession();
-        
-        if (session?.user && mounted) {
-          console.log('🔷 AuthContext: Found session, setting basic user');
-          setUser({
-            id: session.user.id,
-            email: session.user.email!,
-            profile: undefined // Don't fetch profile on startup
-          });
-        } else {
-          console.log('🔷 AuthContext: No session found');
+
+        if (mounted) {
+          await loadUserState(session?.user ?? null);
         }
       } catch (error) {
         console.error('🔷 AuthContext: Quick init error:', error);
@@ -62,18 +91,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     // Simplified auth state listener - no async operations to prevent loops
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         if (!mounted) return;
 
         console.log('🔷 Auth event:', event);
 
         if (event === 'SIGNED_IN' && session?.user) {
           console.log('🔷 Setting user from sign-in event');
-          setUser({
-            id: session.user.id,
-            email: session.user.email!,
-            profile: undefined // Will be loaded separately when needed
-          });
+          await loadUserState(session.user);
           setIsLoading(false);
         } else if (event === 'SIGNED_OUT') {
           console.log('🔷 Clearing user from sign-out event');
@@ -93,32 +118,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const signIn = async (email: string, password: string) => {
     console.log('🔷 Fast sign-in starting for:', email);
-    setIsLoading(true);
-    
     try {
-      // Just do the basic Supabase sign-in, let auth listener handle the rest
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
       });
-      
+
       if (error) {
         throw error;
       }
-      
-      console.log('🔷 Sign-in successful, auth listener will handle state');
-      // Don't set state here - let the auth state listener handle it
-      
+
+      console.log('🔷 Sign-in successful, refreshing user state');
+      await loadUserState(data.user ?? null);
+      setIsLoading(false);
     } catch (error) {
-      console.error('🔷 Sign-in failed:', error);
-      setIsLoading(false); // Only set loading false on error
+      console.error('🔷 AuthContext: Sign-in failed:', error);
       throw error;
     }
   };
 
   const signUp = async (data: RegistrationData) => {
     console.log('🟦 AuthContext.signUp called', { email: data.email });
-    setIsLoading(true);
     try {
       console.log('🟦 Calling AuthService.signUp...');
       await AuthService.signUp(data);
@@ -129,7 +149,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       logger.error('Registration failed', error instanceof Error ? error : new Error(String(error)));
       throw error;
     } finally {
-      setIsLoading(false);
       console.log('🟦 AuthContext.signUp completed');
     }
   };
@@ -172,6 +191,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
+  const refreshUser = useCallback(async () => {
+    const { data: { user: current } } = await supabase.auth.getUser();
+    await loadUserState(current ?? null);
+  }, [loadUserState]);
+
   const contextValue: AuthContextType = {
     user,
     profile,
@@ -183,7 +207,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     signUp,
     signOut,
     resetPassword,
-    updateProfile
+    updateProfile,
+    refreshUser
   };
 
   return (

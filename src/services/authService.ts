@@ -3,6 +3,52 @@ import { logger } from '../utils/logger';
 import type { AuthUser, UserProfile, RegistrationData, InvitationCode } from '../types/auth';
 
 export class AuthService {
+  private static getFunctionsBasePath(): string {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    if (!supabaseUrl) {
+      throw new Error('Missing Supabase configuration');
+    }
+    return `${supabaseUrl}/functions/v1/server/make-server-be81afe8`;
+  }
+
+  private static async callAdminFunction<T>(endpoint: string, body: Record<string, unknown>): Promise<T> {
+    const session = await this.getSession();
+    const accessToken = session?.access_token;
+
+    if (!accessToken) {
+      throw new Error('You must be signed in to perform this action');
+    }
+
+    const url = `${this.getFunctionsBasePath()}${endpoint}`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    const text = await response.text();
+    let payload: any = null;
+
+    if (text) {
+      try {
+        payload = JSON.parse(text);
+      } catch (parseError) {
+        logger.warn('Failed to parse admin function response', parseError instanceof Error ? parseError : new Error(String(parseError)));
+      }
+    }
+
+    if (!response.ok) {
+      const message = payload?.error ?? 'Admin request failed';
+      throw new Error(message);
+    }
+
+    return payload as T;
+  }
+
   /**
    * Sign in with email and password - simplified for performance
    */
@@ -341,6 +387,58 @@ export class AuthService {
   }
 
   /**
+   * Admin: Fetch invitation codes
+   */
+  static async getInvitationCodes(): Promise<InvitationCode[]> {
+    try {
+      const { data, error } = await supabase
+        .from('invitation_codes')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw new Error(`Failed to fetch invitation codes: ${error.message}`);
+      }
+
+      return (data || []).map((code) => ({
+        id: code.id,
+        code: code.code,
+        email: code.email ?? undefined,
+        createdBy: code.created_by,
+        createdAt: new Date(code.created_at),
+        expiresAt: new Date(code.expires_at),
+        usedBy: code.used_by ?? undefined,
+        usedAt: code.used_at ? new Date(code.used_at) : undefined,
+        isActive: code.is_active,
+      }));
+    } catch (error) {
+      logger.error('Get invitation codes error', error instanceof Error ? error : new Error(String(error)));
+      throw error;
+    }
+  }
+
+  /**
+   * Admin: Deactivate invitation code
+   */
+  static async deactivateInvitationCode(codeId: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('invitation_codes')
+        .update({ is_active: false })
+        .eq('id', codeId);
+
+      if (error) {
+        throw new Error(`Failed to deactivate invitation code: ${error.message}`);
+      }
+
+      logger.info('Invitation code deactivated', { codeId });
+    } catch (error) {
+      logger.error('Deactivate invitation code error', error instanceof Error ? error : new Error(String(error)));
+      throw error;
+    }
+  }
+
+  /**
    * Generate random invitation code
    */
   private static generateInvitationCode(): string {
@@ -425,7 +523,17 @@ export class AuthService {
         throw new Error(`Failed to get users: ${error.message}`);
       }
 
-      return data || [];
+      return (data || []).map(user => ({
+        id: user.id,
+        email: user.email,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        role: user.role,
+        isApproved: user.is_approved,
+        approvedBy: user.approved_by,
+        approvedAt: user.approved_at ? new Date(user.approved_at) : undefined,
+        createdAt: new Date(user.created_at)
+      }));
     } catch (error) {
       logger.error('Get all users error', error instanceof Error ? error : new Error(String(error)));
       throw error;
@@ -437,22 +545,69 @@ export class AuthService {
    */
   static async rejectUser(userId: string): Promise<void> {
     try {
-      // Delete the user profile and auth user
-      const { error: profileError } = await supabase
-        .from('user_profiles')
-        .delete()
-        .eq('id', userId);
-
-      if (profileError) {
-        throw new Error(`Failed to reject user profile: ${profileError.message}`);
-      }
-
-      // Note: Supabase auth users cannot be deleted via client SDK
-      // This would need to be done via admin API or manual cleanup
-      
-      logger.info('User rejected', { userId });
+      await this.callAdminFunction<{ success: boolean }>('/admin/reject-user', { userId });
+      logger.info('User rejected and auth removed', { userId });
     } catch (error) {
       logger.error('Reject user error', error instanceof Error ? error : new Error(String(error)));
+      throw error;
+    }
+  }
+
+  /**
+   * Admin: Update another user's profile fields
+   */
+  static async adminUpdateUser(
+    userId: string,
+    updates: Pick<Partial<UserProfile>, 'role' | 'isApproved'>,
+  ): Promise<UserProfile> {
+    try {
+      const payload: Record<string, unknown> = {};
+
+      if (updates.role) {
+        payload.role = updates.role;
+      }
+
+      if (typeof updates.isApproved === 'boolean') {
+        payload.isApproved = updates.isApproved;
+      }
+
+      if (Object.keys(payload).length === 0) {
+        throw new Error('No admin updates provided');
+      }
+
+      const response = await this.callAdminFunction<{
+        success: boolean;
+        profile: {
+          id: string;
+          email: string;
+          firstName: string;
+          lastName: string;
+          role: 'admin' | 'staff';
+          isApproved: boolean;
+          approvedBy: string | null;
+          approvedAt: string | null;
+          createdAt: string;
+        };
+      }>('/admin/update-profile', {
+        userId,
+        updates: payload,
+      });
+
+      const updated = response.profile;
+
+      return {
+        id: updated.id,
+        email: updated.email,
+        firstName: updated.firstName,
+        lastName: updated.lastName,
+        role: updated.role,
+        isApproved: updated.isApproved,
+        approvedBy: updated.approvedBy ?? undefined,
+        approvedAt: updated.approvedAt ? new Date(updated.approvedAt) : undefined,
+        createdAt: new Date(updated.createdAt),
+      };
+    } catch (error) {
+      logger.error('Admin update user error', error instanceof Error ? error : new Error(String(error)));
       throw error;
     }
   }

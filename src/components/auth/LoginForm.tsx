@@ -13,26 +13,50 @@ interface LoginFormProps {
 }
 
 export function LoginForm({ onSwitchToRegister, onSwitchToReset }: LoginFormProps) {
-  const { signIn, isLoading } = useAuth();
+  const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
+
     if (!email || !password) {
       setError('Please fill in all fields');
       return;
     }
 
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
+    setIsSubmitting(true);
+
     try {
-      setError('');
       await signIn(email, password);
+      setError('');
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Login failed. Please try again.';
+      let errorMessage = 'Login failed. Please try again.';
+
+      if (err instanceof Error) {
+        if (err.message.includes('Invalid login credentials')) {
+          errorMessage = 'Invalid email or password. Please check your credentials.';
+        } else if (err.message.includes('Email not confirmed')) {
+          errorMessage = 'Please check your email and click the confirmation link.';
+        } else if (err.message.includes('Too many requests')) {
+          errorMessage = 'Too many login attempts. Please wait and try again.';
+        } else {
+          errorMessage = err.message;
+        }
+      }
+
       setError(errorMessage);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -59,11 +83,14 @@ export function LoginForm({ onSwitchToRegister, onSwitchToReset }: LoginFormProp
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Error Display */}
+            <form 
+              onSubmit={handleSubmit}
+              noValidate
+              className="space-y-4"
+            >
               {error && (
-                <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 p-3 rounded-md">
-                  <AlertCircle className="size-4 flex-shrink-0" />
+                <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                  <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
                   <span>{error}</span>
                 </div>
               )}
@@ -76,8 +103,13 @@ export function LoginForm({ onSwitchToRegister, onSwitchToReset }: LoginFormProp
                   type="email"
                   placeholder="Enter your email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  disabled={isLoading}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (error) {
+                      setError('');
+                    }
+                  }}
+                  disabled={isSubmitting}
                   required
                   autoComplete="email"
                 />
@@ -92,8 +124,13 @@ export function LoginForm({ onSwitchToRegister, onSwitchToReset }: LoginFormProp
                     type={showPassword ? "text" : "password"}
                     placeholder="Enter your password"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    disabled={isLoading}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (error) {
+                        setError('');
+                      }
+                    }}
+                    disabled={isSubmitting}
                     required
                     autoComplete="current-password"
                   />
@@ -103,7 +140,7 @@ export function LoginForm({ onSwitchToRegister, onSwitchToReset }: LoginFormProp
                     size="sm"
                     className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                     onClick={() => setShowPassword(!showPassword)}
-                    disabled={isLoading}
+                    disabled={isSubmitting}
                   >
                     {showPassword ? (
                       <EyeOff className="h-4 w-4" />
@@ -116,11 +153,11 @@ export function LoginForm({ onSwitchToRegister, onSwitchToReset }: LoginFormProp
 
               {/* Sign In Button */}
               <Button 
-                type="submit" 
+                type="submit"
                 className="w-full" 
-                disabled={isLoading || !email || !password}
+                disabled={isSubmitting || !email || !password}
               >
-                {isLoading ? 'Signing in...' : 'Sign in'}
+                {isSubmitting ? 'Signing in...' : 'Sign in'}
               </Button>
 
               {/* Forgot Password Link */}
@@ -129,7 +166,7 @@ export function LoginForm({ onSwitchToRegister, onSwitchToReset }: LoginFormProp
                   type="button"
                   variant="link"
                   onClick={onSwitchToReset}
-                  disabled={isLoading}
+                  disabled={isSubmitting}
                   className="text-sm"
                 >
                   Forgot your password?
@@ -146,7 +183,7 @@ export function LoginForm({ onSwitchToRegister, onSwitchToReset }: LoginFormProp
                 type="button"
                 variant="link"
                 onClick={onSwitchToRegister}
-                disabled={isLoading}
+                disabled={isSubmitting}
                 className="p-0 h-auto font-semibold"
               >
                 Create an account

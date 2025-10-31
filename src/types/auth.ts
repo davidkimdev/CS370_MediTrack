@@ -13,6 +13,7 @@ export interface UserProfile {
 export interface AuthUser {
   id: string;
   email: string;
+  secondaryEmails?: string[];
   profile?: UserProfile;
 }
 
@@ -48,6 +49,7 @@ export interface AuthContextType {
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updateProfile: (data: Partial<UserProfile>) => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 export interface AuthError {
