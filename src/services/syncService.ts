@@ -34,14 +34,23 @@ export class SyncService {
 
   // Real-time subscription to medications changes to keep cache fresh while online
   startMedicationsRealtime(): void {
-    if (this.subscription) return;
+    if (this.subscription) {
+      console.log('⚠️ Realtime already active, skipping duplicate subscription');
+      return;
+    }
+    
+    console.log('📡 Starting realtime subscription for inventory changes...');
+    
     // Listen to inventory changes since stock is derived from inventory rows
     const channel = supabase.channel('rt-inventory');
+    
     channel.on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'inventory' },
       async (payload: any) => {
         try {
+          console.log('📦 Inventory change detected:', payload.eventType);
+          
           // Determine affected medication_id from new/old row
           const medId = (payload.new?.medication_id || payload.old?.medication_id) as
             | string
@@ -59,17 +68,27 @@ export class SyncService {
             0,
           );
           await OfflineStore.updateMedicationStock(medId, total);
+          console.log(`✅ Updated stock for medication ${medId}: ${total}`);
         } catch (e) {
           logger.warn('Realtime inventory refresh failed', e);
         }
       },
     );
-    channel.subscribe();
+    
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        console.log('✅ Realtime subscription active');
+      } else if (status === 'CHANNEL_ERROR') {
+        console.error('❌ Realtime subscription error');
+      }
+    });
+    
     this.subscription = channel;
   }
 
   stopRealtime(): void {
     if (this.subscription) {
+      console.log('🛑 Stopping realtime subscription');
       this.subscription.unsubscribe();
       this.subscription = null;
     }

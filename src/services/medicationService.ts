@@ -6,31 +6,62 @@ import { logger } from '../utils/logger';
 export class MedicationService {
   // Medications
   static async getAllMedications(): Promise<Medication[]> {
-    // First get all medications
-    const { data: medications, error: medError } = await supabase
+    console.log('🔍 MedicationService: Starting to fetch medications...');
+    console.log('🔗 Supabase URL:', supabase['supabaseUrl']);
+
+    // Add timeout wrapper
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Query timeout after 10 seconds - possible RLS issue')), 10000)
+    );
+
+    // First get all medications with timeout
+    const queryPromise = supabase
       .from('medications')
       .select('*')
       .eq('is_active', true)
       .order('name');
 
+    console.log('⏳ Waiting for medications query...');
+    const { data: medications, error: medError } = await Promise.race([
+      queryPromise,
+      timeoutPromise
+    ]).catch(err => {
+      console.error('❌ TIMEOUT ERROR:', err.message);
+      console.error('💡 This usually means RLS policies are blocking the query.');
+      console.error('💡 Check Supabase dashboard → Database → Policies');
+      throw err;
+    }) as any;
+
     if (medError) {
+      console.error('❌ MEDICATIONS ERROR:', medError);
+      console.error('❌ Error code:', medError.code);
+      console.error('❌ Error message:', medError.message);
+      console.error('❌ Error details:', medError.details);
+      console.error('❌ Error hint:', medError.hint);
       logger.error('Error fetching medications', medError);
-      throw new Error('Failed to fetch medications');
+      throw new Error(`Failed to fetch medications: ${medError.message}`);
     }
 
-    // Then get all inventory
+    console.log(`✅ Fetched ${medications?.length || 0} medications`);
+
+    // Then get all inventory (no timeout for now to debug)
+    console.log('🔍 Fetching inventory...');
     const { data: inventory, error: invError } = await supabase
       .from('inventory')
       .select('medication_id, qty_units, updated_at, created_at');
 
     if (invError) {
       logger.error('Error fetching inventory', invError);
+      console.warn('⚠️ Inventory fetch failed, continuing without inventory data');
+      // Continue without inventory instead of failing completely
+    } else {
+      console.log(`✅ Fetched ${inventory?.length || 0} inventory items`);
     }
 
     // Group inventory by medication_id
     const inventoryMap = new Map<string, { quantity: number; lastUpdated?: string }>();
     logger.debug('Total inventory items fetched', { count: inventory?.length });
-    inventory?.forEach((inv) => {
+    inventory?.forEach((inv: any) => {
       const entry = inventoryMap.get(inv.medication_id) || { quantity: 0, lastUpdated: undefined };
       const qty = inv.qty_units || 0;
       entry.quantity += qty;
@@ -48,7 +79,7 @@ export class MedicationService {
     });
 
     return (
-      medications?.map((med) => {
+      medications?.map((med: any) => {
         const inventoryStats = inventoryMap.get(med.id);
         const totalStock = inventoryStats?.quantity || 0;
         const lastUpdatedSource =
@@ -187,7 +218,7 @@ export class MedicationService {
     }
 
     return (
-      data?.map((item) => ({
+      data?.map((item: any) => ({
         id: item.id,
         medicationId: item.medication_id,
         lotNumber: item.lot_number,
@@ -199,15 +230,23 @@ export class MedicationService {
   }
 
   static async getAllInventory(): Promise<InventoryItem[]> {
-    const { data, error } = await supabase.from('inventory').select('*').order('expiration_date');
+    console.log('🔍 MedicationService: Starting to fetch all inventory...');
+    
+    // Remove timeout temporarily to debug
+    const { data, error } = await supabase
+      .from('inventory')
+      .select('*')
+      .order('expiration_date');
 
     if (error) {
       logger.error('Error fetching all inventory', error);
       throw new Error('Failed to fetch inventory');
     }
+    
+    console.log(`✅ Fetched ${data?.length || 0} total inventory items`);
 
     return (
-      data?.map((item) => ({
+      data?.map((item: any) => ({
         id: item.id,
         medicationId: item.medication_id,
         lotNumber: item.lot_number,
@@ -317,6 +356,9 @@ export class MedicationService {
 
   // Dispensing Records
   static async getAllDispensingRecords(): Promise<DispensingRecord[]> {
+    console.log('🔍 MedicationService: Starting to fetch dispensing records...');
+    
+    // Remove timeout temporarily to debug
     const { data, error } = await supabase
       .from('dispensing_logs')
       .select('*')
@@ -326,9 +368,11 @@ export class MedicationService {
       logger.error('Error fetching dispensing records', error);
       throw new Error('Failed to fetch dispensing records');
     }
+    
+    console.log(`✅ Fetched ${data?.length || 0} dispensing records`);
 
     return (
-      data?.map((record) => {
+      data?.map((record: any) => {
         const dispensedAt = record.log_date
           ? logDateToUTCNoon(record.log_date)
           : record.created_at

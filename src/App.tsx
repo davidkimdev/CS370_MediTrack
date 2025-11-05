@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useAuth } from './contexts/AuthContext';
 import { AuthenticationPage } from './components/auth/AuthenticationPage';
 import { FormularyView } from './components/FormularyView';
@@ -39,8 +39,22 @@ export default function App() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [lastLoadedMode, setLastLoadedMode] = useState<'authenticated' | 'public' | null>(null);
+  const isLoadingDataRef = useRef(false);
+  const lastLoadedModeRef = useRef<'authenticated' | 'public' | null>(null);
+  const isMountedRef = useRef(true);
 
   const isAdmin = profile?.role === 'admin';
+
+  // Track component mount/unmount
+  useEffect(() => {
+    console.log('🚀 App component mounted');
+    isMountedRef.current = true;
+    return () => {
+      console.log('🛑 App component unmounting, cleaning up...');
+      isMountedRef.current = false;
+      syncService.stopRealtime();
+    };
+  }, []);
 
   // Initialize currentUser when authentication completes
   useEffect(() => {
@@ -89,30 +103,32 @@ export default function App() {
     }
   }, [isAuthenticated]);
 
-  // Load medications when user is authenticated
-  useEffect(() => {
-    if (isLoading) {
+  const loadInitialData = useCallback(async (authenticated: boolean, force = false) => {
+    // Check if component is still mounted
+    if (!isMountedRef.current) {
+      console.log('⚠️ Component unmounted, aborting data load');
       return;
     }
 
-    const desiredMode = isAuthenticated ? 'authenticated' : 'public';
-    if (lastLoadedMode === desiredMode) {
+    // Prevent concurrent calls
+    if (isLoadingDataRef.current && !force) {
+      console.log('⏸️ Load already in progress, skipping...');
       return;
     }
 
-    void loadInitialData(isAuthenticated);
-  }, [isLoading, isAuthenticated, lastLoadedMode]);
+    const mode = authenticated ? 'authenticated' : 'public';
+    
+    // Check if already loaded in this mode (using ref to avoid stale closure)
+    if (!force && lastLoadedModeRef.current === mode) {
+      console.log(`⏸️ Already loaded in ${mode} mode, skipping...`);
+      return;
+    }
 
-  const loadInitialData = async (authenticated: boolean, force = false) => {
+    isLoadingDataRef.current = true;
+    setIsLoadingData(true);
+    setError(null);
+
     try {
-      const mode = authenticated ? 'authenticated' : 'public';
-      if (!force && lastLoadedMode === mode) {
-        return;
-      }
-
-      setIsLoadingData(true);
-      setError(null);
-
       console.log(`🔄 Loading ${mode} data...`);
 
       let medicationsData: Medication[] = [];
@@ -126,34 +142,74 @@ export default function App() {
       if (navigator.onLine) {
         if (authenticated) {
           try {
-            [medicationsData, dispensingData, inventoryData] = await Promise.all([
-              MedicationService.getAllMedications(),
-              MedicationService.getAllDispensingRecords(),
-              MedicationService.getAllInventory(),
-            ]);
+            console.log('📡 Fetching authenticated data from server...');
+            console.time('Data fetch duration');
+            
+            try {
+              medicationsData = await MedicationService.getAllMedications();
+            } catch (medErr) {
+              console.error('❌ Failed to fetch medications:', medErr);
+              throw medErr;
+            }
+            
+            try {
+              dispensingData = await MedicationService.getAllDispensingRecords();
+            } catch (dispErr) {
+              console.error('❌ Failed to fetch dispensing records:', dispErr);
+              throw dispErr;
+            }
+            
+            try {
+              inventoryData = await MedicationService.getAllInventory();
+            } catch (invErr) {
+              console.error('❌ Failed to fetch inventory:', invErr);
+              throw invErr;
+            }
+            
+            console.timeEnd('Data fetch duration');
+            console.log('✅ Authenticated data fetched successfully');
+            
+            // Only start realtime if not already started
+            syncService.stopRealtime(); // Stop any existing subscription first
             syncService.startMedicationsRealtime();
+            console.log('📡 Realtime subscription started');
           } catch (err) {
-            console.warn('Online fetch failed, trying offline cache:', err);
+            console.error('❌ Online fetch failed:', err);
+            console.warn('🔄 Trying offline cache...');
             medicationsData = await OfflineStore.getAllMedications();
             dispensingData = [];
             inventoryData = [];
+            console.log(`📦 Loaded ${medicationsData.length} medications from cache`);
           }
         } else {
           try {
-            [medicationsData, inventoryData] = await Promise.all([
-              MedicationService.getAllMedications(),
-              MedicationService.getAllInventory(),
-            ]);
+            console.log('📡 Fetching public data from server...');
+            console.time('Public data fetch duration');
+            
+            medicationsData = await MedicationService.getAllMedications();
+            inventoryData = await MedicationService.getAllInventory();
+            
+            console.timeEnd('Public data fetch duration');
+            console.log('✅ Public data fetched successfully');
           } catch (err) {
-            console.warn('Public data fetch failed, trying offline cache:', err);
+            console.error('❌ Public data fetch failed:', err);
+            console.warn('🔄 Trying offline cache...');
             medicationsData = await OfflineStore.getAllMedications();
             inventoryData = [];
+            console.log(`📦 Loaded ${medicationsData.length} medications from cache`);
           }
         }
       } else {
+        console.log('📴 Offline mode - loading from cache');
         medicationsData = await OfflineStore.getAllMedications();
         inventoryData = [];
         dispensingData = [];
+      }
+
+      // Only update state if still mounted
+      if (!isMountedRef.current) {
+        console.log('⚠️ Component unmounted during load, skipping state updates');
+        return;
       }
 
       setMedications(medicationsData);
@@ -161,6 +217,7 @@ export default function App() {
       setInventory(inventoryData);
       setPendingChanges(0);
       setLastLoadedMode(mode);
+      lastLoadedModeRef.current = mode; // Update ref
 
       logger.info('All data loaded successfully', {
         mode,
@@ -169,13 +226,65 @@ export default function App() {
         inventory: inventoryData.length,
       });
     } catch (err) {
+      if (!isMountedRef.current) {
+        console.log('⚠️ Component unmounted during error, skipping error state');
+        return;
+      }
       const errorMessage = err instanceof Error ? err.message : 'Failed to load data';
       setError(errorMessage);
       logger.error('Failed to load initial data', err instanceof Error ? err : new Error(String(err)));
     } finally {
-      setIsLoadingData(false);
+      if (isMountedRef.current) {
+        setIsLoadingData(false);
+      }
+      isLoadingDataRef.current = false;
     }
-  };
+  }, []);
+
+  // Reset loaded mode when auth state changes significantly
+  useEffect(() => {
+    if (!isLoading) {
+      const currentMode = isAuthenticated ? 'authenticated' : 'public';
+      // If auth state changed, reset the ref so data reloads
+      if (lastLoadedModeRef.current !== null && lastLoadedModeRef.current !== currentMode) {
+        console.log(`🔄 Auth mode changed from ${lastLoadedModeRef.current} to ${currentMode}, resetting...`);
+        lastLoadedModeRef.current = null;
+        setLastLoadedMode(null);
+      }
+    }
+  }, [isLoading, isAuthenticated]);
+
+  // Load medications when user is authenticated
+  useEffect(() => {
+    if (isLoading) {
+      console.log('⏳ Waiting for auth to finish loading...');
+      return;
+    }
+
+    const desiredMode = isAuthenticated ? 'authenticated' : 'public';
+    // Use ref to check current mode without causing re-renders
+    if (lastLoadedModeRef.current === desiredMode) {
+      console.log(`✅ Already loaded in ${desiredMode} mode, skipping reload`);
+      return;
+    }
+
+    console.log(`🚀 Starting to load data in ${desiredMode} mode...`);
+    void loadInitialData(isAuthenticated);
+  }, [isLoading, isAuthenticated, loadInitialData]);
+
+  // Safety timeout: if data loading takes too long, show error
+  useEffect(() => {
+    if (isLoadingData && !error) {
+      const timeout = setTimeout(() => {
+        console.error('⏱️ Data loading timeout after 30 seconds');
+        setError('Data loading is taking longer than expected. Please refresh the page.');
+        setIsLoadingData(false);
+        isLoadingDataRef.current = false;
+      }, 30000); // 30 second timeout
+
+      return () => clearTimeout(timeout);
+    }
+  }, [isLoadingData, error]);
 
   const handleMedicationSelect = (medication: Medication) => {
     setSelectedMedication(medication);

@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+// Lazy load XLSX to reduce initial bundle size
 import { ImportedMedicationRow } from '../components/BulkImportDialog';
 
 /**
@@ -21,6 +21,9 @@ export async function parseFormularyFile(file: File): Promise<ImportedMedication
  * Expected columns: Name, Strength, Quantity, Lot Number (optional), Expiration Date (optional)
  */
 async function parseExcelFile(file: File): Promise<ImportedMedicationRow[]> {
+  // Dynamically import XLSX only when needed
+  const XLSX = await import('xlsx');
+  
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 

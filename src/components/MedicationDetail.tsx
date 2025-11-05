@@ -90,7 +90,7 @@ export function MedicationDetail({
     if (!readOnly && currentUser?.name && !studentName) {
       setStudentName(currentUser.name);
     }
-  }, [currentUser?.name, readOnly, studentName]);
+  }, [currentUser?.name, readOnly]); // Removed studentName from deps to prevent loop
   const medicationInventory = inventory.filter((inv) => inv.medicationId === medication.id);
   const availableLots = medicationInventory.filter((inv) => !inv.isExpired && inv.quantity > 0);
 
@@ -314,13 +314,16 @@ export function MedicationDetail({
                       Dispense
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-2xl">
-                  <DialogHeader>
-                    <DialogTitle>Dispense {medication.name}</DialogTitle>
-                    <DialogDescription>Record medication dispensing for patient</DialogDescription>
-                  </DialogHeader>
-                  <div className="max-h-[60vh] overflow-y-auto -mx-6 px-6">
-                    <div className="space-y-4 py-2">
+                  <DialogContent className="w-11/12 max-w-2xl max-h-[90vh] !flex !flex-col !p-0 !gap-0 overflow-hidden">
+                    {/* Header - Fixed */}
+                    <div className="p-6 border-b flex-shrink-0">
+                      <h2 className="text-lg font-semibold leading-none">Dispense {medication.name}</h2>
+                      <p className="text-sm text-muted-foreground mt-2">Record medication dispensing for patient</p>
+                    </div>
+
+                    {/* Content - Scrollable */}
+                    <div className="flex-1 overflow-y-auto p-6">
+                      <div className="space-y-4">
                       {/* Patient Information */}
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-2">
@@ -500,12 +503,16 @@ export function MedicationDetail({
                         />
                       </div>
 
+                      </div>
+                    </div>
+
+                    {/* Footer - Fixed */}
+                    <div className="p-6 border-t flex-shrink-0">
                       <Button onClick={handleDispense} className="w-full">
                         Confirm Dispensing
                       </Button>
                     </div>
-                  </div>
-                </DialogContent>
+                  </DialogContent>
                 </Dialog>
               )
             )}
