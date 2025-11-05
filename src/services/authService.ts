@@ -561,89 +561,50 @@ export class AuthService {
     updates: Pick<Partial<UserProfile>, 'role' | 'isApproved'>,
   ): Promise<UserProfile> {
     try {
-      const session = await this.getSession();
-      const currentUserId = session?.user?.id;
+      const payload: Record<string, unknown> = {};
 
-      if (!currentUserId) {
-        throw new Error('You must be signed in to manage accounts');
+      if (updates.role) {
+        payload.role = updates.role;
       }
 
-      const adminProfile = await this.getUserProfile(currentUserId);
-      if (!adminProfile || adminProfile.role !== 'admin' || !adminProfile.isApproved) {
-        throw new Error('Administrator access is required');
+      if (typeof updates.isApproved === 'boolean') {
+        payload.isApproved = updates.isApproved;
       }
 
-      const { data: targetProfile, error: targetError } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
-
-      if (targetError) {
-        throw new Error('Failed to load user profile');
+      if (Object.keys(payload).length === 0) {
+        throw new Error('No admin updates provided');
       }
 
-      if (!targetProfile) {
-        throw new Error('User not found');
-      }
+      const response = await this.callAdminFunction<{
+        success: boolean;
+        profile: {
+          id: string;
+          email: string;
+          firstName: string;
+          lastName: string;
+          role: 'admin' | 'staff';
+          isApproved: boolean;
+          approvedBy: string | null;
+          approvedAt: string | null;
+          createdAt: string;
+        };
+      }>('/admin/update-profile', {
+        userId,
+        updates: payload,
+      });
 
-      const updateData: Record<string, unknown> = {};
-
-      if (updates.role && updates.role !== targetProfile.role) {
-        if (userId === currentUserId) {
-          throw new Error('You cannot change your own role');
-        }
-
-        if (targetProfile.role === 'admin' && updates.role !== 'admin') {
-          const { count: adminCount, error: countError } = await supabase
-            .from('user_profiles')
-            .select('id', { count: 'exact', head: true })
-            .eq('role', 'admin')
-            .eq('is_approved', true);
-
-          if (countError) {
-            throw new Error('Unable to validate administrator count');
-          }
-
-          if (!adminCount || adminCount <= 1) {
-            throw new Error('At least one approved administrator is required');
-          }
-        }
-
-        updateData.role = updates.role;
-      }
-
-      if (typeof updates.isApproved === 'boolean' && updates.isApproved !== targetProfile.is_approved) {
-        updateData.is_approved = updates.isApproved;
-        updateData.approved_by = updates.isApproved ? currentUserId : null;
-        updateData.approved_at = updates.isApproved ? new Date().toISOString() : null;
-      }
-
-      if (Object.keys(updateData).length === 0) {
-        throw new Error('No changes submitted');
-      }
-
-      const { data: updatedProfile, error: updateError } = await supabase
-        .from('user_profiles')
-        .update(updateData)
-        .eq('id', userId)
-        .select('*')
-        .maybeSingle();
-
-      if (updateError || !updatedProfile) {
-        throw new Error(updateError?.message || 'Failed to update profile');
-      }
+      const updated = response.profile;
 
       return {
-        id: updatedProfile.id,
-        email: updatedProfile.email,
-        firstName: updatedProfile.first_name,
-        lastName: updatedProfile.last_name,
-        role: updatedProfile.role,
-        isApproved: updatedProfile.is_approved,
-        approvedBy: updatedProfile.approved_by ?? undefined,
-        approvedAt: updatedProfile.approved_at ? new Date(updatedProfile.approved_at) : undefined,
-        createdAt: new Date(updatedProfile.created_at),
+        id: updated.id,
+        email: updated.email,
+        firstName: updated.firstName,
+        lastName: updated.lastName,
+        role: updated.role,
+        isApproved: updated.isApproved,
+        approvedBy: updated.approvedBy ?? undefined,
+        approvedAt: updated.approvedAt ? new Date(updated.approvedAt) : undefined,
+        createdAt: new Date(updated.createdAt),
       };
     } catch (error) {
       logger.error('Admin update user error', error instanceof Error ? error : new Error(String(error)));
