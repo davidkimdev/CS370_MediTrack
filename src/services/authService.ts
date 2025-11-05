@@ -221,12 +221,27 @@ export class AuthService {
   static async getUserProfile(userId: string): Promise<UserProfile | null> {
     try {
       console.log('🔍 AuthService: Fetching profile for user:', userId);
-      
-      const { data, error } = await supabase
+
+      // Add timeout wrapper like MedicationService
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Profile query timeout after 10 seconds')), 10000)
+      );
+
+      const queryPromise = supabase
         .from('user_profiles')
         .select('*')
         .eq('id', userId)
         .single();
+
+      console.log('⏳ Waiting for profile query...');
+
+      const { data, error } = await Promise.race([
+        queryPromise,
+        timeoutPromise
+      ]).catch(err => {
+        console.error('❌ PROFILE TIMEOUT ERROR:', err.message);
+        throw err;
+      }) as any;
 
       console.log('🔍 AuthService: Profile query result:', { data, error });
 
@@ -237,9 +252,14 @@ export class AuthService {
           return null;
         }
         console.error('🔍 AuthService: Profile fetch error:', error);
+        console.error('   Error code:', error.code);
+        console.error('   Error message:', error.message);
+        console.error('   Error details:', error.details);
         logger.error('Failed to fetch user profile', error);
-        return null;
+        throw new Error(`Failed to fetch profile: ${error.message}`);
       }
+
+      console.log('✅ Profile fetched successfully:', data.email);
 
       return {
         id: data.id,
@@ -253,8 +273,9 @@ export class AuthService {
         createdAt: new Date(data.created_at)
       };
     } catch (error) {
+      console.error('❌ getUserProfile error:', error);
       logger.error('Get user profile error', error instanceof Error ? error : new Error(String(error)));
-      return null;
+      throw error; // Re-throw so retry logic can catch it
     }
   }
 

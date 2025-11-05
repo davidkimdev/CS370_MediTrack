@@ -42,6 +42,7 @@ export default function App() {
   const isLoadingDataRef = useRef(false);
   const lastLoadedModeRef = useRef<'authenticated' | 'public' | null>(null);
   const isMountedRef = useRef(true);
+  const hasLoadedForCurrentAuthRef = useRef(false);
 
   const isAdmin = profile?.role === 'admin';
 
@@ -49,6 +50,13 @@ export default function App() {
   useEffect(() => {
     console.log('🚀 App component mounted');
     isMountedRef.current = true;
+
+    // CRITICAL FIX: Reset loading flag on mount to prevent stuck "Loading..." state
+    // This can happen if page refreshes while data is loading
+    isLoadingDataRef.current = false;
+    lastLoadedModeRef.current = null;
+    hasLoadedForCurrentAuthRef.current = false;
+
     return () => {
       console.log('🛑 App component unmounting, cleaning up...');
       isMountedRef.current = false;
@@ -117,12 +125,6 @@ export default function App() {
     }
 
     const mode = authenticated ? 'authenticated' : 'public';
-    
-    // Check if already loaded in this mode (using ref to avoid stale closure)
-    if (!force && lastLoadedModeRef.current === mode) {
-      console.log(`⏸️ Already loaded in ${mode} mode, skipping...`);
-      return;
-    }
 
     isLoadingDataRef.current = true;
     setIsLoadingData(true);
@@ -217,7 +219,7 @@ export default function App() {
       setInventory(inventoryData);
       setPendingChanges(0);
       setLastLoadedMode(mode);
-      lastLoadedModeRef.current = mode; // Update ref
+      lastLoadedModeRef.current = mode;
 
       logger.info('All data loaded successfully', {
         mode,
@@ -241,18 +243,22 @@ export default function App() {
     }
   }, []);
 
-  // Reset loaded mode when auth state changes significantly
+  // Reset load flag when auth state changes
   useEffect(() => {
     if (!isLoading) {
       const currentMode = isAuthenticated ? 'authenticated' : 'public';
-      // If auth state changed, reset the ref so data reloads
+      // If auth mode changed, reset the flag so we reload
       if (lastLoadedModeRef.current !== null && lastLoadedModeRef.current !== currentMode) {
-        console.log(`🔄 Auth mode changed from ${lastLoadedModeRef.current} to ${currentMode}, resetting...`);
-        lastLoadedModeRef.current = null;
-        setLastLoadedMode(null);
+        console.log(`🔄 Auth mode changed from ${lastLoadedModeRef.current} to ${currentMode}, resetting load flag`);
+        hasLoadedForCurrentAuthRef.current = false;
+      }
+      // Also reset if we're in authenticated mode but profile isn't loaded yet
+      if (currentMode === 'authenticated' && !profile) {
+        console.log('🔄 Waiting for profile to load before marking as loaded');
+        hasLoadedForCurrentAuthRef.current = false;
       }
     }
-  }, [isLoading, isAuthenticated]);
+  }, [isLoading, isAuthenticated, profile]);
 
   // Load medications when user is authenticated
   useEffect(() => {
@@ -261,16 +267,26 @@ export default function App() {
       return;
     }
 
-    const desiredMode = isAuthenticated ? 'authenticated' : 'public';
-    // Use ref to check current mode without causing re-renders
-    if (lastLoadedModeRef.current === desiredMode) {
-      console.log(`✅ Already loaded in ${desiredMode} mode, skipping reload`);
+    // If user exists but profile isn't loaded yet, wait for it
+    if (user && !profile) {
+      console.log('⏳ Waiting for user profile to load...');
       return;
     }
 
-    console.log(`🚀 Starting to load data in ${desiredMode} mode...`);
-    void loadInitialData(isAuthenticated);
-  }, [isLoading, isAuthenticated, loadInitialData]);
+    // Prevent duplicate loads for the same auth state
+    if (hasLoadedForCurrentAuthRef.current) {
+      console.log('✅ Data already loaded for current auth state, skipping...');
+      return;
+    }
+
+    const mode = isAuthenticated ? 'authenticated' : 'public';
+    console.log(`🚀 Starting to load data in ${mode} mode...`);
+    hasLoadedForCurrentAuthRef.current = true; // Mark as loading before starting
+    void loadInitialData(isAuthenticated).catch(() => {
+      // Reset flag on error so we can retry
+      hasLoadedForCurrentAuthRef.current = false;
+    });
+  }, [isLoading, isAuthenticated, loadInitialData, user, profile]);
 
   // Safety timeout: if data loading takes too long, show error
   useEffect(() => {
@@ -538,9 +554,18 @@ export default function App() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
+        <div className="text-center space-y-4">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading...</p>
+          <p className="text-xs text-muted-foreground">
+            If this takes more than a few seconds, try{' '}
+            <button
+              onClick={() => window.location.reload()}
+              className="underline hover:text-primary"
+            >
+              refreshing the page
+            </button>
+          </p>
         </div>
       </div>
     );

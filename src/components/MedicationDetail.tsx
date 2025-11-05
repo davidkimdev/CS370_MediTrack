@@ -6,6 +6,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { ScrollArea } from './ui/scroll-area';
 import {
   Dialog,
   DialogContent,
@@ -314,15 +315,14 @@ export function MedicationDetail({
                       Dispense
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="w-11/12 max-w-2xl max-h-[90vh] !flex !flex-col !p-0 !gap-0 overflow-hidden">
-                    {/* Header - Fixed */}
-                    <div className="p-6 border-b flex-shrink-0">
-                      <h2 className="text-lg font-semibold leading-none">Dispense {medication.name}</h2>
-                      <p className="text-sm text-muted-foreground mt-2">Record medication dispensing for patient</p>
-                    </div>
-
-                    {/* Content - Scrollable */}
-                    <div className="flex-1 overflow-y-auto p-6">
+                  <DialogContent className="max-h-[90vh] max-w-[90vw] sm:max-w-[700px]">
+                    <DialogHeader>
+                      <DialogTitle>Dispense {medication.name}</DialogTitle>
+                      <DialogDescription>
+                        Record medication dispensing for patient
+                      </DialogDescription>
+                    </DialogHeader>
+                    <ScrollArea className="max-h-[60vh] pr-4">
                       <div className="space-y-4">
                       {/* Patient Information */}
                       <div className="grid grid-cols-2 gap-3">
@@ -504,10 +504,8 @@ export function MedicationDetail({
                       </div>
 
                       </div>
-                    </div>
-
-                    {/* Footer - Fixed */}
-                    <div className="p-6 border-t flex-shrink-0">
+                    </ScrollArea>
+                    <div className="flex gap-2 pt-4">
                       <Button onClick={handleDispense} className="w-full">
                         Confirm Dispensing
                       </Button>

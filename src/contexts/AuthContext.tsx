@@ -17,7 +17,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const loadUserState = useCallback(async (supabaseUser: SupabaseUser | null) => {
+  const loadUserState = useCallback(async (supabaseUser: SupabaseUser | null, retryCount = 0) => {
     if (!supabaseUser) {
       setUser(null);
       setProfile(null);
@@ -29,6 +29,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         ? (supabaseUser.user_metadata.secondary_emails as string[])
         : [];
 
+      console.log(`🔍 Attempting to load profile (attempt ${retryCount + 1}/3)...`);
       const loadedProfile = await AuthService.getUserProfile(supabaseUser.id);
 
       setProfile(loadedProfile);
@@ -38,9 +39,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
         secondaryEmails,
         profile: loadedProfile ?? undefined,
       });
+      console.log('✅ Profile loaded successfully');
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error(`❌ Failed to load profile (attempt ${retryCount + 1}):`, errorMsg);
+
+      // If it's a timeout or auth error and we haven't retried too many times, retry
+      if (retryCount < 2 && (errorMsg.includes('timeout') || errorMsg.includes('JWT') || errorMsg.includes('auth'))) {
+        console.log(`🔄 Retrying in ${(retryCount + 1) * 1000}ms...`);
+        // Wait a bit for token refresh to complete, then retry
+        await new Promise(resolve => setTimeout(resolve, (retryCount + 1) * 1000));
+
+        // Get fresh session before retrying
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          return loadUserState(session.user, retryCount + 1);
+        }
+      }
+
       logger.error(
-        'Failed to load user state',
+        'Failed to load user state after retries',
         error instanceof Error ? error : new Error(String(error)),
       );
 
@@ -63,63 +81,127 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return () => clearTimeout(fallbackTimeout);
   }, []);
 
-  // Simplified initialization - no profile fetching on startup
+  // Initialize auth state - refresh token first, THEN set up listeners
   useEffect(() => {
     let mounted = true;
+    let isInitialized = false;
 
-    const initializeAuth = async () => {
-      console.log('🔷 AuthContext: Quick initialization starting...');
-      
+    console.log('🔷 AuthContext: Initializing auth...');
+
+    const initAuth = async () => {
+      if (!mounted || isInitialized) return;
+
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        console.log('🔷 Getting current session...');
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
 
-        if (mounted) {
-          await loadUserState(session?.user ?? null);
-        }
-      } catch (error) {
-        console.error('🔷 AuthContext: Quick init error:', error);
-      } finally {
-        if (mounted) {
-          console.log('🔷 AuthContext: Quick init complete, loading = false');
-          setIsLoading(false);
-        }
-      }
-    };
-
-    // Start initialization immediately with short delay
-    setTimeout(initializeAuth, 100);
-
-    // Simplified auth state listener - no async operations to prevent loops
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (!mounted) return;
-
-        console.log('🔷 Auth event:', event);
-
-        if (event === 'SIGNED_IN' && session?.user) {
-          console.log('🔷 Setting user from sign-in event');
-          await loadUserState(session.user);
-          setIsLoading(false);
-        } else if (event === 'SIGNED_OUT') {
-          console.log('🔷 Clearing user from sign-out event');
+        if (!currentSession) {
+          console.log('🔷 No session found');
           setUser(null);
           setProfile(null);
           setIsLoading(false);
+          isInitialized = true;
+          return;
         }
-        // Ignore TOKEN_REFRESHED to avoid loops
+
+        console.log('🔷 Session found, checking if token needs refresh...');
+
+        // Calculate if token is expired or close to expiring
+        const expiresAt = currentSession.expires_at;
+        const now = Math.floor(Date.now() / 1000);
+        const timeUntilExpiry = expiresAt ? expiresAt - now : 0;
+
+        console.log(`🔷 Token expires in ${timeUntilExpiry} seconds`);
+
+        let validSession = currentSession;
+
+        // If token expires in less than 60 seconds, refresh it now
+        if (timeUntilExpiry < 60) {
+          console.log('🔷 Token expired or expiring soon, refreshing...');
+          const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+
+          if (refreshError) {
+            console.error('🔷 Token refresh failed:', refreshError);
+            // Sign out and clear session if refresh fails
+            await supabase.auth.signOut();
+            setUser(null);
+            setProfile(null);
+            setIsLoading(false);
+            isInitialized = true;
+            return;
+          }
+
+          if (refreshedSession) {
+            console.log('🔷 Token refreshed successfully!');
+            validSession = refreshedSession;
+          }
+        } else {
+          console.log('🔷 Token is still valid');
+        }
+
+        if (validSession?.user && mounted) {
+          await loadUserState(validSession.user);
+        } else {
+          setUser(null);
+          setProfile(null);
+        }
+      } catch (err) {
+        console.error('🔷 Init error:', err);
+        setUser(null);
+        setProfile(null);
+      } finally {
+        if (mounted) {
+          isInitialized = true;
+          setIsLoading(false);
+        }
       }
-    );
+    };
+
+    // CRITICAL: Run initAuth BEFORE setting up the listener
+    // This ensures token is refreshed before any SIGNED_IN events fire
+    initAuth().then(() => {
+      if (!mounted) return;
+
+      console.log('🔷 Setting up auth state listener...');
+
+      // NOW set up the listener (after init is complete)
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        async (event, session) => {
+          if (!mounted || !isInitialized) return;
+
+          console.log('🔷 Auth event:', event);
+
+          if (event === 'SIGNED_IN' && session?.user) {
+            console.log('🔷 SIGNED_IN - Loading user');
+            await loadUserState(session.user);
+            setIsLoading(false);
+          } else if (event === 'SIGNED_OUT') {
+            console.log('🔷 SIGNED_OUT - Clearing user');
+            setUser(null);
+            setProfile(null);
+            setIsLoading(false);
+          } else if (event === 'USER_UPDATED' && session?.user) {
+            console.log('🔷 USER_UPDATED - Refreshing user');
+            await loadUserState(session.user);
+          }
+          // Ignore TOKEN_REFRESHED and INITIAL_SESSION
+        }
+      );
+
+      return () => {
+        subscription.unsubscribe();
+      };
+    });
 
     return () => {
       mounted = false;
-      subscription.unsubscribe();
     };
-  }, []);
+  }, [loadUserState]);
 
   const signIn = async (email: string, password: string) => {
-    console.log('🔷 Fast sign-in starting for:', email);
+    console.log('🔷 Sign-in starting for:', email);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({
         email,
         password
       });
@@ -128,11 +210,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
         throw error;
       }
 
-      console.log('🔷 Sign-in successful, refreshing user state');
-      await loadUserState(data.user ?? null);
-      setIsLoading(false);
+      console.log('🔷 Sign-in successful - auth state change will load user');
+      // Don't manually load user state - let onAuthStateChange handle it
     } catch (error) {
-      console.error('🔷 AuthContext: Sign-in failed:', error);
+      console.error('🔷 Sign-in failed:', error);
       throw error;
     }
   };
