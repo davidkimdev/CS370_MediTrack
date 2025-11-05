@@ -27,7 +27,6 @@ import {
 export function AdminPanel() {
   const { user, profile } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
-  const [pendingUsers, setPendingUsers] = useState<UserProfile[]>([]);
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [invitationCodes, setInvitationCodes] = useState<InvitationCode[]>([]);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -54,6 +53,29 @@ export function AdminPanel() {
       });
   }, [allUsers]);
 
+  const pendingUsers = useMemo(() => {
+    return allUsers
+      .filter((user) => !user.isApproved)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }, [allUsers]);
+
+  const syncUserState = useCallback((updated: UserProfile) => {
+    setAllUsers((prev) => {
+      const index = prev.findIndex((user) => user.id === updated.id);
+      if (index === -1) {
+        return [...prev, updated];
+      }
+
+      const next = [...prev];
+      next[index] = updated;
+      return next;
+    });
+  }, []);
+
+  const removeUser = useCallback((userId: string) => {
+    setAllUsers((prev) => prev.filter((user) => user.id !== userId));
+  }, []);
+
   const loadAdminData = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
     if (!currentUserId || !isAdmin) {
       if (!silent) {
@@ -73,12 +95,10 @@ export function AdminPanel() {
     }
 
     try {
-      const [pending, users, codes] = await Promise.all([
-        AuthService.getPendingUsers(),
+      const [users, codes] = await Promise.all([
         AuthService.getAllUsers(),
         AuthService.getInvitationCodes(),
       ]);
-      setPendingUsers(pending);
       setAllUsers(users);
       setInvitationCodes(codes);
       setHasLoaded(true);
@@ -104,10 +124,19 @@ export function AdminPanel() {
     }
   }, [isAdmin, loadAdminData]);
 
-  const withUserAction = async (userId: string, action: () => Promise<void>) => {
+  type ActionResult = UserProfile | 'removed' | void;
+
+  const withUserAction = async (userId: string, action: () => Promise<ActionResult>) => {
     setUserActionLoading((prev) => ({ ...prev, [userId]: true }));
     try {
-      await action();
+      const result = await action();
+
+      if (result && result !== 'removed') {
+        syncUserState(result);
+      } else if (result === 'removed') {
+        removeUser(userId);
+      }
+
       await loadAdminData({ silent: true });
     } catch (error) {
       console.error('Admin user action failed', error);
@@ -122,8 +151,9 @@ export function AdminPanel() {
 
   const handleApproveUser = (userId: string) => {
     return withUserAction(userId, async () => {
-      await AuthService.adminUpdateUser(userId, { isApproved: true });
+      const updated = await AuthService.adminUpdateUser(userId, { isApproved: true });
       showSuccessToast('User approved', 'The account now has full access.');
+      return updated;
     });
   };
 
@@ -131,6 +161,7 @@ export function AdminPanel() {
     withUserAction(userId, async () => {
       await AuthService.rejectUser(userId);
       showSuccessToast('User rejected', 'The account request has been removed.');
+      return 'removed';
     });
 
   const handleRoleChange = (
@@ -143,6 +174,17 @@ export function AdminPanel() {
       return;
     }
 
+    if (currentRole === 'admin' && nextRole !== 'admin') {
+      const adminCount = activeUsers.filter((user) => user.role === 'admin').length;
+      if (adminCount <= 1) {
+        showErrorToast(
+          'Cannot remove final administrator',
+          'Promote another user before downgrading this account.',
+        );
+        return;
+      }
+    }
+
     const confirmed = window.confirm(
       `Change ${displayName}'s role from ${currentRole} to ${nextRole}? They will immediately have ${nextRole} permissions.`,
     );
@@ -152,20 +194,22 @@ export function AdminPanel() {
     }
 
     return withUserAction(userId, async () => {
-      await AuthService.adminUpdateUser(userId, { role: nextRole });
+      const updated = await AuthService.adminUpdateUser(userId, { role: nextRole });
       showSuccessToast('Role updated', `${displayName} is now ${nextRole}.`);
+      return updated;
     });
   };
 
   const handleToggleApproval = (userId: string, approved: boolean) =>
     withUserAction(userId, async () => {
-      await AuthService.adminUpdateUser(userId, { isApproved: approved });
+      const updated = await AuthService.adminUpdateUser(userId, { isApproved: approved });
       showSuccessToast(
         approved ? 'Access restored' : 'Access revoked',
         approved
           ? 'User account has been re-enabled.'
           : 'User account has been disabled and will require re-approval.',
       );
+      return updated;
     });
 
   const handleGenerateInvite = async () => {
