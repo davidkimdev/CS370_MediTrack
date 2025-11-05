@@ -68,7 +68,7 @@ export function MedicationDetail({
 }: MedicationDetailProps) {
   const [isDispenseDialogOpen, setIsDispenseDialogOpen] = useState(false);
   const [patientId, setPatientId] = useState('');
-  const [patientInitials, setPatientInitials] = useState('');
+  //const [patientInitials, setPatientInitials] = useState('');
   const [dose, setDose] = useState('');
   const [selectedLots, setSelectedLots] = useState<LotSelection[]>([
     { lotNumber: '', quantity: 0 },
@@ -111,7 +111,7 @@ export function MedicationDetail({
     }
 
     // Validate required fields
-    if (!patientId.trim() || !patientInitials.trim() || !dose.trim() || !physicianName.trim()) {
+    if (!patientId.trim() || !dose.trim() || !physicianName.trim()) {
       showErrorToast(
         'Missing required fields',
         'Please fill in all required fields (marked with *)',
@@ -146,7 +146,7 @@ export function MedicationDetail({
         medicationId: medication.id,
         medicationName: `${medication.name} ${medication.strength}`,
         patientId: patientId.trim(),
-        patientInitials: patientInitials.trim(),
+        //patientInitials: patientInitials.trim(),
         quantity: selectedLot.quantity,
         dose: dose.trim(),
         lotNumber: selectedLot.lotNumber,
@@ -168,7 +168,7 @@ export function MedicationDetail({
 
     // Reset form
     setPatientId('');
-    setPatientInitials('');
+    //setPatientInitials('');
     setDose('');
     setSelectedLots([{ lotNumber: '', quantity: 0 }]);
     setPhysicianName('');
@@ -335,6 +335,7 @@ export function MedicationDetail({
                             onChange={(e) => setPatientId(e.target.value)}
                           />
                         </div>
+                        {/*}
                         <div className="space-y-2">
                           <Label htmlFor="initials">Patient Initials *</Label>
                           <Input
@@ -344,11 +345,12 @@ export function MedicationDetail({
                             onChange={(e) => setPatientInitials(e.target.value)}
                           />
                         </div>
+                        */}
                       </div>
 
-                      {/* Dose Instructions */}
+                      {/* Dose */}
                       <div className="space-y-2">
-                        <Label htmlFor="dose">Dose Instructions *</Label>
+                        <Label htmlFor="dose">Dose *</Label>
                         <Input
                           id="dose"
                           placeholder="e.g., 1 tab, PRN, 1 gtt"

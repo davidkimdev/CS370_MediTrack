@@ -29,7 +29,7 @@ export interface DispensingRecord {
   medicationId: string;
   medicationName: string;
   patientId: string; // e.g., "2025-196", "2635-140"
-  patientInitials: string; // Still keep for quick reference
+  //patientInitials: string; // Still keep for quick reference
   quantity: number;
   dose: string; // e.g., "1 tab", "PRN", "1 gtt"
   lotNumber: string;

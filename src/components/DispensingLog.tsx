@@ -41,13 +41,13 @@ export function DispensingLog({ records, onEditRecord }: DispensingLogProps) {
       const q = searchTerm.toLowerCase();
       filtered = filtered.filter((record) => {
         const med = (record.medicationName || '').toLowerCase();
-        const initials = (record.patientInitials || '').toLowerCase();
+       // const initials = (record.patientInitials || '').toLowerCase();
         const by = (record.dispensedBy || '').toLowerCase();
         const ind = (record.indication || '').toLowerCase();
         const site = (record.clinicSite || '').toLowerCase();
         return (
           med.includes(q) ||
-          initials.includes(q) ||
+          //initials.includes(q) ||
           by.includes(q) ||
           ind.includes(q) ||
           site.includes(q)
@@ -96,7 +96,7 @@ export function DispensingLog({ records, onEditRecord }: DispensingLogProps) {
   }, [records, searchTerm, dateFilter]);
 
   const totalDispensed = filteredRecords.reduce((sum, record) => sum + record.quantity, 0);
-  const uniquePatients = new Set(filteredRecords.map((record) => record.patientInitials)).size;
+  const uniquePatients = new Set(filteredRecords.map((record) => record.patientId)).size;
   const uniqueMedications = new Set(filteredRecords.map((record) => record.medicationId)).size;
 
   const exportToCSV = () => {
@@ -259,7 +259,12 @@ export function DispensingLog({ records, onEditRecord }: DispensingLogProps) {
             placeholder="Search by medication, patient, provider, or indication..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            style={{
+              backgroundColor: '#86efac', // Tailwind's green-300 hex
+              borderColor: '#22c55e',     // Tailwind's green-500
+              color: '#064e3b',           // Tailwind's green-900 (text)
+            }}
+            className="pl-10 border-2 focus:ring-2 focus:ring-green-600 focus:border-green-600"
           />
         </div>
         <Select value={dateFilter} onValueChange={setDateFilter}>
@@ -290,7 +295,7 @@ export function DispensingLog({ records, onEditRecord }: DispensingLogProps) {
                 <TableRow>
                   {onEditRecord && <TableHead className="w-[80px]">Actions</TableHead>}
                   <TableHead>Date</TableHead>
-                  <TableHead>Patient ID</TableHead>
+                  <TableHead className="w-[100px]">Patient ID</TableHead>
                   <TableHead>Medication</TableHead>
                   <TableHead>Dose</TableHead>
                   <TableHead>Lot #</TableHead>

@@ -2,7 +2,7 @@
 // Uses a single database "medtrack" with object stores: medications, pendingDispenses, pendingLots, metadata
 import type { Medication, DispensingRecord, InventoryItem } from '../types/medication';
 
-type PendingDispense = Omit<DispensingRecord, 'id' | 'patientInitials' | 'notes'> & {
+type PendingDispense = Omit<DispensingRecord, 'id' | 'notes'> & {
   id: string; // local temp id
 };
 

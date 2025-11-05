@@ -96,7 +96,7 @@ export class SyncService {
 
   // Queue a dispense while offline: update local stock and add to pending queue
   async queueOfflineDispense(
-    rec: Omit<DispensingRecord, 'id' | 'patientInitials' | 'notes'>,
+    rec: Omit<DispensingRecord, 'id' | 'notes'>,
   ): Promise<PendingDispense> {
     await OfflineStore.decrementMedicationStock(rec.medicationId, rec.quantity);
     return OfflineStore.enqueueDispense({
