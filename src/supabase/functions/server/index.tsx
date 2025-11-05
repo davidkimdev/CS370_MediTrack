@@ -229,29 +229,6 @@ app.post('/make-server-be81afe8/admin/update-profile', async (c) => {
     return c.json({ error: 'Cannot change your own role' }, 400);
   }
 
-  if (
-    requestedRole !== undefined &&
-    requestedRole !== targetProfile.role &&
-    requestedRole === 'staff' &&
-    targetProfile.role === 'admin'
-  ) {
-    const { count: adminCount, error: adminCountError } = await supabaseAdmin
-      .from('user_profiles')
-      .select('id', { count: 'exact', head: true })
-      .eq('role', 'admin')
-      .eq('is_approved', true);
-
-    if (adminCountError) {
-      console.error(`[update-profile] failed to count admins`, { requestId, error: adminCountError });
-      return c.json({ error: 'Unable to validate admin status' }, 500);
-    }
-
-    if (!adminCount || adminCount <= 1) {
-      console.warn(`[update-profile] attempted to remove final admin`, { requestId, userId: body.userId });
-      return c.json({ error: 'At least one approved administrator is required' }, 400);
-    }
-  }
-
   const updatePayload = {} as Record<string, unknown>;
 
   if (requestedRole && requestedRole !== targetProfile.role) {
