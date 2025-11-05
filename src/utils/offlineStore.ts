@@ -167,11 +167,11 @@ export const OfflineStore = {
   },
 
   // Pending dispenses queue
-  async enqueueDispense(rec: Omit<PendingDispense, 'id'> & { id?: string }): Promise<PendingDispense> {
-  const id = rec.id ?? `pd_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  const value: PendingDispense = { ...rec, id };
-  await putInStore(STORES.pendingDispenses, value);
-  return value;
+  async enqueueDispense(rec: Omit<PendingDispense, 'id'>): Promise<PendingDispense> {
+    const id = `pd_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const value: PendingDispense = { ...rec, id };
+    await putInStore(STORES.pendingDispenses, value);
+    return value;
   },
   async getPendingDispenses(): Promise<PendingDispense[]> {
     return getAllFromStore<PendingDispense>(STORES.pendingDispenses);
