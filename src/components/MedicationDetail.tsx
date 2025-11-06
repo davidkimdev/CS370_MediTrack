@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -87,11 +87,6 @@ export function MedicationDetail({
   const [lotExpiration, setLotExpiration] = useState('');
 
   const readOnly = isReadOnly || !currentUser;
-  useEffect(() => {
-    if (!readOnly && currentUser?.name && !studentName) {
-      setStudentName(currentUser.name);
-    }
-  }, [currentUser?.name, readOnly]); // Removed studentName from deps to prevent loop
   const medicationInventory = inventory.filter((inv) => inv.medicationId === medication.id);
   const availableLots = medicationInventory.filter((inv) => !inv.isExpired && inv.quantity > 0);
 
@@ -317,14 +312,22 @@ export function MedicationDetail({
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="max-h-[90vh] max-w-[90vw] sm:max-w-[700px]">
-                    <DialogHeader>
-                      <DialogTitle>Dispense {medication.name}</DialogTitle>
-                      <DialogDescription>
-                        Record medication dispensing for patient
-                      </DialogDescription>
-                    </DialogHeader>
-                    <ScrollArea className="max-h-[60vh] pr-4">
-                      <div className="space-y-4">
+                    <form
+                      autoComplete="off"
+                      className="flex flex-col gap-4"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        handleDispense();
+                      }}
+                    >
+                      <DialogHeader>
+                        <DialogTitle>Dispense {medication.name}</DialogTitle>
+                        <DialogDescription>
+                          Record medication dispensing for patient
+                        </DialogDescription>
+                      </DialogHeader>
+                      <ScrollArea className="max-h-[60vh] pr-4">
+                        <div className="space-y-4">
                       {/* Patient Information */}
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-2">
@@ -465,7 +468,10 @@ export function MedicationDetail({
                           <Label htmlFor="physician">Physician Name *</Label>
                           <Input
                             id="physician"
+                            name="physician-name"
                             placeholder="e.g., Dr. Smith"
+                            autoComplete="new-password"
+                            autoCapitalize="words"
                             value={physicianName}
                             onChange={(e) => setPhysicianName(e.target.value)}
                           />
@@ -475,6 +481,7 @@ export function MedicationDetail({
                           <Input
                             id="student"
                             placeholder="e.g., Jane Doe (optional)"
+                            autoComplete="off"
                             value={studentName}
                             onChange={(e) => setStudentName(e.target.value)}
                           />
@@ -504,13 +511,14 @@ export function MedicationDetail({
                         />
                       </div>
 
+                        </div>
+                      </ScrollArea>
+                      <div className="flex gap-2 pt-4">
+                        <Button type="submit" className="w-full">
+                          Confirm Dispensing
+                        </Button>
                       </div>
-                    </ScrollArea>
-                    <div className="flex gap-2 pt-4">
-                      <Button onClick={handleDispense} className="w-full">
-                        Confirm Dispensing
-                      </Button>
-                    </div>
+                    </form>
                   </DialogContent>
                 </Dialog>
               )
