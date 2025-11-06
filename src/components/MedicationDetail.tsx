@@ -161,6 +161,7 @@ export function MedicationDetail({
         clinicSite: clinicSite.trim() || undefined,
       };
 
+      console.log('🚀 MedicationDetail: About to call onDispense with record:', record);
       onDispense(record);
     });
 

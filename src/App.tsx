@@ -20,6 +20,7 @@ import { MedicationService } from './services/medicationService';
 import { syncService } from './services/syncService';
 import { OfflineStore } from './utils/offlineStore';
 import { logger } from './utils/logger';
+import { showSuccessToast, showErrorToast } from './utils/toastUtils';
 
 type AppSection = 'formulary' | 'dispensing' | 'inventory' | 'profile' | 'admin';
 
@@ -39,6 +40,11 @@ export default function App() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [lastLoadedMode, setLastLoadedMode] = useState<'authenticated' | 'public' | null>(null);
+  // State for withdrawal functionality
+  const undoDispenseMapRef = useRef<Record<string, {
+    record: DispensingRecord;
+    inventoryChange: { oldQuantity: number; inventoryId: string };
+  }>>({});
   const isLoadingDataRef = useRef(false);
   const lastLoadedModeRef = useRef<'authenticated' | 'public' | null>(null);
   const isMountedRef = useRef(true);
@@ -320,11 +326,77 @@ export default function App() {
     ).slice(0, 3); // Limit to 3 alternatives
   };
 
+  const handleUndoDispensing = async (recordId: string) => {
+    const key = String(recordId);
+    console.log('🔄 handleUndoDispensing called with recordId:', key);
+    console.log('🔎 Available undo keys:', Object.keys(undoDispenseMapRef.current));
+    try {
+      const undoEntry = undoDispenseMapRef.current[key];
+      const recentRecord = undoEntry?.record;
+      const recentChange = undoEntry?.inventoryChange;
+      
+      if (!recentRecord || !recentChange) {
+        console.error('Cannot undo: record or inventory change not found', {
+          recentRecord,
+          recentChange,
+          undoMap: undoDispenseMapRef.current,
+        });
+        showErrorToast('Undo window expired or data unavailable.');
+        return;
+      }
+
+      // Delete the dispensing record from database
+      await MedicationService.deleteDispensingRecord(recordId);
+      
+      // Restore inventory quantity
+      await MedicationService.updateInventoryItem(recentChange.inventoryId, { 
+        quantity: recentChange.oldQuantity 
+      });
+
+      // Update local state
+  setDispensingRecords((prev) => prev.filter((rec) => String(rec.id) !== key));
+      
+      // Restore medication stock
+      setMedications((prev) =>
+        prev.map((med) =>
+          med.id === recentRecord.medicationId
+            ? {
+                ...med,
+                currentStock: med.currentStock + recentRecord.quantity,
+                isAvailable: true,
+                lastUpdated: new Date(),
+              }
+            : med,
+        ),
+      );
+      
+      // Restore inventory
+      setInventory((prev) =>
+        prev.map((inv) =>
+          inv.id === recentChange.inventoryId
+            ? { ...inv, quantity: recentChange.oldQuantity }
+            : inv,
+        ),
+      );
+
+      // Clean up tracking
+      delete undoDispenseMapRef.current[key];
+
+      showSuccessToast('Dispensing successfully withdrawn');
+      console.log('✅ Dispensing successfully withdrawn');
+    } catch (error) {
+      console.error('Error withdrawing dispensing:', error);
+      showErrorToast('Failed to withdraw dispensing. Please contact support.');
+    }
+  };
+
   const handleDispense = async (record: Omit<DispensingRecord, "id">) => {
+    console.log('🎯 handleDispense called with:', record);
     try {
       if (navigator.onLine) {
         // Online: write-through to server then update local/cache
-        const newRecord = await MedicationService.createDispensingRecord(record);
+  const newRecord = await MedicationService.createDispensingRecord(record);
+  console.log('🧾 New dispensing record created with id:', newRecord.id);
         setDispensingRecords((prev: DispensingRecord[]) => [newRecord, ...prev]);
 
         // Update inventory lot quantity in database
@@ -332,8 +404,26 @@ export default function App() {
           (inv) => inv.lotNumber === record.lotNumber && inv.medicationId === record.medicationId,
         );
         if (inventoryLot) {
+          const oldQuantity = inventoryLot.quantity;
           const newQuantity = Math.max(0, inventoryLot.quantity - record.quantity);
           await MedicationService.updateInventoryItem(inventoryLot.id, { quantity: newQuantity });
+          
+          // Track for withdrawal functionality
+          const recordKey = String(newRecord.id);
+          undoDispenseMapRef.current = {
+            ...undoDispenseMapRef.current,
+            [recordKey]: {
+              record: newRecord,
+              inventoryChange: { oldQuantity, inventoryId: inventoryLot.id },
+            },
+          };
+          console.log('💾 Stored undo data for', recordKey, 'current keys:', Object.keys(undoDispenseMapRef.current));
+
+          // Auto-cleanup after 10 seconds
+          setTimeout(() => {
+            delete undoDispenseMapRef.current[recordKey];
+            console.log('⏰ Undo window expired for', recordKey);
+          }, 10000);
         }
 
         // Update local state
@@ -361,6 +451,30 @@ export default function App() {
               : inv,
           ),
         );
+        
+        // Show success toast with withdrawal option (with slight delay)
+        const medication = medications.find(m => m.id === record.medicationId);
+        // Show success toast with withdrawal option and navigate back to formulary
+        setTimeout(() => {
+          const medication = medications.find(m => m.id === record.medicationId);
+          const recordKey = String(newRecord.id);
+          showSuccessToast(
+            `${medication?.name || 'Medication'} dispensed successfully`,
+            undefined,
+            {
+              label: 'Withdraw',
+              onClick: () => {
+                console.log('🖱️ Withdraw button clicked! Record ID:', recordKey);
+                handleUndoDispensing(recordKey);
+              },
+            }
+          );
+          console.log('🎉 Success toast with withdrawal displayed');
+          
+          // Navigate back to formulary after successful dispensing
+          setCurrentView('formulary');
+          setSelectedMedication(null);
+        }, 100);
       } else {
         // Offline: queue and update local stock/cache immediately
         await syncService.queueOfflineDispense(record);
@@ -382,9 +496,22 @@ export default function App() {
           id: `temp-${Date.now()}`, // Temporary ID for offline records
         };
         setDispensingRecords((prev: DispensingRecord[]) => [tempRecord, ...prev]);
+        
+        // Show success toast for offline dispensing and navigate back
+        const medication = medications.find(m => m.id === record.medicationId);
+        showSuccessToast(
+          `${medication?.name || 'Medication'} dispensed (offline - will sync when online)`
+        );
+        
+        // Navigate back to formulary after successful offline dispensing
+        setTimeout(() => {
+          setCurrentView('formulary');
+          setSelectedMedication(null);
+        }, 100);
       }
     } catch (error) {
       console.error('Error dispensing medication:', error);
+      showErrorToast('Failed to dispense medication. Please try again.');
     }
   };
 
@@ -614,6 +741,8 @@ export default function App() {
 
   // Show detail view if medication is selected
   if (currentView === 'detail' && selectedMedication) {
+    console.log('🔐 Authentication status when rendering MedicationDetail:', { isAuthenticated, user: !!user, profile: !!profile });
+    console.log('📋 onDispense prop will be:', isAuthenticated ? 'handleDispense function' : 'undefined');
     return (
       <MedicationDetail
         medication={selectedMedication}

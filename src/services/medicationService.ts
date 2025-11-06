@@ -310,6 +310,8 @@ export class MedicationService {
       throw new Error('Failed to update inventory item');
     }
 
+    logger.info('Inventory item updated successfully', { id, updates });
+
     return {
       id: data.id,
       medicationId: data.medication_id,
@@ -493,7 +495,7 @@ export class MedicationService {
       .select('id')
       .ilike('first_name', `%${record.dispensedBy.split(' ')[0]}%`)
       .limit(1)
-      .single();
+      .maybeSingle();
 
     const enteredBy = userData?.id || null;
 
@@ -552,6 +554,20 @@ export class MedicationService {
       indication: record.indication,
       notes: data.notes || undefined,
     };
+  }
+
+  static async deleteDispensingRecord(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('dispensing_logs')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      logger.error('Error deleting dispensing record', error);
+      throw new Error('Failed to delete dispensing record');
+    }
+
+    logger.info('Dispensing record deleted successfully', { id });
   }
 
   // Users
