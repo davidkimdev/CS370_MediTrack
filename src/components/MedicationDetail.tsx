@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -27,7 +28,138 @@ import {
   Trash2,
 } from 'lucide-react';
 import { Medication, DispensingRecord, InventoryItem, User } from '../types/medication';
+import { useFieldHistory, type FieldHistoryEntry } from '../hooks/useFieldHistory';
 import { showErrorToast } from '../utils/toastUtils';
+
+const isBrowser = typeof window !== 'undefined';
+
+interface HistoryDropdownProps {
+  anchorRef: React.RefObject<HTMLInputElement>;
+  suggestions: FieldHistoryEntry[];
+  onSelect: (value: string) => void;
+  onClearEntry: (value: string) => void;
+  onClearAll: () => void;
+  onClose: () => void;
+}
+
+function HistoryDropdown({ anchorRef, suggestions, onSelect, onClearEntry, onClearAll, onClose }: HistoryDropdownProps) {
+  if (!suggestions.length) {
+    return null;
+  }
+
+  if (!isBrowser) {
+    return null;
+  }
+
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const [position, setPosition] = useState<{ top: number; left: number; width: number } | null>(
+    null,
+  );
+
+  useEffect(() => {
+    const updatePosition = () => {
+      const anchor = anchorRef.current;
+      if (!anchor) {
+        setPosition(null);
+        return;
+      }
+      const rect = anchor.getBoundingClientRect();
+      setPosition({
+        top: rect.bottom + window.scrollY,
+        left: rect.left + window.scrollX,
+        width: rect.width,
+      });
+    };
+
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [anchorRef]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      if (!target) {
+        return;
+      }
+      if (anchorRef.current?.contains(target)) {
+        return;
+      }
+      if (dropdownRef.current?.contains(target)) {
+        return;
+      }
+      onClose();
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [anchorRef, onClose]);
+
+  if (!position) {
+    return null;
+  }
+
+  return createPortal(
+    <div
+      ref={dropdownRef}
+      style={{
+        position: 'fixed',
+        top: position.top,
+        left: position.left,
+        width: position.width,
+        zIndex: 2000,
+      }}
+      className="overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-xl"
+    >
+      <ul className="max-h-48 overflow-y-auto text-sm">
+        {suggestions.map((entry) => (
+          <li key={entry.value} className="flex items-center gap-1 border-b last:border-b-0">
+            <button
+              type="button"
+              className="flex-1 px-3 py-2 text-left hover:bg-muted"
+              onMouseDown={(event) => {
+                event.preventDefault();
+                onSelect(entry.value);
+              }}
+            >
+              {entry.value}
+            </button>
+            <button
+              type="button"
+              className="px-2 text-xs text-muted-foreground hover:text-destructive"
+              onMouseDown={(event) => {
+                event.preventDefault();
+                onClearEntry(entry.value);
+              }}
+            >
+              Clear
+            </button>
+          </li>
+        ))}
+      </ul>
+      <div className="flex justify-end border-t bg-muted/40 px-2 py-1">
+        <button
+          type="button"
+          className="text-xs text-muted-foreground hover:text-destructive"
+          onMouseDown={(event) => {
+            event.preventDefault();
+            onClearAll();
+          }}
+        >
+          Clear all
+        </button>
+      </div>
+    </div>,
+    document.body,
+  );
+}
 
 interface MedicationDetailProps {
   medication: Medication;
@@ -78,6 +210,51 @@ export function MedicationDetail({
   const [studentName, setStudentName] = useState('');
   const [clinicSite, setClinicSite] = useState('');
   const [notes, setNotes] = useState('');
+
+  const patientIdInputRef = useRef<HTMLInputElement>(null);
+  const patientInitialsInputRef = useRef<HTMLInputElement>(null);
+  const doseInputRef = useRef<HTMLInputElement>(null);
+  const physicianInputRef = useRef<HTMLInputElement>(null);
+  const studentInputRef = useRef<HTMLInputElement>(null);
+  const clinicInputRef = useRef<HTMLInputElement>(null);
+
+  const patientIdHistory = useFieldHistory('dispense_patient_id', { minLength: 2 });
+  const patientInitialsHistory = useFieldHistory('dispense_patient_initials', { minLength: 2 });
+  const doseHistory = useFieldHistory('dispense_dose', { minLength: 1 });
+  const physicianHistory = useFieldHistory('dispense_physician_name', { minLength: 2 });
+  const studentHistory = useFieldHistory('dispense_student_name', { minLength: 2 });
+  const clinicSiteHistory = useFieldHistory('dispense_clinic_site', { minLength: 2 });
+
+  const [activeHistoryField, setActiveHistoryField] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isDispenseDialogOpen) {
+      setActiveHistoryField(null);
+    }
+  }, [isDispenseDialogOpen]);
+
+  const scheduleHistoryClose = (fieldKey: string) => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.setTimeout(() => {
+      setActiveHistoryField((current) => (current === fieldKey ? null : current));
+    }, 120);
+  };
+
+  const patientIdSuggestionsOpen =
+    activeHistoryField === 'patientId' && patientIdHistory.suggestions.length > 0;
+  const patientInitialsSuggestionsOpen =
+    activeHistoryField === 'patientInitials' && patientInitialsHistory.suggestions.length > 0;
+  const doseSuggestionsOpen =
+    activeHistoryField === 'dose' && doseHistory.suggestions.length > 0;
+  const physicianSuggestionsOpen =
+    activeHistoryField === 'physician' && physicianHistory.suggestions.length > 0;
+  const studentSuggestionsOpen =
+    activeHistoryField === 'student' && studentHistory.suggestions.length > 0;
+  const clinicSuggestionsOpen =
+    activeHistoryField === 'clinic' && clinicSiteHistory.suggestions.length > 0;
 
   // Lot editing state
   const [isLotDialogOpen, setIsLotDialogOpen] = useState(false);
@@ -160,6 +337,13 @@ export function MedicationDetail({
       onDispense(record);
     });
 
+  patientIdHistory.recordValue(patientId);
+  patientInitialsHistory.recordValue(patientInitials);
+  doseHistory.recordValue(dose);
+  physicianHistory.recordValue(physicianName);
+  studentHistory.recordValue(studentName);
+  clinicSiteHistory.recordValue(clinicSite);
+
     console.log(`Medication dispensed successfully from ${validLots.length} lot(s)`);
     setIsDispenseDialogOpen(false);
 
@@ -172,6 +356,12 @@ export function MedicationDetail({
     setStudentName('');
     setClinicSite('');
     setNotes('');
+  patientIdHistory.updateQuery('');
+  patientInitialsHistory.updateQuery('');
+  doseHistory.updateQuery('');
+  physicianHistory.updateQuery('');
+  studentHistory.updateQuery('');
+  clinicSiteHistory.updateQuery('');
   };
 
   // Multi-lot helpers for dispensing
@@ -311,7 +501,10 @@ export function MedicationDetail({
                       Dispense
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-h-[90vh] max-w-[90vw] sm:max-w-[700px]">
+                  <DialogContent
+                    className="max-h-[90vh] max-w-[90vw] sm:max-w-[700px]"
+                    onOpenAutoFocus={(event) => event.preventDefault()}
+                  >
                     <form
                       autoComplete="off"
                       className="flex flex-col gap-4"
@@ -332,33 +525,190 @@ export function MedicationDetail({
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-2">
                           <Label htmlFor="patientId">Patient ID *</Label>
-                          <Input
-                            id="patientId"
-                            placeholder="e.g., 2025-196"
-                            value={patientId}
-                            onChange={(e) => setPatientId(e.target.value)}
-                          />
+                          <div className="space-y-1">
+                            <div className="relative">
+                              <Input
+                                id="patientId"
+                                placeholder="e.g., 2025-196"
+                                autoComplete="off"
+                                ref={patientIdInputRef}
+                                value={patientId}
+                                onFocus={() => {
+                                  setActiveHistoryField('patientId');
+                                  patientIdHistory.updateQuery(patientId);
+                                }}
+                                onMouseDown={(event) => {
+                                  if (document.activeElement === event.currentTarget) {
+                                    event.preventDefault();
+                                    const value = event.currentTarget.value;
+                                    setActiveHistoryField((current) => {
+                                      const next = current === 'patientId' ? null : 'patientId';
+                                      if (next) {
+                                        patientIdHistory.updateQuery(value);
+                                      }
+                                      return next;
+                                    });
+                                  }
+                                }}
+                                onBlur={() => scheduleHistoryClose('patientId')}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  setPatientId(value);
+                                  patientIdHistory.updateQuery(value);
+                                }}
+                              />
+                              {patientIdSuggestionsOpen && (
+                                <HistoryDropdown
+                                  anchorRef={patientIdInputRef}
+                                  suggestions={patientIdHistory.suggestions}
+                                  onSelect={(value) => {
+                                    setPatientId(value);
+                                    patientIdHistory.recordValue(value);
+                                    patientIdHistory.updateQuery(value);
+                                    setActiveHistoryField(null);
+                                  }}
+                                  onClearEntry={(value) => {
+                                    patientIdHistory.clearEntry(value);
+                                    patientIdHistory.updateQuery(patientId);
+                                  }}
+                                  onClearAll={() => {
+                                    patientIdHistory.clearAll();
+                                    patientIdHistory.updateQuery(patientId);
+                                  }}
+                                  onClose={() => {
+                                    setActiveHistoryField(null);
+                                    patientIdHistory.updateQuery(patientId);
+                                  }}
+                                />
+                              )}
+                            </div>
+                          </div>
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="initials">Patient Initials *</Label>
-                          <Input
-                            id="initials"
-                            placeholder="e.g., J.D."
-                            value={patientInitials}
-                            onChange={(e) => setPatientInitials(e.target.value)}
-                          />
+                          <div className="space-y-1">
+                            <div className="relative">
+                              <Input
+                                id="initials"
+                                placeholder="e.g., J.D."
+                                autoComplete="off"
+                                ref={patientInitialsInputRef}
+                                value={patientInitials}
+                                onFocus={() => {
+                                  setActiveHistoryField('patientInitials');
+                                  patientInitialsHistory.updateQuery(patientInitials);
+                                }}
+                                onMouseDown={(event) => {
+                                  if (document.activeElement === event.currentTarget) {
+                                    event.preventDefault();
+                                    const value = event.currentTarget.value;
+                                    setActiveHistoryField((current) => {
+                                      const next =
+                                        current === 'patientInitials' ? null : 'patientInitials';
+                                      if (next) {
+                                        patientInitialsHistory.updateQuery(value);
+                                      }
+                                      return next;
+                                    });
+                                  }
+                                }}
+                                onBlur={() => scheduleHistoryClose('patientInitials')}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  setPatientInitials(value);
+                                  patientInitialsHistory.updateQuery(value);
+                                }}
+                              />
+                              {patientInitialsSuggestionsOpen && (
+                                <HistoryDropdown
+                                  anchorRef={patientInitialsInputRef}
+                                  suggestions={patientInitialsHistory.suggestions}
+                                  onSelect={(value) => {
+                                    setPatientInitials(value);
+                                    patientInitialsHistory.recordValue(value);
+                                    patientInitialsHistory.updateQuery(value);
+                                    setActiveHistoryField(null);
+                                  }}
+                                  onClearEntry={(value) => {
+                                    patientInitialsHistory.clearEntry(value);
+                                    patientInitialsHistory.updateQuery(patientInitials);
+                                  }}
+                                  onClearAll={() => {
+                                    patientInitialsHistory.clearAll();
+                                    patientInitialsHistory.updateQuery(patientInitials);
+                                  }}
+                                  onClose={() => {
+                                    setActiveHistoryField(null);
+                                    patientInitialsHistory.updateQuery(patientInitials);
+                                  }}
+                                />
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
 
                       {/* Dose Instructions */}
                       <div className="space-y-2">
                         <Label htmlFor="dose">Dose Instructions *</Label>
-                        <Input
-                          id="dose"
-                          placeholder="e.g., 1 tab, PRN, 1 gtt"
-                          value={dose}
-                          onChange={(e) => setDose(e.target.value)}
-                        />
+                        <div className="space-y-1">
+                          <div className="relative">
+                            <Input
+                              id="dose"
+                              placeholder="e.g., 1 tab, PRN, 1 gtt"
+                              autoComplete="off"
+                              ref={doseInputRef}
+                              value={dose}
+                              onFocus={() => {
+                                setActiveHistoryField('dose');
+                                doseHistory.updateQuery(dose);
+                              }}
+                              onMouseDown={(event) => {
+                                if (document.activeElement === event.currentTarget) {
+                                  event.preventDefault();
+                                  const value = event.currentTarget.value;
+                                  setActiveHistoryField((current) => {
+                                    const next = current === 'dose' ? null : 'dose';
+                                    if (next) {
+                                      doseHistory.updateQuery(value);
+                                    }
+                                    return next;
+                                  });
+                                }
+                              }}
+                              onBlur={() => scheduleHistoryClose('dose')}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                setDose(value);
+                                doseHistory.updateQuery(value);
+                              }}
+                            />
+                            {doseSuggestionsOpen && (
+                              <HistoryDropdown
+                                anchorRef={doseInputRef}
+                                suggestions={doseHistory.suggestions}
+                                onSelect={(value) => {
+                                  setDose(value);
+                                  doseHistory.recordValue(value);
+                                  doseHistory.updateQuery(value);
+                                  setActiveHistoryField(null);
+                                }}
+                                onClearEntry={(value) => {
+                                  doseHistory.clearEntry(value);
+                                  doseHistory.updateQuery(dose);
+                                }}
+                                onClearAll={() => {
+                                  doseHistory.clearAll();
+                                  doseHistory.updateQuery(dose);
+                                }}
+                                onClose={() => {
+                                  setActiveHistoryField(null);
+                                  doseHistory.updateQuery(dose);
+                                }}
+                              />
+                            )}
+                          </div>
+                        </div>
                       </div>
 
                       {/* Multi-Lot Selection */}
@@ -466,37 +816,191 @@ export function MedicationDetail({
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-2">
                           <Label htmlFor="physician">Physician Name *</Label>
-                          <Input
-                            id="physician"
-                            name="physician-name"
-                            placeholder="e.g., Dr. Smith"
-                            autoComplete="new-password"
-                            autoCapitalize="words"
-                            value={physicianName}
-                            onChange={(e) => setPhysicianName(e.target.value)}
-                          />
+                          <div className="space-y-1">
+                            <div className="relative">
+                              <Input
+                                id="physician"
+                                name="physician-name"
+                                placeholder="e.g., Dr. Smith"
+                                autoComplete="off"
+                                autoCapitalize="words"
+                                ref={physicianInputRef}
+                                value={physicianName}
+                                onFocus={() => {
+                                  setActiveHistoryField('physician');
+                                  physicianHistory.updateQuery(physicianName);
+                                }}
+                                onMouseDown={(event) => {
+                                  if (document.activeElement === event.currentTarget) {
+                                    event.preventDefault();
+                                    const value = event.currentTarget.value;
+                                    setActiveHistoryField((current) => {
+                                      const next = current === 'physician' ? null : 'physician';
+                                      if (next) {
+                                        physicianHistory.updateQuery(value);
+                                      }
+                                      return next;
+                                    });
+                                  }
+                                }}
+                                onBlur={() => scheduleHistoryClose('physician')}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  setPhysicianName(value);
+                                  physicianHistory.updateQuery(value);
+                                }}
+                              />
+                              {physicianSuggestionsOpen && (
+                                <HistoryDropdown
+                                  anchorRef={physicianInputRef}
+                                  suggestions={physicianHistory.suggestions}
+                                  onSelect={(value) => {
+                                    setPhysicianName(value);
+                                    physicianHistory.recordValue(value);
+                                    physicianHistory.updateQuery(value);
+                                    setActiveHistoryField(null);
+                                  }}
+                                  onClearEntry={(value) => {
+                                    physicianHistory.clearEntry(value);
+                                    physicianHistory.updateQuery(physicianName);
+                                  }}
+                                  onClearAll={() => {
+                                    physicianHistory.clearAll();
+                                    physicianHistory.updateQuery(physicianName);
+                                  }}
+                                  onClose={() => {
+                                    setActiveHistoryField(null);
+                                    physicianHistory.updateQuery(physicianName);
+                                  }}
+                                />
+                              )}
+                            </div>
+                          </div>
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="student">Student Name</Label>
-                          <Input
-                            id="student"
-                            placeholder="e.g., Jane Doe (optional)"
-                            autoComplete="off"
-                            value={studentName}
-                            onChange={(e) => setStudentName(e.target.value)}
-                          />
+                          <div className="space-y-1">
+                            <div className="relative">
+                              <Input
+                                id="student"
+                                placeholder="e.g., Jane Doe (optional)"
+                                autoComplete="off"
+                                ref={studentInputRef}
+                                value={studentName}
+                                onFocus={() => {
+                                  setActiveHistoryField('student');
+                                  studentHistory.updateQuery(studentName);
+                                }}
+                                onMouseDown={(event) => {
+                                  if (document.activeElement === event.currentTarget) {
+                                    event.preventDefault();
+                                    const value = event.currentTarget.value;
+                                    setActiveHistoryField((current) => {
+                                      const next = current === 'student' ? null : 'student';
+                                      if (next) {
+                                        studentHistory.updateQuery(value);
+                                      }
+                                      return next;
+                                    });
+                                  }
+                                }}
+                                onBlur={() => scheduleHistoryClose('student')}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  setStudentName(value);
+                                  studentHistory.updateQuery(value);
+                                }}
+                              />
+                              {studentSuggestionsOpen && (
+                                <HistoryDropdown
+                                  anchorRef={studentInputRef}
+                                  suggestions={studentHistory.suggestions}
+                                  onSelect={(value) => {
+                                    setStudentName(value);
+                                    studentHistory.recordValue(value);
+                                    studentHistory.updateQuery(value);
+                                    setActiveHistoryField(null);
+                                  }}
+                                  onClearEntry={(value) => {
+                                    studentHistory.clearEntry(value);
+                                    studentHistory.updateQuery(studentName);
+                                  }}
+                                  onClearAll={() => {
+                                    studentHistory.clearAll();
+                                    studentHistory.updateQuery(studentName);
+                                  }}
+                                  onClose={() => {
+                                    setActiveHistoryField(null);
+                                    studentHistory.updateQuery(studentName);
+                                  }}
+                                />
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
 
                       {/* Clinic Site */}
                       <div className="space-y-2">
                         <Label htmlFor="clinic-site">Clinic Site</Label>
-                        <Input
-                          id="clinic-site"
-                          placeholder="e.g., Bainbridge, Moultrie, etc."
-                          value={clinicSite}
-                          onChange={(e) => setClinicSite(e.target.value)}
-                        />
+                        <div className="space-y-1">
+                          <div className="relative">
+                            <Input
+                              id="clinic-site"
+                              placeholder="e.g., Bainbridge, Moultrie, etc."
+                              autoComplete="off"
+                              ref={clinicInputRef}
+                              value={clinicSite}
+                              onFocus={() => {
+                                setActiveHistoryField('clinic');
+                                clinicSiteHistory.updateQuery(clinicSite);
+                              }}
+                              onMouseDown={(event) => {
+                                if (document.activeElement === event.currentTarget) {
+                                  event.preventDefault();
+                                  const value = event.currentTarget.value;
+                                  setActiveHistoryField((current) => {
+                                    const next = current === 'clinic' ? null : 'clinic';
+                                    if (next) {
+                                      clinicSiteHistory.updateQuery(value);
+                                    }
+                                    return next;
+                                  });
+                                }
+                              }}
+                              onBlur={() => scheduleHistoryClose('clinic')}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                setClinicSite(value);
+                                clinicSiteHistory.updateQuery(value);
+                              }}
+                            />
+                            {clinicSuggestionsOpen && (
+                              <HistoryDropdown
+                                anchorRef={clinicInputRef}
+                                suggestions={clinicSiteHistory.suggestions}
+                                onSelect={(value) => {
+                                  setClinicSite(value);
+                                  clinicSiteHistory.recordValue(value);
+                                  clinicSiteHistory.updateQuery(value);
+                                  setActiveHistoryField(null);
+                                }}
+                                onClearEntry={(value) => {
+                                  clinicSiteHistory.clearEntry(value);
+                                  clinicSiteHistory.updateQuery(clinicSite);
+                                }}
+                                onClearAll={() => {
+                                  clinicSiteHistory.clearAll();
+                                  clinicSiteHistory.updateQuery(clinicSite);
+                                }}
+                                onClose={() => {
+                                  setActiveHistoryField(null);
+                                  clinicSiteHistory.updateQuery(clinicSite);
+                                }}
+                              />
+                            )}
+                          </div>
+                        </div>
                       </div>
 
                       {/* Notes */}
