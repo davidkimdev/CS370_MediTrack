@@ -265,8 +265,8 @@ export function FormularyView({ medications, onMedicationSelect }: FormularyView
           {/* Category chips with overflow "More" */}
           <div className="w-full flex items-center gap-2">
             <div className="flex-1 min-w-0">
-              <ScrollArea className="w-full whitespace-nowrap">
-                <div className="flex items-center gap-1 pr-24 sm:pr-28">
+              <div className="w-full overflow-x-auto whitespace-nowrap">
+                <div className="inline-flex items-center gap-1 pr-24 sm:pr-28">
                   <Button
                     variant={categoryFilter === 'all' ? 'default' : 'outline'}
                     size="sm"
@@ -303,8 +303,7 @@ export function FormularyView({ medications, onMedicationSelect }: FormularyView
                     </Button>
                   )}
                 </div>
-                <ScrollBar orientation="horizontal" />
-              </ScrollArea>
+              </div>
             </div>
             {overflowCategories.length > 0 && (
               <DropdownMenu>
