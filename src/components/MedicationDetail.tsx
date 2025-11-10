@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+ 
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -28,138 +28,10 @@ import {
   Trash2,
 } from 'lucide-react';
 import { Medication, DispensingRecord, InventoryItem, User } from '../types/medication';
-import { useFieldHistory, type FieldHistoryEntry } from '../hooks/useFieldHistory';
+import { useFieldHistory } from '../hooks/useFieldHistory';
 import { showErrorToast } from '../utils/toastUtils';
 
-const isBrowser = typeof window !== 'undefined';
-
-interface HistoryDropdownProps {
-  anchorRef: React.RefObject<HTMLInputElement>;
-  suggestions: FieldHistoryEntry[];
-  onSelect: (value: string) => void;
-  onClearEntry: (value: string) => void;
-  onClearAll: () => void;
-  onClose: () => void;
-}
-
-function HistoryDropdown({ anchorRef, suggestions, onSelect, onClearEntry, onClearAll, onClose }: HistoryDropdownProps) {
-  if (!suggestions.length) {
-    return null;
-  }
-
-  if (!isBrowser) {
-    return null;
-  }
-
-  const dropdownRef = useRef<HTMLDivElement | null>(null);
-  const [position, setPosition] = useState<{ top: number; left: number; width: number } | null>(
-    null,
-  );
-
-  useEffect(() => {
-    const updatePosition = () => {
-      const anchor = anchorRef.current;
-      if (!anchor) {
-        setPosition(null);
-        return;
-      }
-      const rect = anchor.getBoundingClientRect();
-      setPosition({
-        top: rect.bottom + window.scrollY,
-        left: rect.left + window.scrollX,
-        width: rect.width,
-      });
-    };
-
-    updatePosition();
-    window.addEventListener('resize', updatePosition);
-    window.addEventListener('scroll', updatePosition, true);
-
-    return () => {
-      window.removeEventListener('resize', updatePosition);
-      window.removeEventListener('scroll', updatePosition, true);
-    };
-  }, [anchorRef]);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Node | null;
-      if (!target) {
-        return;
-      }
-      if (anchorRef.current?.contains(target)) {
-        return;
-      }
-      if (dropdownRef.current?.contains(target)) {
-        return;
-      }
-      onClose();
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [anchorRef, onClose]);
-
-  if (!position) {
-    return null;
-  }
-
-  return createPortal(
-    <div
-      ref={dropdownRef}
-      style={{
-        position: 'fixed',
-        top: position.top,
-        left: position.left,
-        width: position.width,
-        zIndex: 2000,
-      }}
-      className="overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-xl"
-    >
-      <ul className="max-h-48 overflow-y-auto text-sm">
-        {suggestions.map((entry) => (
-          <li key={entry.value} className="flex items-center gap-1 border-b last:border-b-0">
-            <button
-              type="button"
-              className="flex-1 px-3 py-2 text-left hover:bg-muted"
-              onMouseDown={(event) => {
-                event.preventDefault();
-                onSelect(entry.value);
-              }}
-            >
-              {entry.value}
-            </button>
-            <button
-              type="button"
-              className="px-2 text-xs text-muted-foreground hover:text-destructive"
-              onMouseDown={(event) => {
-                event.preventDefault();
-                onClearEntry(entry.value);
-              }}
-            >
-              Clear
-            </button>
-          </li>
-        ))}
-      </ul>
-      <div className="flex justify-end border-t bg-muted/40 px-2 py-1">
-        <button
-          type="button"
-          className="text-xs text-muted-foreground hover:text-destructive"
-          onMouseDown={(event) => {
-            event.preventDefault();
-            onClearAll();
-          }}
-        >
-          Clear all
-        </button>
-      </div>
-    </div>,
-    document.body,
-  );
-}
+ 
 
 interface MedicationDetailProps {
   medication: Medication;
@@ -224,37 +96,41 @@ export function MedicationDetail({
   const physicianHistory = useFieldHistory('dispense_physician_name', { minLength: 2 });
   const studentHistory = useFieldHistory('dispense_student_name', { minLength: 2 });
   const clinicSiteHistory = useFieldHistory('dispense_clinic_site', { minLength: 2 });
+  // Per-field open flags
+  const [openPatientId, setOpenPatientId] = useState(false);
+  const [openPatientInitials, setOpenPatientInitials] = useState(false);
+  const [openDose, setOpenDose] = useState(false);
+  const [openPhysician, setOpenPhysician] = useState(false);
+  const [openStudent, setOpenStudent] = useState(false);
+  const [openClinic, setOpenClinic] = useState(false);
 
-  const [activeHistoryField, setActiveHistoryField] = useState<string | null>(null);
+  const closeAllSuggestions = () => {
+    setOpenPatientId(false);
+    setOpenPatientInitials(false);
+    setOpenDose(false);
+    setOpenPhysician(false);
+    setOpenStudent(false);
+    setOpenClinic(false);
+  };
 
   useEffect(() => {
     if (!isDispenseDialogOpen) {
-      setActiveHistoryField(null);
+      closeAllSuggestions();
     }
   }, [isDispenseDialogOpen]);
 
-  const scheduleHistoryClose = (fieldKey: string) => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    window.setTimeout(() => {
-      setActiveHistoryField((current) => (current === fieldKey ? null : current));
-    }, 120);
-  };
-
-  const patientIdSuggestionsOpen =
-    activeHistoryField === 'patientId' && patientIdHistory.suggestions.length > 0;
-  const patientInitialsSuggestionsOpen =
-    activeHistoryField === 'patientInitials' && patientInitialsHistory.suggestions.length > 0;
-  const doseSuggestionsOpen =
-    activeHistoryField === 'dose' && doseHistory.suggestions.length > 0;
-  const physicianSuggestionsOpen =
-    activeHistoryField === 'physician' && physicianHistory.suggestions.length > 0;
-  const studentSuggestionsOpen =
-    activeHistoryField === 'student' && studentHistory.suggestions.length > 0;
-  const clinicSuggestionsOpen =
-    activeHistoryField === 'clinic' && clinicSiteHistory.suggestions.length > 0;
+  // Outside click listener
+  useEffect(() => {
+    if (!isDispenseDialogOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.history-suggestion-container')) {
+        closeAllSuggestions();
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [isDispenseDialogOpen]);
 
   // Lot editing state
   const [isLotDialogOpen, setIsLotDialogOpen] = useState(false);
@@ -527,60 +403,82 @@ export function MedicationDetail({
                           <Label htmlFor="patientId">Patient ID *</Label>
                           <div className="space-y-1">
                             <div className="relative">
-                              <Input
-                                id="patientId"
-                                placeholder="e.g., 2025-196"
-                                autoComplete="off"
-                                ref={patientIdInputRef}
-                                value={patientId}
-                                onFocus={() => {
-                                  setActiveHistoryField('patientId');
-                                  patientIdHistory.updateQuery(patientId);
-                                }}
-                                onMouseDown={(event) => {
-                                  if (document.activeElement === event.currentTarget) {
-                                    event.preventDefault();
-                                    const value = event.currentTarget.value;
-                                    setActiveHistoryField((current) => {
-                                      const next = current === 'patientId' ? null : 'patientId';
-                                      if (next) {
-                                        patientIdHistory.updateQuery(value);
-                                      }
-                                      return next;
-                                    });
-                                  }
-                                }}
-                                onBlur={() => scheduleHistoryClose('patientId')}
-                                onChange={(e) => {
-                                  const value = e.target.value;
-                                  setPatientId(value);
-                                  patientIdHistory.updateQuery(value);
-                                }}
-                              />
-                              {patientIdSuggestionsOpen && (
-                                <HistoryDropdown
-                                  anchorRef={patientIdInputRef}
-                                  suggestions={patientIdHistory.suggestions}
-                                  onSelect={(value) => {
+                              <div className="history-suggestion-container">
+                                <Input
+                                  id="patientId"
+                                  placeholder="e.g., 2025-196"
+                                  autoComplete="off"
+                                  ref={patientIdInputRef}
+                                  value={patientId}
+                                  onFocus={() => {
+                                    setOpenPatientId(true);
+                                    patientIdHistory.updateQuery(patientId);
+                                  }}
+                                  onMouseDown={(event) => {
+                                    if (
+                                      document.activeElement === event.currentTarget &&
+                                      event.currentTarget.value.trim() === ''
+                                    ) {
+                                      event.preventDefault();
+                                      setOpenPatientId((prev) => {
+                                        const next = !prev;
+                                        if (next) {
+                                          patientIdHistory.updateQuery(event.currentTarget.value);
+                                        }
+                                        return next;
+                                      });
+                                    }
+                                  }}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
                                     setPatientId(value);
-                                    patientIdHistory.recordValue(value);
                                     patientIdHistory.updateQuery(value);
-                                    setActiveHistoryField(null);
-                                  }}
-                                  onClearEntry={(value) => {
-                                    patientIdHistory.clearEntry(value);
-                                    patientIdHistory.updateQuery(patientId);
-                                  }}
-                                  onClearAll={() => {
-                                    patientIdHistory.clearAll();
-                                    patientIdHistory.updateQuery(patientId);
-                                  }}
-                                  onClose={() => {
-                                    setActiveHistoryField(null);
-                                    patientIdHistory.updateQuery(patientId);
+                                    if (!openPatientId) setOpenPatientId(true);
                                   }}
                                 />
-                              )}
+                                {openPatientId && patientIdHistory.suggestions.length > 0 && (
+                                  <ul className="absolute z-50 mt-1 w-full max-h-48 overflow-auto rounded-md border bg-popover text-sm shadow" role="listbox">
+                                    {patientIdHistory.suggestions.map((s) => (
+                                      <li key={s.value}>
+                                        <button
+                                          type="button"
+                                          className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-muted"
+                                          onClick={() => {
+                                            setPatientId(s.value);
+                                            patientIdHistory.recordValue(s.value);
+                                            patientIdHistory.updateQuery(s.value);
+                                            setOpenPatientId(false);
+                                          }}
+                                        >
+                                          <span>{s.value}</span>
+                                          <span
+                                            className="text-xs text-muted-foreground hover:text-destructive"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              patientIdHistory.clearEntry(s.value);
+                                              patientIdHistory.updateQuery(patientId);
+                                            }}
+                                          >
+                                            Clear
+                                          </span>
+                                        </button>
+                                      </li>
+                                    ))}
+                                    <li className="border-t">
+                                      <button
+                                        type="button"
+                                        className="w-full px-3 py-1.5 text-left text-xs text-muted-foreground hover:text-destructive hover:bg-muted"
+                                        onClick={() => {
+                                          patientIdHistory.clearAll();
+                                          patientIdHistory.updateQuery(patientId);
+                                        }}
+                                      >
+                                        Clear all
+                                      </button>
+                                    </li>
+                                  </ul>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -588,61 +486,84 @@ export function MedicationDetail({
                           <Label htmlFor="initials">Patient Initials *</Label>
                           <div className="space-y-1">
                             <div className="relative">
-                              <Input
-                                id="initials"
-                                placeholder="e.g., J.D."
-                                autoComplete="off"
-                                ref={patientInitialsInputRef}
-                                value={patientInitials}
-                                onFocus={() => {
-                                  setActiveHistoryField('patientInitials');
-                                  patientInitialsHistory.updateQuery(patientInitials);
-                                }}
-                                onMouseDown={(event) => {
-                                  if (document.activeElement === event.currentTarget) {
-                                    event.preventDefault();
-                                    const value = event.currentTarget.value;
-                                    setActiveHistoryField((current) => {
-                                      const next =
-                                        current === 'patientInitials' ? null : 'patientInitials';
-                                      if (next) {
-                                        patientInitialsHistory.updateQuery(value);
-                                      }
-                                      return next;
-                                    });
-                                  }
-                                }}
-                                onBlur={() => scheduleHistoryClose('patientInitials')}
-                                onChange={(e) => {
-                                  const value = e.target.value;
-                                  setPatientInitials(value);
-                                  patientInitialsHistory.updateQuery(value);
-                                }}
-                              />
-                              {patientInitialsSuggestionsOpen && (
-                                <HistoryDropdown
-                                  anchorRef={patientInitialsInputRef}
-                                  suggestions={patientInitialsHistory.suggestions}
-                                  onSelect={(value) => {
+                              <div className="history-suggestion-container">
+                                <Input
+                                  id="initials"
+                                  placeholder="e.g., J.D."
+                                  autoComplete="off"
+                                  ref={patientInitialsInputRef}
+                                  value={patientInitials}
+                                  onFocus={() => {
+                                    setOpenPatientInitials(true);
+                                    patientInitialsHistory.updateQuery(patientInitials);
+                                  }}
+                                  onMouseDown={(event) => {
+                                    if (
+                                      document.activeElement === event.currentTarget &&
+                                      event.currentTarget.value.trim() === ''
+                                    ) {
+                                      event.preventDefault();
+                                      setOpenPatientInitials((prev) => {
+                                        const next = !prev;
+                                        if (next) {
+                                          patientInitialsHistory.updateQuery(
+                                            event.currentTarget.value,
+                                          );
+                                        }
+                                        return next;
+                                      });
+                                    }
+                                  }}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
                                     setPatientInitials(value);
-                                    patientInitialsHistory.recordValue(value);
                                     patientInitialsHistory.updateQuery(value);
-                                    setActiveHistoryField(null);
-                                  }}
-                                  onClearEntry={(value) => {
-                                    patientInitialsHistory.clearEntry(value);
-                                    patientInitialsHistory.updateQuery(patientInitials);
-                                  }}
-                                  onClearAll={() => {
-                                    patientInitialsHistory.clearAll();
-                                    patientInitialsHistory.updateQuery(patientInitials);
-                                  }}
-                                  onClose={() => {
-                                    setActiveHistoryField(null);
-                                    patientInitialsHistory.updateQuery(patientInitials);
+                                    if (!openPatientInitials) setOpenPatientInitials(true);
                                   }}
                                 />
-                              )}
+                                {openPatientInitials && patientInitialsHistory.suggestions.length > 0 && (
+                                  <ul className="absolute z-50 mt-1 w-full max-h-48 overflow-auto rounded-md border bg-popover text-sm shadow" role="listbox">
+                                    {patientInitialsHistory.suggestions.map((s) => (
+                                      <li key={s.value}>
+                                        <button
+                                          type="button"
+                                          className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-muted"
+                                          onClick={() => {
+                                            setPatientInitials(s.value);
+                                            patientInitialsHistory.recordValue(s.value);
+                                            patientInitialsHistory.updateQuery(s.value);
+                                            setOpenPatientInitials(false);
+                                          }}
+                                        >
+                                          <span>{s.value}</span>
+                                          <span
+                                            className="text-xs text-muted-foreground hover:text-destructive"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              patientInitialsHistory.clearEntry(s.value);
+                                              patientInitialsHistory.updateQuery(patientInitials);
+                                            }}
+                                          >
+                                            Clear
+                                          </span>
+                                        </button>
+                                      </li>
+                                    ))}
+                                    <li className="border-t">
+                                      <button
+                                        type="button"
+                                        className="w-full px-3 py-1.5 text-left text-xs text-muted-foreground hover:text-destructive hover:bg-muted"
+                                        onClick={() => {
+                                          patientInitialsHistory.clearAll();
+                                          patientInitialsHistory.updateQuery(patientInitials);
+                                        }}
+                                      >
+                                        Clear all
+                                      </button>
+                                    </li>
+                                  </ul>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -653,60 +574,82 @@ export function MedicationDetail({
                         <Label htmlFor="dose">Dose Instructions *</Label>
                         <div className="space-y-1">
                           <div className="relative">
-                            <Input
-                              id="dose"
-                              placeholder="e.g., 1 tab, PRN, 1 gtt"
-                              autoComplete="off"
-                              ref={doseInputRef}
-                              value={dose}
-                              onFocus={() => {
-                                setActiveHistoryField('dose');
-                                doseHistory.updateQuery(dose);
-                              }}
-                              onMouseDown={(event) => {
-                                if (document.activeElement === event.currentTarget) {
-                                  event.preventDefault();
-                                  const value = event.currentTarget.value;
-                                  setActiveHistoryField((current) => {
-                                    const next = current === 'dose' ? null : 'dose';
-                                    if (next) {
-                                      doseHistory.updateQuery(value);
-                                    }
-                                    return next;
-                                  });
-                                }
-                              }}
-                              onBlur={() => scheduleHistoryClose('dose')}
-                              onChange={(e) => {
-                                const value = e.target.value;
-                                setDose(value);
-                                doseHistory.updateQuery(value);
-                              }}
-                            />
-                            {doseSuggestionsOpen && (
-                              <HistoryDropdown
-                                anchorRef={doseInputRef}
-                                suggestions={doseHistory.suggestions}
-                                onSelect={(value) => {
+                            <div className="history-suggestion-container">
+                              <Input
+                                id="dose"
+                                placeholder="e.g., 1 tab, PRN, 1 gtt"
+                                autoComplete="off"
+                                ref={doseInputRef}
+                                value={dose}
+                                onFocus={() => {
+                                  setOpenDose(true);
+                                  doseHistory.updateQuery(dose);
+                                }}
+                                onMouseDown={(event) => {
+                                  if (
+                                    document.activeElement === event.currentTarget &&
+                                    event.currentTarget.value.trim() === ''
+                                  ) {
+                                    event.preventDefault();
+                                    setOpenDose((prev) => {
+                                      const next = !prev;
+                                      if (next) {
+                                        doseHistory.updateQuery(event.currentTarget.value);
+                                      }
+                                      return next;
+                                    });
+                                  }
+                                }}
+                                onChange={(e) => {
+                                  const value = e.target.value;
                                   setDose(value);
-                                  doseHistory.recordValue(value);
                                   doseHistory.updateQuery(value);
-                                  setActiveHistoryField(null);
-                                }}
-                                onClearEntry={(value) => {
-                                  doseHistory.clearEntry(value);
-                                  doseHistory.updateQuery(dose);
-                                }}
-                                onClearAll={() => {
-                                  doseHistory.clearAll();
-                                  doseHistory.updateQuery(dose);
-                                }}
-                                onClose={() => {
-                                  setActiveHistoryField(null);
-                                  doseHistory.updateQuery(dose);
+                                  if (!openDose) setOpenDose(true);
                                 }}
                               />
-                            )}
+                              {openDose && doseHistory.suggestions.length > 0 && (
+                                <ul className="absolute z-50 mt-1 w-full max-h-48 overflow-auto rounded-md border bg-popover text-sm shadow" role="listbox">
+                                  {doseHistory.suggestions.map((s) => (
+                                    <li key={s.value}>
+                                      <button
+                                        type="button"
+                                        className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-muted"
+                                        onClick={() => {
+                                          setDose(s.value);
+                                          doseHistory.recordValue(s.value);
+                                          doseHistory.updateQuery(s.value);
+                                          setOpenDose(false);
+                                        }}
+                                      >
+                                        <span>{s.value}</span>
+                                        <span
+                                          className="text-xs text-muted-foreground hover:text-destructive"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            doseHistory.clearEntry(s.value);
+                                            doseHistory.updateQuery(dose);
+                                          }}
+                                        >
+                                          Clear
+                                        </span>
+                                      </button>
+                                    </li>
+                                  ))}
+                                  <li className="border-t">
+                                    <button
+                                      type="button"
+                                      className="w-full px-3 py-1.5 text-left text-xs text-muted-foreground hover:text-destructive hover:bg-muted"
+                                      onClick={() => {
+                                        doseHistory.clearAll();
+                                        doseHistory.updateQuery(dose);
+                                      }}
+                                    >
+                                      Clear all
+                                    </button>
+                                  </li>
+                                </ul>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -818,62 +761,84 @@ export function MedicationDetail({
                           <Label htmlFor="physician">Physician Name *</Label>
                           <div className="space-y-1">
                             <div className="relative">
-                              <Input
-                                id="physician"
-                                name="physician-name"
-                                placeholder="e.g., Dr. Smith"
-                                autoComplete="off"
-                                autoCapitalize="words"
-                                ref={physicianInputRef}
-                                value={physicianName}
-                                onFocus={() => {
-                                  setActiveHistoryField('physician');
-                                  physicianHistory.updateQuery(physicianName);
-                                }}
-                                onMouseDown={(event) => {
-                                  if (document.activeElement === event.currentTarget) {
-                                    event.preventDefault();
-                                    const value = event.currentTarget.value;
-                                    setActiveHistoryField((current) => {
-                                      const next = current === 'physician' ? null : 'physician';
-                                      if (next) {
-                                        physicianHistory.updateQuery(value);
-                                      }
-                                      return next;
-                                    });
-                                  }
-                                }}
-                                onBlur={() => scheduleHistoryClose('physician')}
-                                onChange={(e) => {
-                                  const value = e.target.value;
-                                  setPhysicianName(value);
-                                  physicianHistory.updateQuery(value);
-                                }}
-                              />
-                              {physicianSuggestionsOpen && (
-                                <HistoryDropdown
-                                  anchorRef={physicianInputRef}
-                                  suggestions={physicianHistory.suggestions}
-                                  onSelect={(value) => {
+                              <div className="history-suggestion-container">
+                                <Input
+                                  id="physician"
+                                  name="physician-name"
+                                  placeholder="e.g., Dr. Smith"
+                                  autoComplete="off"
+                                  autoCapitalize="words"
+                                  ref={physicianInputRef}
+                                  value={physicianName}
+                                  onFocus={() => {
+                                    setOpenPhysician(true);
+                                    physicianHistory.updateQuery(physicianName);
+                                  }}
+                                  onMouseDown={(event) => {
+                                    if (
+                                      document.activeElement === event.currentTarget &&
+                                      event.currentTarget.value.trim() === ''
+                                    ) {
+                                      event.preventDefault();
+                                      setOpenPhysician((prev) => {
+                                        const next = !prev;
+                                        if (next) {
+                                          physicianHistory.updateQuery(event.currentTarget.value);
+                                        }
+                                        return next;
+                                      });
+                                    }
+                                  }}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
                                     setPhysicianName(value);
-                                    physicianHistory.recordValue(value);
                                     physicianHistory.updateQuery(value);
-                                    setActiveHistoryField(null);
-                                  }}
-                                  onClearEntry={(value) => {
-                                    physicianHistory.clearEntry(value);
-                                    physicianHistory.updateQuery(physicianName);
-                                  }}
-                                  onClearAll={() => {
-                                    physicianHistory.clearAll();
-                                    physicianHistory.updateQuery(physicianName);
-                                  }}
-                                  onClose={() => {
-                                    setActiveHistoryField(null);
-                                    physicianHistory.updateQuery(physicianName);
+                                    if (!openPhysician) setOpenPhysician(true);
                                   }}
                                 />
-                              )}
+                                {openPhysician && physicianHistory.suggestions.length > 0 && (
+                                  <ul className="absolute z-50 mt-1 w-full max-h-48 overflow-auto rounded-md border bg-popover text-sm shadow" role="listbox">
+                                    {physicianHistory.suggestions.map((s) => (
+                                      <li key={s.value}>
+                                        <button
+                                          type="button"
+                                          className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-muted"
+                                          onClick={() => {
+                                            setPhysicianName(s.value);
+                                            physicianHistory.recordValue(s.value);
+                                            physicianHistory.updateQuery(s.value);
+                                            setOpenPhysician(false);
+                                          }}
+                                        >
+                                          <span>{s.value}</span>
+                                          <span
+                                            className="text-xs text-muted-foreground hover:text-destructive"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              physicianHistory.clearEntry(s.value);
+                                              physicianHistory.updateQuery(physicianName);
+                                            }}
+                                          >
+                                            Clear
+                                          </span>
+                                        </button>
+                                      </li>
+                                    ))}
+                                    <li className="border-t">
+                                      <button
+                                        type="button"
+                                        className="w-full px-3 py-1.5 text-left text-xs text-muted-foreground hover:text-destructive hover:bg-muted"
+                                        onClick={() => {
+                                          physicianHistory.clearAll();
+                                          physicianHistory.updateQuery(physicianName);
+                                        }}
+                                      >
+                                        Clear all
+                                      </button>
+                                    </li>
+                                  </ul>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -881,60 +846,82 @@ export function MedicationDetail({
                           <Label htmlFor="student">Student Name</Label>
                           <div className="space-y-1">
                             <div className="relative">
-                              <Input
-                                id="student"
-                                placeholder="e.g., Jane Doe (optional)"
-                                autoComplete="off"
-                                ref={studentInputRef}
-                                value={studentName}
-                                onFocus={() => {
-                                  setActiveHistoryField('student');
-                                  studentHistory.updateQuery(studentName);
-                                }}
-                                onMouseDown={(event) => {
-                                  if (document.activeElement === event.currentTarget) {
-                                    event.preventDefault();
-                                    const value = event.currentTarget.value;
-                                    setActiveHistoryField((current) => {
-                                      const next = current === 'student' ? null : 'student';
-                                      if (next) {
-                                        studentHistory.updateQuery(value);
-                                      }
-                                      return next;
-                                    });
-                                  }
-                                }}
-                                onBlur={() => scheduleHistoryClose('student')}
-                                onChange={(e) => {
-                                  const value = e.target.value;
-                                  setStudentName(value);
-                                  studentHistory.updateQuery(value);
-                                }}
-                              />
-                              {studentSuggestionsOpen && (
-                                <HistoryDropdown
-                                  anchorRef={studentInputRef}
-                                  suggestions={studentHistory.suggestions}
-                                  onSelect={(value) => {
+                              <div className="history-suggestion-container">
+                                <Input
+                                  id="student"
+                                  placeholder="e.g., Jane Doe (optional)"
+                                  autoComplete="off"
+                                  ref={studentInputRef}
+                                  value={studentName}
+                                  onFocus={() => {
+                                    setOpenStudent(true);
+                                    studentHistory.updateQuery(studentName);
+                                  }}
+                                  onMouseDown={(event) => {
+                                    if (
+                                      document.activeElement === event.currentTarget &&
+                                      event.currentTarget.value.trim() === ''
+                                    ) {
+                                      event.preventDefault();
+                                      setOpenStudent((prev) => {
+                                        const next = !prev;
+                                        if (next) {
+                                          studentHistory.updateQuery(event.currentTarget.value);
+                                        }
+                                        return next;
+                                      });
+                                    }
+                                  }}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
                                     setStudentName(value);
-                                    studentHistory.recordValue(value);
                                     studentHistory.updateQuery(value);
-                                    setActiveHistoryField(null);
-                                  }}
-                                  onClearEntry={(value) => {
-                                    studentHistory.clearEntry(value);
-                                    studentHistory.updateQuery(studentName);
-                                  }}
-                                  onClearAll={() => {
-                                    studentHistory.clearAll();
-                                    studentHistory.updateQuery(studentName);
-                                  }}
-                                  onClose={() => {
-                                    setActiveHistoryField(null);
-                                    studentHistory.updateQuery(studentName);
+                                    if (!openStudent) setOpenStudent(true);
                                   }}
                                 />
-                              )}
+                                {openStudent && studentHistory.suggestions.length > 0 && (
+                                  <ul className="absolute z-50 mt-1 w-full max-h-48 overflow-auto rounded-md border bg-popover text-sm shadow" role="listbox">
+                                    {studentHistory.suggestions.map((s) => (
+                                      <li key={s.value}>
+                                        <button
+                                          type="button"
+                                          className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-muted"
+                                          onClick={() => {
+                                            setStudentName(s.value);
+                                            studentHistory.recordValue(s.value);
+                                            studentHistory.updateQuery(s.value);
+                                            setOpenStudent(false);
+                                          }}
+                                        >
+                                          <span>{s.value}</span>
+                                          <span
+                                            className="text-xs text-muted-foreground hover:text-destructive"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              studentHistory.clearEntry(s.value);
+                                              studentHistory.updateQuery(studentName);
+                                            }}
+                                          >
+                                            Clear
+                                          </span>
+                                        </button>
+                                      </li>
+                                    ))}
+                                    <li className="border-t">
+                                      <button
+                                        type="button"
+                                        className="w-full px-3 py-1.5 text-left text-xs text-muted-foreground hover:text-destructive hover:bg-muted"
+                                        onClick={() => {
+                                          studentHistory.clearAll();
+                                          studentHistory.updateQuery(studentName);
+                                        }}
+                                      >
+                                        Clear all
+                                      </button>
+                                    </li>
+                                  </ul>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -945,60 +932,82 @@ export function MedicationDetail({
                         <Label htmlFor="clinic-site">Clinic Site</Label>
                         <div className="space-y-1">
                           <div className="relative">
-                            <Input
-                              id="clinic-site"
-                              placeholder="e.g., Bainbridge, Moultrie, etc."
-                              autoComplete="off"
-                              ref={clinicInputRef}
-                              value={clinicSite}
-                              onFocus={() => {
-                                setActiveHistoryField('clinic');
-                                clinicSiteHistory.updateQuery(clinicSite);
-                              }}
-                              onMouseDown={(event) => {
-                                if (document.activeElement === event.currentTarget) {
-                                  event.preventDefault();
-                                  const value = event.currentTarget.value;
-                                  setActiveHistoryField((current) => {
-                                    const next = current === 'clinic' ? null : 'clinic';
-                                    if (next) {
-                                      clinicSiteHistory.updateQuery(value);
-                                    }
-                                    return next;
-                                  });
-                                }
-                              }}
-                              onBlur={() => scheduleHistoryClose('clinic')}
-                              onChange={(e) => {
-                                const value = e.target.value;
-                                setClinicSite(value);
-                                clinicSiteHistory.updateQuery(value);
-                              }}
-                            />
-                            {clinicSuggestionsOpen && (
-                              <HistoryDropdown
-                                anchorRef={clinicInputRef}
-                                suggestions={clinicSiteHistory.suggestions}
-                                onSelect={(value) => {
+                            <div className="history-suggestion-container">
+                              <Input
+                                id="clinic-site"
+                                placeholder="e.g., Bainbridge, Moultrie, etc."
+                                autoComplete="off"
+                                ref={clinicInputRef}
+                                value={clinicSite}
+                                onFocus={() => {
+                                  setOpenClinic(true);
+                                  clinicSiteHistory.updateQuery(clinicSite);
+                                }}
+                                onMouseDown={(event) => {
+                                  if (
+                                    document.activeElement === event.currentTarget &&
+                                    event.currentTarget.value.trim() === ''
+                                  ) {
+                                    event.preventDefault();
+                                    setOpenClinic((prev) => {
+                                      const next = !prev;
+                                      if (next) {
+                                        clinicSiteHistory.updateQuery(event.currentTarget.value);
+                                      }
+                                      return next;
+                                    });
+                                  }
+                                }}
+                                onChange={(e) => {
+                                  const value = e.target.value;
                                   setClinicSite(value);
-                                  clinicSiteHistory.recordValue(value);
                                   clinicSiteHistory.updateQuery(value);
-                                  setActiveHistoryField(null);
-                                }}
-                                onClearEntry={(value) => {
-                                  clinicSiteHistory.clearEntry(value);
-                                  clinicSiteHistory.updateQuery(clinicSite);
-                                }}
-                                onClearAll={() => {
-                                  clinicSiteHistory.clearAll();
-                                  clinicSiteHistory.updateQuery(clinicSite);
-                                }}
-                                onClose={() => {
-                                  setActiveHistoryField(null);
-                                  clinicSiteHistory.updateQuery(clinicSite);
+                                  if (!openClinic) setOpenClinic(true);
                                 }}
                               />
-                            )}
+                              {openClinic && clinicSiteHistory.suggestions.length > 0 && (
+                                <ul className="absolute z-50 mt-1 w-full max-h-48 overflow-auto rounded-md border bg-popover text-sm shadow" role="listbox">
+                                  {clinicSiteHistory.suggestions.map((s) => (
+                                    <li key={s.value}>
+                                      <button
+                                        type="button"
+                                        className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-muted"
+                                        onClick={() => {
+                                          setClinicSite(s.value);
+                                          clinicSiteHistory.recordValue(s.value);
+                                          clinicSiteHistory.updateQuery(s.value);
+                                          setOpenClinic(false);
+                                        }}
+                                      >
+                                        <span>{s.value}</span>
+                                        <span
+                                          className="text-xs text-muted-foreground hover:text-destructive"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            clinicSiteHistory.clearEntry(s.value);
+                                            clinicSiteHistory.updateQuery(clinicSite);
+                                          }}
+                                        >
+                                          Clear
+                                        </span>
+                                      </button>
+                                    </li>
+                                  ))}
+                                  <li className="border-t">
+                                    <button
+                                      type="button"
+                                      className="w-full px-3 py-1.5 text-left text-xs text-muted-foreground hover:text-destructive hover:bg-muted"
+                                      onClick={() => {
+                                        clinicSiteHistory.clearAll();
+                                        clinicSiteHistory.updateQuery(clinicSite);
+                                      }}
+                                    >
+                                      Clear all
+                                    </button>
+                                  </li>
+                                </ul>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
