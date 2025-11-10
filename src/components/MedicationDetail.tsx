@@ -1057,7 +1057,18 @@ export function MedicationDetail({
             </div>
             <div>
               <Label className="text-sm font-medium">Category</Label>
-              <Badge variant="outline">{medication.category}</Badge>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {(Array.isArray(medication.category)
+                  ? medication.category
+                  : medication.category
+                  ? [medication.category as unknown as string]
+                  : []
+                ).map((cat) => (
+                  <Badge key={cat} variant="outline" className="text-xs">
+                    {cat}
+                  </Badge>
+                ))}
+              </div>
             </div>
             <div>
               <Label className="text-sm font-medium">Last Updated</Label>

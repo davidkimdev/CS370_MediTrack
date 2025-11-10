@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -6,7 +6,15 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+import { ScrollArea, ScrollBar } from './ui/scroll-area';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu';
 import {
   AlertTriangle,
   CheckCircle,
@@ -45,6 +53,8 @@ export function StockManagement({
 }: StockManagementProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [activeCategory, setActiveCategory] = useState<string>('All');
+  const [categorySearch, setCategorySearch] = useState<string>('');
   const [selectedMedication, setSelectedMedication] = useState<Medication | null>(null);
   const [newQuantity, setNewQuantity] = useState('');
   const [updateReason, setUpdateReason] = useState('');
@@ -78,12 +88,16 @@ export function StockManagement({
     let filtered = medications;
 
     if (searchTerm) {
-      filtered = filtered.filter(
-        (med) =>
-          med.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          med.genericName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          med.category.toLowerCase().includes(searchTerm.toLowerCase()),
-      );
+      const q = searchTerm.toLowerCase();
+      filtered = filtered.filter((med) => {
+        const cats = Array.isArray(med.category) ? med.category : [];
+        const catsText = cats.join(' ').toLowerCase();
+        return (
+          med.name.toLowerCase().includes(q) ||
+          med.genericName.toLowerCase().includes(q) ||
+          catsText.includes(q)
+        );
+      });
     }
 
     if (statusFilter !== 'all') {
@@ -114,6 +128,75 @@ export function StockManagement({
       return a.name.localeCompare(b.name);
     });
   }, [medications, searchTerm, statusFilter]);
+
+  // Derive category lists from medications
+  const allCategories = useMemo(() => {
+    const set = new Set<string>();
+    for (const med of medications) {
+      const cats = Array.isArray(med.category) ? med.category : [];
+      for (const c of cats) {
+        const v = (c ?? '').trim();
+        if (v) set.add(v);
+      }
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [medications]);
+
+  const visibleCategories = useMemo(() => {
+    if (!categorySearch) return allCategories;
+    const q = categorySearch.toLowerCase();
+    return allCategories.filter((c) => c.toLowerCase().includes(q));
+  }, [allCategories, categorySearch]);
+
+  // Category counts based on filteredMedications (before category filter)
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const m of filteredMedications) {
+      const cats = Array.isArray(m.category) ? m.category : [];
+      for (const c of cats) {
+        const v = (c ?? '').trim();
+        if (!v) continue;
+        counts.set(v, (counts.get(v) || 0) + 1);
+      }
+    }
+    return counts;
+  }, [filteredMedications]);
+
+  const sortedVisibleCategories = useMemo(() => {
+    return [...visibleCategories].sort((a, b) => {
+      const ca = categoryCounts.get(a) || 0;
+      const cb = categoryCounts.get(b) || 0;
+      if (cb !== ca) return cb - ca;
+      return a.localeCompare(b);
+    });
+  }, [visibleCategories, categoryCounts]);
+
+  const INLINE_LIMIT = 10;
+  const topCategories = useMemo(
+    () => sortedVisibleCategories.slice(0, INLINE_LIMIT),
+    [sortedVisibleCategories],
+  );
+  const overflowCategories = useMemo(
+    () => sortedVisibleCategories.slice(INLINE_LIMIT),
+    [sortedVisibleCategories],
+  );
+  const ensureSelectedChip =
+    activeCategory !== 'All' && !topCategories.includes(activeCategory);
+
+  useEffect(() => {
+    if (activeCategory !== 'All' && !visibleCategories.includes(activeCategory)) {
+      setActiveCategory('All');
+    }
+  }, [visibleCategories, activeCategory]);
+
+  const visibleMedications = useMemo(() => {
+    if (activeCategory === 'All') return filteredMedications;
+    return filteredMedications.filter((m) =>
+      (Array.isArray(m.category) ? m.category : [])
+        .map((c) => (c ?? '').trim())
+        .includes(activeCategory),
+    );
+  }, [filteredMedications, activeCategory]);
 
   const medicationLots = useMemo(() => {
     if (!selectedMedication) return [] as InventoryItem[];
@@ -340,6 +423,73 @@ export function StockManagement({
         </Select>
       </div>
 
+      {/* Category Search + Tabs */}
+      <div className="space-y-3">
+        <div className="relative w-full md:w-80">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+          <Input
+            placeholder="Search categories..."
+            value={categorySearch}
+            onChange={(e) => setCategorySearch(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+
+        <Tabs value={activeCategory} onValueChange={setActiveCategory}>
+          <TabsList className="w-full flex items-center gap-2">
+            <div className="flex-1 min-w-0">
+              <ScrollArea className="w-full whitespace-nowrap">
+                <div className="flex items-center gap-1 pr-24 sm:pr-28">
+                  <TabsTrigger value="All">All</TabsTrigger>
+                  {topCategories.map((cat) => (
+                    <TabsTrigger key={cat} value={cat} title={cat} className="max-w-none">
+                      {cat}
+                      {categoryCounts.get(cat) ? (
+                        <span className="ml-1 text-[10px] opacity-70">{categoryCounts.get(cat)}</span>
+                      ) : null}
+                    </TabsTrigger>
+                  ))}
+                  {ensureSelectedChip && (
+                    <TabsTrigger
+                      key={`sel-${activeCategory}`}
+                      value={activeCategory}
+                      title={activeCategory}
+                      className="max-w-none"
+                    >
+                      {activeCategory}
+                      {categoryCounts.get(activeCategory) ? (
+                        <span className="ml-1 text-[10px] opacity-70">{categoryCounts.get(activeCategory)}</span>
+                      ) : null}
+                    </TabsTrigger>
+                  )}
+                </div>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+            </div>
+            {overflowCategories.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="ml-1 h-8 whitespace-nowrap">
+                    More +{overflowCategories.length}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="max-h-80 overflow-auto">
+                  {overflowCategories.map((cat) => (
+                    <DropdownMenuItem key={cat} onClick={() => setActiveCategory(cat)}>
+                      <span className="mr-2">{cat}</span>
+                      {categoryCounts.get(cat) ? (
+                        <span className="ml-auto text-xs opacity-70">{categoryCounts.get(cat)}</span>
+                      ) : null}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </TabsList>
+          <TabsContent value={activeCategory} />
+        </Tabs>
+      </div>
+
       {/* Stock Table */}
       <Card>
         <CardContent className="p-0">
@@ -357,7 +507,7 @@ export function StockManagement({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredMedications.map((medication) => {
+                {visibleMedications.map((medication) => {
                   const stockStatus = getStockStatus(medication);
                   const StatusIcon = stockStatus.icon;
 
@@ -372,9 +522,15 @@ export function StockManagement({
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="text-xs">
-                          {medication.category}
-                        </Badge>
+                        <div className="flex flex-wrap gap-1">
+                          {(Array.isArray(medication.category) ? medication.category : []).map(
+                            (cat) => (
+                              <Badge key={cat} variant="outline" className="text-xs">
+                                {cat}
+                              </Badge>
+                            ),
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">

@@ -95,7 +95,12 @@ export class MedicationService {
           genericName: med.name,
           strength: med.strength || '',
           dosageForm: med.dosage_form || 'tablet',
-          category: 'General',
+          // Normalize category to string[] (text[] in DB); fallback to ['General']
+          category: Array.isArray(med.category)
+            ? (med.category as string[]).map((c) => (c ?? '').trim()).filter(Boolean)
+            : med.category
+            ? [String(med.category).trim()]
+            : ['General'],
           currentStock: totalStock,
           minStock: 20,
           maxStock: 100,
@@ -114,6 +119,7 @@ export class MedicationService {
     name: string;
     strength: string;
     dosageForm?: string;
+    categories?: string[]; // Supabase text[] column
     isActive?: boolean;
   }): Promise<{ id: string }> {
     const { data, error } = await supabase
@@ -122,6 +128,7 @@ export class MedicationService {
         name: input.name,
         strength: input.strength,
         dosage_form: input.dosageForm || 'tablet',
+        category: input.categories && input.categories.length > 0 ? input.categories : null,
         is_active: input.isActive ?? true,
       })
       .select('id')
@@ -151,7 +158,11 @@ export class MedicationService {
       genericName: data.generic_name,
       strength: data.strength,
       dosageForm: data.dosage_form,
-      category: data.category,
+      category: Array.isArray(data.category)
+        ? (data.category as string[]).map((c) => (c ?? '').trim()).filter(Boolean)
+        : data.category
+        ? [String(data.category).trim()]
+        : ['General'],
       currentStock: data.current_stock,
       minStock: data.min_stock,
       maxStock: data.max_stock,

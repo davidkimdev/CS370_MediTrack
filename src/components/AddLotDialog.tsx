@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Badge } from './ui/badge';
 import { Package, AlertCircle } from 'lucide-react';
 import { cn } from './ui/utils';
 import { Medication, InventoryItem } from '../types/medication';
@@ -28,6 +29,7 @@ export function AddLotDialog({
   const [newMedName, setNewMedName] = useState('');
   const [newMedStrength, setNewMedStrength] = useState('');
   const [newMedDosageForm, setNewMedDosageForm] = useState('tablet');
+  const [newMedCategoriesText, setNewMedCategoriesText] = useState('');
   const [lotNumber, setLotNumber] = useState('');
   const [quantity, setQuantity] = useState('');
   const [expirationDate, setExpirationDate] = useState<Date | undefined>(undefined);
@@ -57,6 +59,7 @@ export function AddLotDialog({
       setNewMedName('');
       setNewMedStrength('');
       setNewMedDosageForm('tablet');
+      setNewMedCategoriesText('');
       setLotNumber('');
       setQuantity('');
       setExpirationDate(undefined);
@@ -67,6 +70,39 @@ export function AddLotDialog({
       setErrors({});
     }
   }, [open, medication]);
+
+  // Build category suggestions from existing medications
+  const allCategories = useMemo(() => {
+    const set = new Set<string>();
+    for (const m of medications) {
+      const cats = Array.isArray(m.category) ? m.category : [];
+      for (const c of cats) {
+        const v = (c ?? '').trim();
+        if (v) set.add(v);
+      }
+    }
+    return Array.from(set).sort();
+  }, [medications]);
+
+  const currentCats = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          newMedCategoriesText
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean),
+        ),
+      ),
+    [newMedCategoriesText],
+  );
+
+  const toggleCategory = (cat: string) => {
+    const set = new Set(currentCats);
+    if (set.has(cat)) set.delete(cat);
+    else set.add(cat);
+    setNewMedCategoriesText(Array.from(set).join(', '));
+  };
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -115,10 +151,12 @@ export function AddLotDialog({
           return;
         }
         const { MedicationService } = await import('../services/medicationService');
+        const parsedCats = Array.from(new Set(newMedCategoriesText.split(',').map(s => s.trim()).filter(Boolean)));
         const created = await MedicationService.createMedication({
           name: newMedName.trim(),
           strength: newMedStrength.trim(),
           dosageForm: newMedDosageForm,
+          categories: parsedCats.length ? parsedCats : undefined,
           isActive: true,
         });
         medicationId = created.id;
@@ -256,6 +294,33 @@ export function AddLotDialog({
                       <SelectItem value="ointment">ointment</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+                {/* Categories input + suggestions */}
+                <div className="space-y-2 sm:col-span-3">
+                  <Label htmlFor="new-med-categories">Categories</Label>
+                  <Input
+                    id="new-med-categories"
+                    value={newMedCategoriesText}
+                    onChange={(e) => setNewMedCategoriesText(e.target.value)}
+                    placeholder="Comma-separated, e.g., Antibiotic, Pediatric"
+                  />
+                  {allCategories.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {allCategories.map((cat) => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => toggleCategory(cat)}
+                          className="focus:outline-none"
+                          title={`Toggle ${cat}`}
+                        >
+                          <Badge variant={currentCats.includes(cat) ? 'default' : 'outline'} className="text-xs">
+                            {cat}
+                          </Badge>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

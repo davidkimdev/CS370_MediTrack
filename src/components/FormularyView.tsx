@@ -4,6 +4,13 @@ import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { ScrollArea, ScrollBar } from './ui/scroll-area';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu';
 import { Skeleton } from './ui/skeleton';
 import { AlertTriangle, CheckCircle, Package, Search, X } from 'lucide-react';
 import { Medication } from '../types/medication';
@@ -20,8 +27,19 @@ export function FormularyView({ medications, onMedicationSelect }: FormularyView
   const [isLoading, setIsLoading] = useState(false);
 
   const categories = useMemo(() => {
-    const cats = Array.from(new Set(medications.map((med) => med.category)));
-    return cats.sort();
+    const set = new Set<string>();
+    for (const med of medications) {
+      const cats = Array.isArray(med.category)
+        ? med.category
+        : med.category
+        ? [med.category as unknown as string]
+        : [];
+      for (const c of cats) {
+        const v = (c ?? '').trim();
+        if (v) set.add(v);
+      }
+    }
+    return Array.from(set).sort();
   }, [medications]);
 
   const filteredMedications = useMemo(() => {
@@ -32,7 +50,12 @@ export function FormularyView({ medications, onMedicationSelect }: FormularyView
         med.genericName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         med.commonUses.some((use) => use.toLowerCase().includes(searchTerm.toLowerCase()));
 
-      const matchesCategory = categoryFilter === 'all' || med.category === categoryFilter;
+      const medCats = Array.isArray(med.category)
+        ? med.category
+        : med.category
+        ? [med.category as unknown as string]
+        : [];
+      const matchesCategory = categoryFilter === 'all' || medCats.includes(categoryFilter);
 
       const matchesAvailability =
         availabilityFilter === 'all' ||
@@ -65,6 +88,62 @@ export function FormularyView({ medications, onMedicationSelect }: FormularyView
       return strengthA - strengthB;
     });
   }, [medications, searchTerm, categoryFilter, availabilityFilter]);
+
+  // Pre-filter list for category counts (do not apply category filter yet)
+  const medsForCounts = useMemo(() => {
+    return medications.filter((med) => {
+      const matchesSearch =
+        searchTerm === '' ||
+        med.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        med.genericName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        med.commonUses.some((use) => use.toLowerCase().includes(searchTerm.toLowerCase()));
+
+      const matchesAvailability =
+        availabilityFilter === 'all' ||
+        (availabilityFilter === 'available' && med.isAvailable) ||
+        (availabilityFilter === 'low' && med.isAvailable && med.currentStock <= med.minStock) ||
+        (availabilityFilter === 'out' && !med.isAvailable);
+      return matchesSearch && matchesAvailability;
+    });
+  }, [medications, searchTerm, availabilityFilter]);
+
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const m of medsForCounts) {
+      const cats = Array.isArray(m.category)
+        ? m.category
+        : m.category
+        ? [m.category as unknown as string]
+        : [];
+      for (const c of cats) {
+        const v = (c ?? '').trim();
+        if (!v) continue;
+        counts.set(v, (counts.get(v) || 0) + 1);
+      }
+    }
+    return counts;
+  }, [medsForCounts]);
+
+  const sortedCategories = useMemo(() => {
+    return [...categories].sort((a, b) => {
+      const ca = categoryCounts.get(a) || 0;
+      const cb = categoryCounts.get(b) || 0;
+      if (cb !== ca) return cb - ca;
+      return a.localeCompare(b);
+    });
+  }, [categories, categoryCounts]);
+
+  const INLINE_LIMIT = 10;
+  const topCategories = useMemo(
+    () => sortedCategories.slice(0, INLINE_LIMIT),
+    [sortedCategories],
+  );
+  const overflowCategories = useMemo(
+    () => sortedCategories.slice(INLINE_LIMIT),
+    [sortedCategories],
+  );
+  const ensureSelectedChip =
+    categoryFilter !== 'all' && !topCategories.includes(categoryFilter);
 
   const getStockStatus = (medication: Medication) => {
     if (!medication.isAvailable) {
@@ -182,21 +261,74 @@ export function FormularyView({ medications, onMedicationSelect }: FormularyView
           )}
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-2">
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-full sm:w-[140px]">
-              <SelectValue placeholder="Category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              {categories.map((category) => (
-                <SelectItem key={category} value={category}>
-                  {category}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex flex-col gap-2">
+          {/* Category chips with overflow "More" */}
+          <div className="w-full flex items-center gap-2">
+            <div className="flex-1 min-w-0">
+              <ScrollArea className="w-full whitespace-nowrap">
+                <div className="flex items-center gap-1 pr-24 sm:pr-28">
+                  <Button
+                    variant={categoryFilter === 'all' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setCategoryFilter('all')}
+                  >
+                    All Categories
+                  </Button>
+                  {topCategories.map((cat) => (
+                    <Button
+                      key={cat}
+                      variant={categoryFilter === cat ? 'default' : 'outline'}
+                      size="sm"
+                      title={cat}
+                      onClick={() => setCategoryFilter(cat)}
+                    >
+                      {cat}
+                      {categoryCounts.get(cat) ? (
+                        <span className="ml-1 text-[10px] opacity-70">{categoryCounts.get(cat)}</span>
+                      ) : null}
+                    </Button>
+                  ))}
+                  {ensureSelectedChip && categoryFilter !== 'all' && (
+                    <Button
+                      key={`sel-${categoryFilter}`}
+                      variant={'default'}
+                      size="sm"
+                      title={categoryFilter}
+                      onClick={() => setCategoryFilter(categoryFilter)}
+                    >
+                      {categoryFilter}
+                      {categoryCounts.get(categoryFilter) ? (
+                        <span className="ml-1 text-[10px] opacity-70">{categoryCounts.get(categoryFilter)}</span>
+                      ) : null}
+                    </Button>
+                  )}
+                </div>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+            </div>
+            {overflowCategories.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="ml-1 h-8 whitespace-nowrap">
+                    More +{overflowCategories.length}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="max-h-80 overflow-auto">
+                  {overflowCategories.map((cat) => (
+                    <DropdownMenuItem key={cat} onClick={() => setCategoryFilter(cat)}>
+                      <span className="mr-2">{cat}</span>
+                      {categoryCounts.get(cat) ? (
+                        <span className="ml-auto text-xs opacity-70">{categoryCounts.get(cat)}</span>
+                      ) : null}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
 
+          {/* Status filter + clear */}
+          <div className="flex items-center gap-2">
           <Select value={availabilityFilter} onValueChange={setAvailabilityFilter}>
             <SelectTrigger className="w-full sm:w-[120px]">
               <SelectValue placeholder="Status" />
@@ -214,6 +346,7 @@ export function FormularyView({ medications, onMedicationSelect }: FormularyView
               <X className="size-4" />
             </Button>
           )}
+          </div>
         </div>
       </div>
 
@@ -261,9 +394,16 @@ export function FormularyView({ medications, onMedicationSelect }: FormularyView
                     </p>
 
                     <div className="flex flex-wrap items-center gap-1 mb-2">
-                      <Badge variant="outline" className="text-xs">
-                        {medication.category}
-                      </Badge>
+                      {(Array.isArray(medication.category)
+                        ? medication.category
+                        : medication.category
+                        ? [medication.category as unknown as string]
+                        : []
+                      ).map((cat) => (
+                        <Badge key={cat} variant="outline" className="text-xs">
+                          {cat}
+                        </Badge>
+                      ))}
                       {medication.commonUses.slice(0, 1).map((use) => (
                         <Badge
                           key={use}

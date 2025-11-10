@@ -320,10 +320,15 @@ export default function App() {
   };
 
   const getAlternatives = (medication: Medication): Medication[] => {
-    return medications.filter(m => 
-      medication.alternatives.includes(m.id) || 
-      m.category === medication.category && m.id !== medication.id
-    ).slice(0, 3); // Limit to 3 alternatives
+    return medications
+      .filter((m) => {
+        if (medication.alternatives.includes(m.id)) return true;
+        const a = new Set((Array.isArray(medication.category) ? medication.category : []).map((c) => (c ?? '').trim()));
+        const b = (Array.isArray(m.category) ? m.category : []).map((c) => (c ?? '').trim());
+        const intersects = b.some((c) => a.has(c));
+        return intersects && m.id !== medication.id;
+      })
+      .slice(0, 3); // Limit to 3 alternatives
   };
 
   const handleUndoDispensing = async (recordId: string) => {

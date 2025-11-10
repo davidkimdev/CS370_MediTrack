@@ -4,7 +4,8 @@ export interface Medication {
   genericName: string;
   strength: string;
   dosageForm: string;
-  category: string;
+  // Supports multiple categories per medication (Supabase text[])
+  category: string[];
   currentStock: number;
   minStock: number;
   maxStock: number;
