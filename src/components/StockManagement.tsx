@@ -6,7 +6,6 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { ScrollArea, ScrollBar } from './ui/scroll-area';
 import {
@@ -423,7 +422,7 @@ export function StockManagement({
         </Select>
       </div>
 
-      {/* Category Search + Tabs */}
+      {/* Category Search + Chips */}
       <div className="space-y-3">
         <div className="relative w-full md:w-80">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
@@ -435,59 +434,68 @@ export function StockManagement({
           />
         </div>
 
-        <Tabs value={activeCategory} onValueChange={setActiveCategory}>
-          <TabsList className="w-full flex items-center gap-2">
-            <div className="flex-1 min-w-0">
-              <ScrollArea className="w-full whitespace-nowrap">
-                <div className="flex items-center gap-1 pr-24 sm:pr-28">
-                  <TabsTrigger value="All">All</TabsTrigger>
-                  {topCategories.map((cat) => (
-                    <TabsTrigger key={cat} value={cat} title={cat} className="max-w-none">
-                      {cat}
-                      {categoryCounts.get(cat) ? (
-                        <span className="ml-1 text-[10px] opacity-70">{categoryCounts.get(cat)}</span>
-                      ) : null}
-                    </TabsTrigger>
-                  ))}
-                  {ensureSelectedChip && (
-                    <TabsTrigger
-                      key={`sel-${activeCategory}`}
-                      value={activeCategory}
-                      title={activeCategory}
-                      className="max-w-none"
-                    >
-                      {activeCategory}
-                      {categoryCounts.get(activeCategory) ? (
-                        <span className="ml-1 text-[10px] opacity-70">{categoryCounts.get(activeCategory)}</span>
-                      ) : null}
-                    </TabsTrigger>
-                  )}
-                </div>
-                <ScrollBar orientation="horizontal" />
-              </ScrollArea>
-            </div>
-            {overflowCategories.length > 0 && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="ml-1 h-8 whitespace-nowrap">
-                    More +{overflowCategories.length}
+        <div className="w-full flex items-center gap-2">
+          <div className="flex-1 min-w-0">
+            <div className="w-full overflow-x-auto whitespace-nowrap">
+              <div className="inline-flex items-center gap-1 pr-24 sm:pr-28">
+                <Button
+                  variant={activeCategory === 'All' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setActiveCategory('All')}
+                >
+                  All
+                </Button>
+                {topCategories.map((cat) => (
+                  <Button
+                    key={cat}
+                    variant={activeCategory === cat ? 'default' : 'outline'}
+                    size="sm"
+                    title={cat}
+                    onClick={() => setActiveCategory(cat)}
+                  >
+                    {cat}
+                    {categoryCounts.get(cat) ? (
+                      <span className="ml-1 text-[10px] opacity-70">{categoryCounts.get(cat)}</span>
+                    ) : null}
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="max-h-80 overflow-auto">
-                  {overflowCategories.map((cat) => (
-                    <DropdownMenuItem key={cat} onClick={() => setActiveCategory(cat)}>
-                      <span className="mr-2">{cat}</span>
-                      {categoryCounts.get(cat) ? (
-                        <span className="ml-auto text-xs opacity-70">{categoryCounts.get(cat)}</span>
-                      ) : null}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-          </TabsList>
-          <TabsContent value={activeCategory} />
-        </Tabs>
+                ))}
+                {ensureSelectedChip && activeCategory !== 'All' && (
+                  <Button
+                    key={`sel-${activeCategory}`}
+                    variant={'default'}
+                    size="sm"
+                    title={activeCategory}
+                    onClick={() => setActiveCategory(activeCategory)}
+                  >
+                    {activeCategory}
+                    {categoryCounts.get(activeCategory) ? (
+                      <span className="ml-1 text-[10px] opacity-70">{categoryCounts.get(activeCategory)}</span>
+                    ) : null}
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+          {overflowCategories.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="ml-1 h-8 whitespace-nowrap">
+                  More +{overflowCategories.length}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="max-h-80 overflow-auto">
+                {overflowCategories.map((cat) => (
+                  <DropdownMenuItem key={cat} onClick={() => setActiveCategory(cat)}>
+                    <span className="mr-2">{cat}</span>
+                    {categoryCounts.get(cat) ? (
+                      <span className="ml-auto text-xs opacity-70">{categoryCounts.get(cat)}</span>
+                    ) : null}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
       </div>
 
       {/* Stock Table */}
