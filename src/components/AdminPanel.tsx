@@ -23,6 +23,9 @@ import {
   UserPlus,
   Users,
 } from 'lucide-react';
+import { AdminKpiHeader } from './admin/KpiHeader';
+import { MedicationService } from '../services/medicationService';
+import ManageAccounts from '@/components/admin/ManageAccounts';
 
 export function AdminPanel() {
   const { user, profile } = useAuth();
@@ -250,390 +253,87 @@ export function AdminPanel() {
     return null;
   }
 
+  // KPI Metrics (memoized for performance)
+  const [medStats, setMedStats] = useState<{ total: number; low: number; out: number } | null>(null);
+  const [showManageAccounts, setShowManageAccounts] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadMedStats() {
+      try {
+        const meds = await MedicationService.getAllMedications();
+        if (cancelled) return;
+        const total = meds.length;
+        const low = meds.filter((m) => typeof m.minStock === 'number' && m.currentStock <= (m.minStock || 0)).length;
+        const out = meds.filter((m) => (m.currentStock || 0) <= 0).length;
+        setMedStats({ total, low, out });
+      } catch (e) {
+        console.warn('Failed to load medication stats (non-blocking):', e);
+        if (!cancelled) setMedStats({ total: 0, low: 0, out: 0 });
+      }
+    }
+    void loadMedStats();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const kpiMetrics = useMemo(() => {
+    const now = Date.now();
+    const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+    const recentRedemptions = invitationCodes.filter(
+      (c) => c.usedAt && c.usedAt.getTime() >= sevenDaysAgo,
+    ).length;
+    return {
+      activeUsers: activeUsers.length,
+      adminUsers: allUsers.filter((u) => u.role === 'admin' && u.isApproved).length,
+      pendingApprovals: pendingUsers.length,
+      activeInvitationCodes: invitationCodes.filter(
+        (c) => c.isActive && !c.usedAt && c.expiresAt.getTime() >= now,
+      ).length,
+      recentRedemptions,
+      totalMedications: medStats?.total ?? undefined,
+      lowStock: medStats?.low ?? undefined,
+      outOfStock: medStats?.out ?? undefined,
+    };
+  }, [activeUsers, allUsers, pendingUsers, invitationCodes, medStats]);
+
+  if (showManageAccounts) {
+    return <ManageAccounts onBack={() => setShowManageAccounts(false)} />;
+  }
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold flex items-center gap-2">
-            <ShieldCheck className="size-6 text-emerald-600" />
-            Admin Control Center
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Manage access, onboard new teammates, and review account activity.
-          </p>
-        </div>
-        <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing || isLoading}>
-          {refreshing ? <Loader2 className="mr-2 size-4 animate-spin" /> : <RefreshCw className="mr-2 size-4" />}
-          Refresh
-        </Button>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <UserPlus className="size-5" />
-            Invitation Codes
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
-            <div className="space-y-2">
-              <Label htmlFor="invite-email">Optional email (locks code to this address)</Label>
-              <Input
-                id="invite-email"
-                type="email"
-                placeholder="name@example.com"
-                value={inviteEmail}
-                onChange={(event) => setInviteEmail(event.target.value)}
-              />
-            </div>
-            <div className="flex items-end">
-              <Button onClick={handleGenerateInvite} disabled={isGeneratingCode} className="w-full sm:w-auto">
-                {isGeneratingCode ? (
-                  <Loader2 className="mr-2 size-4 animate-spin" />
-                ) : (
-                  <UserPlus className="mr-2 size-4" />
-                )}
-                Generate code
-              </Button>
-            </div>
-          </div>
-
-          {generatedCode && (
-            <div className="flex items-center gap-3 rounded-md border bg-muted/40 px-3 py-2">
-              <span className="font-mono text-lg">{generatedCode}</span>
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => handleCopyCode(generatedCode)}
-              >
-                {copiedCode === generatedCode ? (
-                  <ClipboardCheck className="mr-2 size-4" />
-                ) : (
-                  <Clipboard className="mr-2 size-4" />
-                )}
-                Copy
-              </Button>
-            </div>
-          )}
-
-          <p className="text-xs text-muted-foreground">
-            Invitation codes remain active for 7 days unless disabled or redeemed earlier.
-          </p>
-
-          <Separator />
-
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <KeyRound className="size-4" />
-                Active invitation codes
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">
-                  Showing {activeCodes.length} active codes
-                </span>
-                {archivedCodes.length > 0 && (
-                  <Button variant="ghost" size="sm" onClick={() => setIsHistoryOpen(true)}>
-                    View history
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            {isLoading && !hasLoaded ? (
-              <div className="py-4 text-center text-muted-foreground">
-                <Loader2 className="mx-auto mb-2 size-4 animate-spin" />
-                Loading invitation codes…
-              </div>
-            ) : activeCodes.length === 0 ? (
-              <div className="rounded-md border border-dashed bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-                No active invitation codes. Generate a new one above.
-              </div>
-            ) : (
-              <div className="rounded-md border overflow-hidden">
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Code</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Created</TableHead>
-                        <TableHead>Expires</TableHead>
-                        <TableHead className="w-[160px]">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {activeCodes.map((code) => {
-                        const status = getInvitationStatus(code);
-                        const disableLoading = codeActionLoading[code.id];
-                        return (
-                          <TableRow key={code.id}>
-                            <TableCell className="font-mono text-xs sm:text-sm">{code.code}</TableCell>
-                            <TableCell className="text-xs text-muted-foreground">
-                              {code.email ?? 'Any email'}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={status.variant} className={status.className}>
-                                {status.label}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-xs text-muted-foreground">
-                              {code.createdAt.toLocaleDateString()}
-                            </TableCell>
-                            <TableCell className="text-xs text-muted-foreground">
-                              {code.expiresAt.toLocaleDateString()}
-                            </TableCell>
-                            <TableCell className="flex flex-wrap gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleCopyCode(code.code)}
-                              >
-                                {copiedCode === code.code ? (
-                                  <ClipboardCheck className="mr-2 size-4" />
-                                ) : (
-                                  <Clipboard className="mr-2 size-4" />
-                                )}
-                                Copy
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="text-muted-foreground hover:text-destructive"
-                                disabled={disableLoading}
-                                onClick={() => handleDeactivateCode(code.id)}
-                              >
-                                {disableLoading ? (
-                                  <Loader2 className="mr-2 size-4 animate-spin" />
-                                ) : (
-                                  <Ban className="mr-2 size-4" />
-                                )}
-                                Disable
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
-        <DialogContent className="w-[92vw] max-w-4xl overflow-hidden p-0">
-          <DialogHeader className="px-6 pt-6">
-            <DialogTitle>Invitation Code History</DialogTitle>
-          </DialogHeader>
-          <div className="px-6 pb-6">
-            {archivedCodes.length === 0 ? (
-              <div className="rounded-md border border-dashed bg-muted/30 px-4 py-6 text-center text-sm text-muted-foreground">
-                No archived codes yet.
-              </div>
-            ) : (
-              <div className="rounded-md border">
-                <div className="max-h-[60vh] overflow-auto">
-                  <Table className="w-full min-w-[720px]">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Code</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Created</TableHead>
-                        <TableHead>Expires</TableHead>
-                        <TableHead>Resolved</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {archivedCodes.map((code) => {
-                        const status = getInvitationStatus(code);
-                        return (
-                          <TableRow key={code.id}>
-                            <TableCell className="font-mono text-xs sm:text-sm">{code.code}</TableCell>
-                            <TableCell className="text-xs text-muted-foreground">
-                              {code.email ?? 'Any email'}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={status.variant} className={status.className}>
-                                {status.label}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-xs text-muted-foreground">
-                              {code.createdAt.toLocaleDateString()}
-                            </TableCell>
-                            <TableCell className="text-xs text-muted-foreground">
-                              {code.expiresAt.toLocaleDateString()}
-                            </TableCell>
-                            <TableCell className="text-xs text-muted-foreground">
-                              {code.usedAt ? code.usedAt.toLocaleString() : '—'}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="order-2 lg:order-1">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ShieldCheck className="size-5" /> Pending Approvals
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="py-6 text-center text-muted-foreground">
-                <Loader2 className="mx-auto mb-2 size-5 animate-spin" />
-                Loading pending requests…
-              </div>
-            ) : pendingUsers.length === 0 ? (
-              <div className="py-6 text-center text-muted-foreground">
-                No pending account requests.
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Requested</TableHead>
-                    <TableHead className="w-[150px]">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pendingUsers.map((pending) => {
-                    const loading = userActionLoading[pending.id];
-                    return (
-                      <TableRow key={pending.id}>
-                        <TableCell>{`${pending.firstName} ${pending.lastName}`}</TableCell>
-                        <TableCell className="font-mono text-xs sm:text-sm">{pending.email}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
-                          {pending.createdAt.toLocaleDateString()}
-                        </TableCell>
-                        <TableCell className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={loading}
-                            onClick={() => handleApproveUser(pending.id)}
-                          >
-                            Approve
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            disabled={loading}
-                            onClick={() => handleRejectUser(pending.id)}
-                          >
-                            Reject
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="order-1 lg:order-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="size-5" /> Active Accounts
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {isLoading ? (
-              <div className="py-6 text-center text-muted-foreground">
-                <Loader2 className="mx-auto mb-2 size-5 animate-spin" />
-                Loading accounts…
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="w-[180px]">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {activeUsers.map((account) => {
-                    const loading = userActionLoading[account.id];
-                    const isSelf = account.id === currentUserId;
-                    return (
-                      <TableRow key={account.id}>
-                        <TableCell>{`${account.firstName} ${account.lastName}`}</TableCell>
-                        <TableCell className="font-mono text-xs sm:text-sm">{account.email}</TableCell>
-                        <TableCell>
-                          <Select
-                            value={account.role}
-                            onValueChange={(value) =>
-                              handleRoleChange(
-                                account.id,
-                                account.role,
-                                value as 'admin' | 'staff',
-                                `${account.firstName} ${account.lastName}`.trim() || account.email,
-                              )
-                            }
-                            disabled={loading || isSelf}
-                          >
-                            <SelectTrigger className="h-8">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="admin">Admin</SelectItem>
-                              <SelectItem value="staff">Staff</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell>
-                          {account.isApproved ? (
-                            <Badge variant="outline" className="bg-emerald-100 text-emerald-700">
-                              Active
-                            </Badge>
-                          ) : (
-                            <Badge variant="destructive">Disabled</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="flex flex-wrap gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={loading || isSelf}
-                            onClick={() => handleToggleApproval(account.id, !account.isApproved)}
-                          >
-                            {account.isApproved ? 'Disable' : 'Re-enable'}
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            )}
-            <Separator />
-            <p className="text-xs text-muted-foreground">
-              * Admins can approve accounts, generate invitations, and adjust roles. Staff accounts have
-              operational access only.
+    <div className="space-y-8">
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-semibold flex items-center gap-2">
+              <ShieldCheck className="size-6 text-emerald-600" />
+              Admin Control Center
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Manage access, onboard new teammates, and review account activity.
             </p>
-          </CardContent>
-        </Card>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="bg-white text-foreground hover:bg-muted"
+              onClick={() => setShowManageAccounts(true)}
+            >
+              Manage accounts
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing || isLoading}>
+              {refreshing ? <Loader2 className="mr-2 size-4 animate-spin" /> : <RefreshCw className="mr-2 size-4" />}
+              Refresh
+            </Button>
+          </div>
+        </div>
+        {/* KPI Header */}
+        <AdminKpiHeader loading={isLoading && !hasLoaded} metrics={kpiMetrics} title="Admin overview" />
       </div>
+      {/* Additional admin widgets can be added below as needed */}
     </div>
   );
 }
