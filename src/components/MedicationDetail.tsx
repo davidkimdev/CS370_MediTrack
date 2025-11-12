@@ -381,7 +381,7 @@ export function MedicationDetail({
                     <Button>
                       <Plus className="size-4 mr-2" />
                       Dispense
-                    </Button>
+                    </Button> 
                   </DialogTrigger>
                   <DialogContent
                     className="max-h-[calc(100vh-5rem)] sm:max-h-[calc(100vh-10rem)] w-[90vw] max-w-[700px] p-0 flex flex-col gap-0 overflow-hidden"
