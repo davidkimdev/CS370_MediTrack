@@ -567,6 +567,74 @@ export class MedicationService {
     };
   }
 
+  /**
+   * Faster variant when we already know the authenticated user's id.
+   * Skips the name-based lookup in `users` table to reduce latency.
+   * Falls back to the slower path if userId not provided.
+   */
+  static async createDispensingRecordFast(
+    record: Omit<DispensingRecord, 'id'>,
+    userId?: string,
+  ): Promise<DispensingRecord> {
+    if (!userId) {
+      return this.createDispensingRecord(record);
+    }
+
+    const { data, error } = await supabase
+      .from('dispensing_logs')
+      .insert({
+        log_date: toESTDateString(record.dispensedAt),
+        patient_id: record.patientId,
+        medication_id: record.medicationId,
+        medication_name: record.medicationName,
+        dose_instructions: record.dose,
+        lot_number: record.lotNumber,
+        expiration_date: record.expirationDate
+          ? record.expirationDate.toISOString().split('T')[0]
+          : null,
+        amount_dispensed: `${record.quantity} tabs`,
+        physician_name: record.physicianName,
+        student_name: record.studentName || null,
+        entered_by: userId,
+        clinic_site: record.clinicSite || null,
+        notes: record.notes || null,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      logger.error('Error creating dispensing record (fast path)', error);
+      throw new Error('Failed to create dispensing record');
+    }
+
+    return {
+      id: data.id,
+      medicationId: record.medicationId,
+      medicationName: data.medication_name,
+      patientId: data.patient_id,
+      patientInitials:
+        data.patient_id?.split('-')[0] +
+        '.' +
+        (data.patient_id?.split('-')[1]?.slice(0, 1) || '') +
+        '.',
+      quantity: record.quantity,
+      dose: data.dose_instructions,
+      lotNumber: record.lotNumber || '',
+      expirationDate: record.expirationDate,
+      dispensedBy: record.dispensedBy,
+      physicianName: data.physician_name,
+      studentName: data.student_name || undefined,
+      clinicSite: data.clinic_site || record.clinicSite || undefined,
+      dispensedAt: data.log_date
+        ? logDateToUTCNoon(data.log_date)
+        : data.created_at
+          ? new Date(data.created_at)
+          : record.dispensedAt,
+      indication: record.indication,
+      notes: data.notes || undefined,
+    };
+  }
+
   static async deleteDispensingRecord(id: string): Promise<void> {
     const { error } = await supabase
       .from('dispensing_logs')
