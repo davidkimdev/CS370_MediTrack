@@ -181,7 +181,16 @@ export function AdminPanel() {
       const code = await AuthService.createInvitationCode(currentUserId, inviteEmail || undefined);
       setGeneratedCode(code);
       setInviteEmail('');
-      showSuccessToast('Invitation ready', 'Share this code to onboard a teammate.');
+      showSuccessToast('Invitation ready', 'Share this code to onboard a teammate.', {
+        label: 'Copy code',
+        icon: <Clipboard className="h-3 w-3" />,
+        onClick: () => {
+          navigator.clipboard.writeText(code).then(
+            () => showSuccessToast('Invitation copied'),
+            () => showErrorToast('Copy failed', 'Unable to copy to clipboard.'),
+          );
+        },
+      });
       await loadAdminData({ silent: true });
     } catch (error) {
       console.error('Failed to create invitation code', error);

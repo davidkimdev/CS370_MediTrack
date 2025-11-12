@@ -20,7 +20,8 @@ import { MedicationService } from './services/medicationService';
 import { syncService } from './services/syncService';
 import { OfflineStore } from './utils/offlineStore';
 import { logger } from './utils/logger';
-import { showSuccessToast, showErrorToast } from './utils/toastUtils';
+import { showSuccessToast, showErrorToast, showProgressToast } from './utils/toastUtils';
+import { RotateCcw } from 'lucide-react';
 
 type AppSection = 'formulary' | 'dispensing' | 'inventory' | 'profile' | 'admin';
 
@@ -397,12 +398,37 @@ export default function App() {
 
   const handleDispense = async (record: Omit<DispensingRecord, "id">) => {
     console.log('🎯 handleDispense called with:', record);
+    // We'll store progress reference to fail gracefully
+    let progress: ReturnType<typeof showProgressToast> | null = null;
     try {
       if (navigator.onLine) {
-        // Online: write-through to server then update local/cache
-  const newRecord = await MedicationService.createDispensingRecord(record);
-  console.log('🧾 New dispensing record created with id:', newRecord.id);
-        setDispensingRecords((prev: DispensingRecord[]) => [newRecord, ...prev]);
+        // Online: show progress immediately for perceived speed
+        progress = showProgressToast({
+          title: 'Dispensing…',
+          description: 'Writing record and updating inventory',
+          initialProgress: 8,
+        });
+
+        let newRecord: DispensingRecord | null = null;
+        // Attempt fast path first; fall back if it errors (e.g., foreign key constraint)
+        try {
+          newRecord = await MedicationService.createDispensingRecordFast(
+            record,
+            currentUser?.id,
+          );
+        } catch (fastErr) {
+          console.warn('⚠️ Fast path failed, falling back to standard create:', fastErr);
+          try {
+            newRecord = await MedicationService.createDispensingRecord(record);
+          } catch (standardErr) {
+            throw standardErr; // bubble to outer catch
+          }
+        }
+
+        if (!newRecord) throw new Error('Record creation returned null');
+  progress && progress.update(40);
+        console.log('🧾 New dispensing record created with id:', newRecord.id);
+        setDispensingRecords((prev: DispensingRecord[]) => [newRecord!, ...prev]);
 
         // Update inventory lot quantity in database
         const inventoryLot = inventory.find(
@@ -412,6 +438,7 @@ export default function App() {
           const oldQuantity = inventoryLot.quantity;
           const newQuantity = Math.max(0, inventoryLot.quantity - record.quantity);
           await MedicationService.updateInventoryItem(inventoryLot.id, { quantity: newQuantity });
+          progress && progress.update(62);
           
           // Track for withdrawal functionality
           const recordKey = String(newRecord.id);
@@ -463,11 +490,15 @@ export default function App() {
         setTimeout(() => {
           const medication = medications.find(m => m.id === record.medicationId);
           const recordKey = String(newRecord.id);
+          progress && progress.update(88);
+          // Dismiss progress to avoid duplicate success toast.
+          progress && progress.dismiss();
           showSuccessToast(
             `${medication?.name || 'Medication'} dispensed successfully`,
             undefined,
             {
               label: 'Withdraw',
+              icon: <RotateCcw className="h-3 w-3" />,
               onClick: () => {
                 console.log('🖱️ Withdraw button clicked! Record ID:', recordKey);
                 handleUndoDispensing(recordKey);
@@ -516,7 +547,11 @@ export default function App() {
       }
     } catch (error) {
       console.error('Error dispensing medication:', error);
-      showErrorToast('Failed to dispense medication. Please try again.');
+      if (progress) {
+        progress.fail(error instanceof Error ? error.message : 'Unknown error');
+      } else {
+        showErrorToast('Failed to dispense medication. Please try again.', error instanceof Error ? error.message : undefined);
+      }
     }
   };
 
