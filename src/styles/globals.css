@@ -2,9 +2,9 @@
 
 :root {
   --font-size: 16px;
-  --background: #5ac9d3;
+  --background: #00065ded;
   --foreground: oklch(0.145 0 0);
-  --card: #841515;
+  --card: #fafafa;
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
@@ -16,7 +16,7 @@
   --muted-foreground: #717182;
   --accent: #e9ebef;
   --accent-foreground: #030213;
-  --destructive: #d4183d;
+  --destructive: #fdfcfc;
   --destructive-foreground: #ffffff;
   --border: rgba(0, 0, 0, 0.1);
   --input: transparent;
