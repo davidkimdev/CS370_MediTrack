@@ -119,7 +119,7 @@ export function MedicationDetail({
     setOpenStudent(false);
     setOpenClinic(false);
   };
-
+ 
   useEffect(() => {
     if (!isDispenseDialogOpen) {
       closeAllSuggestions();
