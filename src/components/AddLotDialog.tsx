@@ -35,21 +35,22 @@ export function AddLotDialog({
   const [expirationDate, setExpirationDate] = useState<Date | undefined>(undefined);
   const [expYear, setExpYear] = useState<number | undefined>();
   const [expMonth, setExpMonth] = useState<number | undefined>();
-  const [expDay, setExpDay] = useState<number | undefined>();
+  //const [expDay, setExpDay] = useState<number | undefined>();
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Update expirationDate when year, month, or day changes
   useEffect(() => {
-    if (expYear && expMonth && expDay) {
+    if (expYear && expMonth) {
       // Create date in UTC to avoid timezone issues
-      const newDate = new Date(Date.UTC(expYear, expMonth - 1, expDay));
+      const lastDay = new Date(Date.UTC(expYear, expMonth, 0)).getUTCDate();
+      const newDate = new Date(Date.UTC(expYear, expMonth - 1, lastDay));
       setExpirationDate(newDate);
     } else {
       setExpirationDate(undefined);
     }
-  }, [expYear, expMonth, expDay]);
+  }, [expYear, expMonth]);
 
   // Reset form when dialog opens/closes or medication changes
   useEffect(() => {
@@ -65,7 +66,7 @@ export function AddLotDialog({
       setExpirationDate(undefined);
       setExpYear(undefined);
       setExpMonth(undefined);
-      setExpDay(undefined);
+      //setExpDay(undefined);
       setNotes('');
       setErrors({});
     }
@@ -424,27 +425,6 @@ export function AddLotDialog({
                     {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
                       <SelectItem key={month} value={month.toString()}>
                         {month}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Select
-                  value={expDay?.toString()}
-                  onValueChange={(v: string) => setExpDay(parseInt(v))}
-                  disabled={!expYear || !expMonth}
-                >
-                  <SelectTrigger className={cn(errors.expirationDate && 'border-red-500')}>
-                    <SelectValue placeholder="Day" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from(
-                      { length: new Date(expYear || 0, expMonth || 0, 0).getDate() },
-                      (_, i) => i + 1,
-                    ).map((day) => (
-                      <SelectItem key={day} value={day.toString()}>
-                        {day}
                       </SelectItem>
                     ))}
                   </SelectContent>

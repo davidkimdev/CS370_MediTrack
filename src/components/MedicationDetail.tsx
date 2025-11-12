@@ -57,6 +57,7 @@ interface LotSelection {
   expirationDate?: Date;
 }
 
+
 export function MedicationDetail({
   medication,
   alternatives,
@@ -286,7 +287,7 @@ export function MedicationDetail({
     setEditingLot(lot);
     setLotNumber(lot.lotNumber);
     setLotQuantity(lot.quantity.toString());
-    setLotExpiration(lot.expirationDate.toISOString().split('T')[0]);
+    setLotExpiration(lot.expirationDate.toISOString().slice(0, 7));
     setIsLotDialogOpen(true);
   };
 
@@ -302,12 +303,18 @@ export function MedicationDetail({
       return;
     }
 
+    const expirationDate = new Date(`${lotExpiration}-01T00:00:00Z`);
+
+// Move to *last day* of the month in UTC
+    expirationDate.setUTCMonth(expirationDate.getUTCMonth() + 1);
+    expirationDate.setUTCDate(0);
+
     if (editingLot) {
       // Update existing lot
       onUpdateLot?.(editingLot.id, {
         lotNumber: lotNumber.trim(),
         quantity: qty,
-        expirationDate: new Date(lotExpiration),
+        expirationDate,
       });
     } else {
       // Add new lot
@@ -315,7 +322,7 @@ export function MedicationDetail({
         medicationId: medication.id,
         lotNumber: lotNumber.trim(),
         quantity: qty,
-        expirationDate: new Date(lotExpiration),
+        expirationDate,
       });
     }
 
@@ -1251,7 +1258,7 @@ export function MedicationDetail({
                 <Label htmlFor="lot-expiration">Expiration Date *</Label>
                 <Input
                   id="lot-expiration"
-                  type="date"
+                  type="month"
                   value={lotExpiration}
                   onChange={(e) => setLotExpiration(e.target.value)}
                 />
