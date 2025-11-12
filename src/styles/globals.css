@@ -2,7 +2,7 @@
 
 :root {
   --font-size: 16px;
-  --background: #00065ded;
+  --background: #ffffffed;
   --foreground: oklch(0.145 0 0);
   --card: #fafafa;
   --card-foreground: oklch(0.145 0 0);
@@ -265,5 +265,31 @@ html {
 @layer components {
   .animate-fade-in {
     animation: fade-in 0.3s ease-out forwards;
+  }
+
+  /* Dialog responsive improvements */
+  @media (max-width: 640px) {
+    [role='dialog'] {
+      max-height: 95vh !important;
+      margin: 2.5vh auto;
+    }
+    
+    /* Ensure proper scrolling on mobile */
+    [role='dialog'] [data-radix-scroll-area-viewport] {
+      -webkit-overflow-scrolling: touch;
+    }
+  }
+
+  /* Prevent horizontal scroll on small screens */
+  .overflow-x-clip {
+    overflow-x: clip;
+  }
+  
+  /* Better select dropdowns on mobile */
+  @media (max-width: 640px) {
+    [role='listbox'],
+    [role='menu'] {
+      max-height: 40vh;
+    }
   }
 }

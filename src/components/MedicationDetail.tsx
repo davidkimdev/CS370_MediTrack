@@ -7,7 +7,6 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { ScrollArea } from './ui/scroll-area';
 import {
   Dialog,
   DialogContent,
@@ -72,6 +71,13 @@ export function MedicationDetail({
   onRequireAuth,
 }: MedicationDetailProps) {
   const [isDispenseDialogOpen, setIsDispenseDialogOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 640);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   const [patientId, setPatientId] = useState('');
   const [patientInitials, setPatientInitials] = useState('');
   const [dose, setDose] = useState('');
@@ -378,29 +384,39 @@ export function MedicationDetail({
                     </Button>
                   </DialogTrigger>
                   <DialogContent
-                    className="max-h-[90vh] max-w-[90vw] sm:max-w-[700px]"
+                    className="max-h-[calc(100vh-5rem)] sm:max-h-[calc(100vh-10rem)] w-[90vw] max-w-[700px] p-0 flex flex-col gap-0 overflow-hidden"
+                    style={
+                      isMobile
+                        ? {
+                            top: '22.5rem',
+                            height: 'calc(100vh - 10rem)',
+                            transform: 'none',
+                          }
+                        : {
+                          height: 'calc(100vh - 10rem)',
+                        }
+                    }
                     onOpenAutoFocus={(event) => event.preventDefault()}
                   >
+                      <DialogHeader className="flex-shrink-0 px-4 sm:px-6 pt-3 pb-2 border-b">
+                        <DialogTitle className="text-base sm:text-lg">Dispense {medication.name}</DialogTitle>
+                        <DialogDescription className="text-xs sm:text-sm">
+                          Record medication dispensing for patient
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="flex-1 overflow-y-auto px-4 sm:px-6">
                     <form
                       autoComplete="off"
-                      className="flex flex-col gap-4"
+                      className="space-y-2 sm:space-y-3 py-2 sm:py-3"
                       onSubmit={(event) => {
                         event.preventDefault();
                         handleDispense();
                       }}
                     >
-                      <DialogHeader>
-                        <DialogTitle>Dispense {medication.name}</DialogTitle>
-                        <DialogDescription>
-                          Record medication dispensing for patient
-                        </DialogDescription>
-                      </DialogHeader>
-                      <ScrollArea className="max-h-[60vh] pr-4">
-                        <div className="space-y-4">
                       {/* Patient Information */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-2">
-                          <Label htmlFor="patientId">Patient ID *</Label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="patientId" className="text-sm sm:text-base">Patient ID *</Label>
                           <div className="space-y-1">
                             <div className="relative">
                               <div className="history-suggestion-container">
@@ -410,6 +426,7 @@ export function MedicationDetail({
                                   autoComplete="off"
                                   ref={patientIdInputRef}
                                   value={patientId}
+                                  className="h-8 sm:h-9 text-sm sm:text-base"
                                   onFocus={() => {
                                     setOpenPatientId(true);
                                     patientIdHistory.updateQuery(patientId);
@@ -482,8 +499,8 @@ export function MedicationDetail({
                             </div>
                           </div>
                         </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="initials">Patient Initials *</Label>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="initials" className="text-sm sm:text-base">Patient Initials *</Label>
                           <div className="space-y-1">
                             <div className="relative">
                               <div className="history-suggestion-container">
@@ -493,6 +510,7 @@ export function MedicationDetail({
                                   autoComplete="off"
                                   ref={patientInitialsInputRef}
                                   value={patientInitials}
+                                  className="h-8 sm:h-9 text-sm sm:text-base"
                                   onFocus={() => {
                                     setOpenPatientInitials(true);
                                     patientInitialsHistory.updateQuery(patientInitials);
@@ -570,8 +588,8 @@ export function MedicationDetail({
                       </div>
 
                       {/* Dose Instructions */}
-                      <div className="space-y-2">
-                        <Label htmlFor="dose">Dose Instructions *</Label>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="dose" className="text-sm sm:text-base">Dose Instructions *</Label>
                         <div className="space-y-1">
                           <div className="relative">
                             <div className="history-suggestion-container">
@@ -581,6 +599,7 @@ export function MedicationDetail({
                                 autoComplete="off"
                                 ref={doseInputRef}
                                 value={dose}
+                                className="h-8 sm:h-9 text-sm sm:text-base"
                                 onFocus={() => {
                                   setOpenDose(true);
                                   doseHistory.updateQuery(dose);
@@ -655,7 +674,7 @@ export function MedicationDetail({
                       </div>
 
                       {/* Multi-Lot Selection */}
-                      <div className="space-y-3">
+                      <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <Label>Lots to Dispense *</Label>
                           <p className="text-sm text-muted-foreground">
@@ -672,11 +691,11 @@ export function MedicationDetail({
                           return (
                             <div
                               key={index}
-                              className="flex gap-2 items-start p-3 border rounded-md bg-muted/30"
+                              className="flex flex-col sm:flex-row gap-2 items-start p-3 border rounded-md bg-muted/30"
                             >
-                              <div className="flex-1 space-y-2">
+                              <div className="flex-1 w-full space-y-2">
                                 <div className="space-y-1">
-                                  <Label htmlFor={lotSelectId} className="text-xs">
+                                  <Label htmlFor={lotSelectId} className="text-xs sm:text-sm">
                                     Lot Number
                                   </Label>
                                   <Select
@@ -685,7 +704,7 @@ export function MedicationDetail({
                                       updateLotSelection(index, 'lotNumber', value)
                                     }
                                   >
-                                    <SelectTrigger id={lotSelectId} className="h-9">
+                                    <SelectTrigger id={lotSelectId} className="h-8 sm:h-9 w-full">
                                       <SelectValue placeholder="Select lot" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -694,9 +713,11 @@ export function MedicationDetail({
                                           key={availLot.lotNumber}
                                           value={availLot.lotNumber}
                                         >
-                                          {availLot.lotNumber} - Exp:{' '}
-                                          {availLot.expirationDate.toLocaleDateString()} - Qty:{' '}
-                                          {availLot.quantity}
+                                          <span className="text-xs sm:text-sm">
+                                            {availLot.lotNumber} - Exp:{' '}
+                                            {availLot.expirationDate.toLocaleDateString()} - Qty:{' '}
+                                            {availLot.quantity}
+                                          </span>
                                         </SelectItem>
                                       ))}
                                     </SelectContent>
@@ -704,7 +725,7 @@ export function MedicationDetail({
                                 </div>
                                 <div className="grid grid-cols-2 gap-2">
                                   <div className="space-y-1">
-                                    <Label htmlFor={lotQuantityId} className="text-xs">
+                                    <Label htmlFor={lotQuantityId} className="text-xs sm:text-sm">
                                       Quantity
                                     </Label>
                                     <Input
@@ -717,11 +738,11 @@ export function MedicationDetail({
                                         updateLotSelection(index, 'quantity', e.target.value)
                                       }
                                       placeholder="0"
-                                      className="h-9"
+                                      className="h-8 sm:h-9"
                                     />
                                   </div>
                                   <div className="space-y-1">
-                                    <Label className="text-xs">Available</Label>
+                                    <Label className="text-xs sm:text-sm">Available</Label>
                                     <p className="text-sm font-medium py-2">
                                       {inventoryLot ? `${inventoryLot.quantity} units` : '-'}
                                     </p>
@@ -734,7 +755,7 @@ export function MedicationDetail({
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => removeLotSelection(index)}
-                                  className="h-9 px-2 text-destructive hover:text-destructive"
+                                  className="h-9 px-2 text-destructive hover:text-destructive sm:mt-5"
                                 >
                                   <Trash2 className="size-4" />
                                 </Button>
@@ -756,9 +777,9 @@ export function MedicationDetail({
                       </div>
 
                       {/* Provider Information */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-2">
-                          <Label htmlFor="physician">Physician Name *</Label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="physician" className="text-sm sm:text-base">Physician Name *</Label>
                           <div className="space-y-1">
                             <div className="relative">
                               <div className="history-suggestion-container">
@@ -770,6 +791,7 @@ export function MedicationDetail({
                                   autoCapitalize="words"
                                   ref={physicianInputRef}
                                   value={physicianName}
+                                  className="h-8 sm:h-9 text-sm sm:text-base"
                                   onFocus={() => {
                                     setOpenPhysician(true);
                                     physicianHistory.updateQuery(physicianName);
@@ -842,8 +864,8 @@ export function MedicationDetail({
                             </div>
                           </div>
                         </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="student">Student Name</Label>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="student" className="text-sm sm:text-base">Student Name</Label>
                           <div className="space-y-1">
                             <div className="relative">
                               <div className="history-suggestion-container">
@@ -853,6 +875,7 @@ export function MedicationDetail({
                                   autoComplete="off"
                                   ref={studentInputRef}
                                   value={studentName}
+                                  className="h-8 sm:h-9 text-sm sm:text-base"
                                   onFocus={() => {
                                     setOpenStudent(true);
                                     studentHistory.updateQuery(studentName);
@@ -928,7 +951,7 @@ export function MedicationDetail({
                       </div>
 
                       {/* Clinic Site */}
-                      <div className="space-y-2">
+                      <div className="space-y-1.5">
                         <Label htmlFor="clinic-site">Clinic Site</Label>
                         <div className="space-y-1">
                           <div className="relative">
@@ -1013,7 +1036,7 @@ export function MedicationDetail({
                       </div>
 
                       {/* Notes */}
-                      <div className="space-y-2">
+                      <div className="space-y-1.5">
                         <Label htmlFor="notes">Notes</Label>
                         <Textarea
                           id="notes"
@@ -1023,15 +1046,14 @@ export function MedicationDetail({
                           rows={2}
                         />
                       </div>
-
-                        </div>
-                      </ScrollArea>
-                      <div className="flex gap-2 pt-4">
-                        <Button type="submit" className="w-full">
+                    </form>
+                      </div>
+                      <div className="flex gap-2 pt-3 pb-4 sm:pb-5 border-t px-6 sm:px-8 flex-shrink-0 bg-background">
+                        <Button type="button" onClick={handleDispense} className="w-full h-9 sm:h-10 text-sm sm:text-base m-2 sm:m-4">
+                          
                           Confirm Dispensing
                         </Button>
                       </div>
-                    </form>
                   </DialogContent>
                 </Dialog>
               )
