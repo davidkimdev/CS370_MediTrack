@@ -2,9 +2,9 @@
 
 :root {
   --font-size: 16px;
-  --background: #ffffff;
+  --background: #5ac9d3;
   --foreground: oklch(0.145 0 0);
-  --card: #ffffff;
+  --card: #841515;
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
