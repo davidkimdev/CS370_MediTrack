@@ -21,7 +21,6 @@ import {
   ArrowLeft,
   Package,
   Clock,
-  AlertCircle,
   Plus,
   Edit2,
   Trash2,
@@ -71,6 +70,19 @@ export function MedicationDetail({
   onDeleteLot,
   onRequireAuth,
 }: MedicationDetailProps) {
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
+  }, []);
+
+  const handleAlternativeSelect = (med: Medication) => {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    onSelectAlternative(med);
+  };
+
   const [isDispenseDialogOpen, setIsDispenseDialogOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 640);
 
@@ -346,22 +358,23 @@ export function MedicationDetail({
   const canEditLots = !readOnly && currentUser?.role === 'pharmacy_staff';
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={onBack}>
-          <ArrowLeft className="size-4" />
-        </Button>
-        <div className="flex-1">
-          <h1 className="text-xl font-semibold">{medication.name}</h1>
-          <p className="text-muted-foreground">{medication.genericName}</p>
-        </div>
-        {readOnly && (
-          <Button variant="outline" size="sm" onClick={() => onRequireAuth?.()}>
-            Log in
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto px-4 pt-12 pb-6 space-y-4">
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={onBack}>
+            <ArrowLeft className="size-4" />
           </Button>
-        )}
-      </div>
+          <div className="flex-1">
+            <h1 className="text-xl font-semibold">{medication.name}</h1>
+            <p className="text-muted-foreground">{medication.genericName}</p>
+          </div>
+          {readOnly && (
+            <Button variant="outline" size="sm" onClick={() => onRequireAuth?.()}>
+              Log in
+            </Button>
+          )}
+        </div>
 
       {/* Stock Status Card */}
       <Card>
@@ -1069,7 +1082,7 @@ export function MedicationDetail({
         </CardContent>
       </Card>
 
-      {/* Medication Details */}
+      {/* Details */}
       <div className="grid md:grid-cols-2 gap-4">
         <Card>
           <CardHeader>
@@ -1110,143 +1123,106 @@ export function MedicationDetail({
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Clinical Information</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div>
-              <Label className="text-sm font-medium">Common Uses</Label>
-              <div className="flex flex-wrap gap-1 mt-1">
-                {medication.commonUses.map((use) => (
-                  <Badge key={use} variant="secondary" className="text-xs">
-                    {use}
-                  </Badge>
-                ))}
-              </div>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Package className="size-4" />
+                Inventory Details
+              </CardTitle>
+              {canEditLots && (
+                <Button variant="outline" size="sm" onClick={handleAddLot}>
+                  <Plus className="size-4 mr-1" />
+                  Add Lot
+                </Button>
+              )}
             </div>
-            <div>
-              <Label className="text-sm font-medium">Contraindications</Label>
-              <div className="space-y-1 mt-1">
-                {medication.contraindications.map((contra) => (
-                  <div key={contra} className="flex items-center gap-2">
-                    <AlertCircle className="size-3 text-amber-500" />
-                    <span className="text-sm">{contra}</span>
+          </CardHeader>
+          <CardContent>
+            {medicationInventory.length > 0 ? (
+              <div className="space-y-2">
+                {medicationInventory.map((inv) => (
+                  <div key={inv.id} className="flex items-center justify-between p-3 border rounded">
+                    <div className="flex-1">
+                      <p className="font-medium">Lot: {inv.lotNumber}</p>
+                      <p className="text-sm text-muted-foreground">Quantity: {inv.quantity} units</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <div className="flex items-center gap-1">
+                          <Clock className="size-3" />
+                          <span className="text-sm">
+                            Exp: {inv.expirationDate.toLocaleDateString()}
+                          </span>
+                        </div>
+                        {inv.isExpired && (
+                          <Badge variant="destructive" className="text-xs mt-1">
+                            Expired
+                          </Badge>
+                        )}
+                      </div>
+                      {canEditLots && (
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditLot(inv)}
+                            className="h-8 w-8 p-0"
+                          >
+                            <Edit2 className="size-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteLot(inv.id)}
+                            className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
-            </div>
+            ) : (
+              <div className="text-center py-6 text-muted-foreground">
+                <Package className="size-12 mx-auto mb-2 opacity-30" />
+                <p>No lot numbers recorded</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Inventory Details */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Package className="size-4" />
-              Inventory Details
-            </CardTitle>
-            {canEditLots && (
-              <Button variant="outline" size="sm" onClick={handleAddLot}>
-                <Plus className="size-4 mr-1" />
-                Add Lot
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {medicationInventory.length > 0 ? (
+      {/* Alternatives */}
+      {alternatives.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Alternative Medications</CardTitle>
+          </CardHeader>
+          <CardContent>
             <div className="space-y-2">
-              {medicationInventory.map((inv) => (
-                <div key={inv.id} className="flex items-center justify-between p-3 border rounded">
-                  <div className="flex-1">
-                    <p className="font-medium">Lot: {inv.lotNumber}</p>
-                    <p className="text-sm text-muted-foreground">Quantity: {inv.quantity} units</p>
+              {alternatives.map((alt) => (
+                <div
+                  key={alt.id}
+                  className="flex items-center justify-between p-3 border rounded cursor-pointer hover:bg-muted/50"
+                  onClick={() => handleAlternativeSelect(alt)}
+                >
+                  <div>
+                    <p className="font-medium">
+                      {alt.name} {alt.strength}
+                    </p>
+                    <p className="text-sm text-muted-foreground">{alt.genericName}</p>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <div className="flex items-center gap-1">
-                        <Clock className="size-3" />
-                        <span className="text-sm">
-                          Exp: {inv.expirationDate.toLocaleDateString()}
-                        </span>
-                      </div>
-                      {inv.isExpired && (
-                        <Badge variant="destructive" className="text-xs mt-1">
-                          Expired
-                        </Badge>
-                      )}
-                    </div>
-                    {canEditLots && (
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEditLot(inv)}
-                          className="h-8 w-8 p-0"
-                        >
-                          <Edit2 className="size-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteLot(inv.id)}
-                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </div>
-                    )}
+                  <div className="text-right">
+                    <p className="font-medium text-green-600">{alt.currentStock} available</p>
+                    <p className="text-xs text-muted-foreground">Click to view</p>
                   </div>
                 </div>
               ))}
             </div>
-          ) : (
-            <div className="text-center py-6 text-muted-foreground">
-              <Package className="size-12 mx-auto mb-2 opacity-30" />
-              <p>No lot numbers recorded</p>
-              {canEditLots && (
-                <Button variant="outline" size="sm" onClick={handleAddLot} className="mt-3">
-                  <Plus className="size-4 mr-1" />
-                  Add First Lot
-                </Button>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Alternatives */}
-      {(!medication.isAvailable || medication.currentStock <= medication.minStock) &&
-        alternatives.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Alternative Medications</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {alternatives.map((alt) => (
-                  <div
-                    key={alt.id}
-                    className="flex items-center justify-between p-3 border rounded cursor-pointer hover:bg-muted/50"
-                    onClick={() => onSelectAlternative(alt)}
-                  >
-                    <div>
-                      <p className="font-medium">
-                        {alt.name} {alt.strength}
-                      </p>
-                      <p className="text-sm text-muted-foreground">{alt.genericName}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium text-green-600">{alt.currentStock} available</p>
-                      <p className="text-xs text-muted-foreground">Click to view</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Lot Edit/Add Dialog */}
       {canEditLots && (
@@ -1295,6 +1271,7 @@ export function MedicationDetail({
           </DialogContent>
         </Dialog>
       )}
+      </div>
     </div>
   );
 }

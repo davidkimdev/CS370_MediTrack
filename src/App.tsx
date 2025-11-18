@@ -41,6 +41,10 @@ export default function App() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [lastLoadedMode, setLastLoadedMode] = useState<'authenticated' | 'public' | null>(null);
+  const [formularySearchTerm, setFormularySearchTerm] = useState('');
+  const [formularyCategoryFilter, setFormularyCategoryFilter] = useState<string>('all');
+  const [formularyAvailabilityFilter, setFormularyAvailabilityFilter] = useState<string>('all');
+  const [formularyCategorySearch, setFormularyCategorySearch] = useState('');
   // State for withdrawal functionality
   const undoDispenseMapRef = useRef<Record<string, {
     record: DispensingRecord;
@@ -321,15 +325,13 @@ export default function App() {
   };
 
   const getAlternatives = (medication: Medication): Medication[] => {
-    return medications
-      .filter((m) => {
-        if (medication.alternatives.includes(m.id)) return true;
-        const a = new Set((Array.isArray(medication.category) ? medication.category : []).map((c) => (c ?? '').trim()));
-        const b = (Array.isArray(m.category) ? m.category : []).map((c) => (c ?? '').trim());
-        const intersects = b.some((c) => a.has(c));
-        return intersects && m.id !== medication.id;
-      })
-      .slice(0, 3); // Limit to 3 alternatives
+    return medications.filter((m) => {
+      if (medication.alternatives.includes(m.id)) return true;
+      const a = new Set((Array.isArray(medication.category) ? medication.category : []).map((c) => (c ?? '').trim()));
+      const b = (Array.isArray(m.category) ? m.category : []).map((c) => (c ?? '').trim());
+      const intersects = b.some((c) => a.has(c));
+      return intersects && m.id !== medication.id;
+    });
   };
 
   const handleUndoDispensing = async (recordId: string) => {
@@ -742,7 +744,7 @@ export default function App() {
     return (
       <div className="min-h-screen bg-background flex flex-col">
         <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="container mx-auto px-4 py-8 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="size-8 bg-primary rounded-lg flex items-center justify-center">
                 <Pill className="size-4 text-primary-foreground" />
@@ -806,7 +808,7 @@ export default function App() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-4">
+        <div className="container mx-auto px-4 py-8 flex items-center justify-between gap-4">
           {/* Logo */}
           <div className="flex items-center gap-2">
             <div className="size-8 bg-primary rounded-lg flex items-center justify-center">
@@ -1020,6 +1022,14 @@ export default function App() {
               <FormularyView
                 medications={medications}
                 onMedicationSelect={handleMedicationSelect}
+                searchTerm={formularySearchTerm}
+                onSearchTermChange={setFormularySearchTerm}
+                categoryFilter={formularyCategoryFilter}
+                onCategoryFilterChange={setFormularyCategoryFilter}
+                availabilityFilter={formularyAvailabilityFilter}
+                onAvailabilityFilterChange={setFormularyAvailabilityFilter}
+                categorySearchTerm={formularyCategorySearch}
+                onCategorySearchTermChange={setFormularyCategorySearch}
               />
             )}
 
