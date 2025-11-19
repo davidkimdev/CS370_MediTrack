@@ -13,7 +13,7 @@
   --card-foreground: #1a2332;
 
   /* Medical blue primary color */
-  --primary: #2563eb;
+  --primary: #012066;
   --primary-foreground: #ffffff;
   --primary-hover: #1d4ed8;
 
@@ -45,7 +45,7 @@
   --border: rgba(148, 163, 184, 0.2);
   --input: #f8fafc;
   --input-background: #ffffff;
-  --ring: #2563eb;
+  --ring: #012066;
 
   --popover: #ffffff;
   --popover-foreground: #1a2332;
@@ -65,12 +65,12 @@
 
   --sidebar: #ffffff;
   --sidebar-foreground: #1a2332;
-  --sidebar-primary: #2563eb;
+  --sidebar-primary: #012066;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #f0f9ff;
   --sidebar-accent-foreground: #0369a1;
   --sidebar-border: rgba(148, 163, 184, 0.2);
-  --sidebar-ring: #2563eb;
+  --sidebar-ring: #012066;
 }
 
 .dark {
@@ -342,7 +342,7 @@ html {
   }
 
   [data-state='active'][data-slot='tabs-trigger'] {
-    background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+    background: linear-gradient(135deg, #012066 0%, #3b82f6 100%);
     color: white;
     box-shadow: 0 2px 4px 0 rgba(37, 99, 235, 0.3);
   }
@@ -361,7 +361,7 @@ html {
   }
 
   [data-slot='input']:focus-visible {
-    border-color: #2563eb !important;
+    border-color: #012066 !important;
     outline: none !important;
   }
 
@@ -377,7 +377,7 @@ html {
 
   /* Button styling fixes */
   [data-slot='button'][class*='bg-primary'] {
-    background-color: #2563eb !important;
+    background-color: #012066 !important;
     color: white !important;
   }
 
@@ -413,7 +413,7 @@ html {
 
   /* Gradient text for headings */
   .gradient-text {
-    background: linear-gradient(135deg, #2563eb 0%, #14b8a6 100%);
+    background: linear-gradient(135deg, #012066 0%, #14b8a6 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -422,7 +422,7 @@ html {
   /* Simple pill icon with subtle 3D rotation */
   .pill-icon-animated {
     position: relative;
-    background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%) !important;
+    background: linear-gradient(135deg, #012066 0%, #3b82f6 100%) !important;
   }
 
   /* Subtle 3D spinning pill animation */
