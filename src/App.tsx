@@ -987,7 +987,7 @@ export default function App() {
           onValueChange={(value) => handleSectionChange(value as AppSection)}
           className="w-full"
         >
-          <TabsList className="w-full flex flex-wrap justify-start gap-2">
+          <TabsList className="w-full grid grid-cols-3 h-auto p-1">
             {navigationSections.map(({ key, label, icon: Icon, requiresAuth }) => {
               const isRestricted = requiresAuth && !isAuthenticated;
 
@@ -995,12 +995,12 @@ export default function App() {
                 <TabsTrigger
                   key={key}
                   value={key}
-                  className={`flex items-center gap-2 ${isRestricted ? 'opacity-70' : ''}`}
+                  className={`flex items-center gap-1.5 px-2 py-2 text-xs sm:text-sm ${isRestricted ? 'opacity-70' : ''}`}
                   disabled={isRestricted}
                   title={isRestricted ? 'Log in to access this area' : undefined}
                 >
-                  <Icon className="size-4" />
-                  <span>{label}</span>
+                  <Icon className="size-4 flex-shrink-0" />
+                  <span className="truncate">{label}</span>
                 </TabsTrigger>
               );
             })}

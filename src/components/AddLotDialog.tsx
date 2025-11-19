@@ -461,7 +461,7 @@ export function AddLotDialog({
           )}
 
           {/* Actions */}
-          <div className="flex gap-2 pt-4">
+          <div className="flex gap-2 mt-6">
             <Button onClick={handleSubmit} disabled={isSubmitting} className="flex-1">
               {isSubmitting ? 'Adding...' : 'Add Lot'}
             </Button>

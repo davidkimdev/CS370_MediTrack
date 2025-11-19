@@ -1068,8 +1068,8 @@ export function MedicationDetail({
                       </div>
                     </form>
                       </div>
-                      <div className="flex gap-2 pt-3 pb-4 sm:pb-5 border-t px-6 sm:px-8 flex-shrink-0 bg-background">
-                        <Button type="button" onClick={handleDispense} className="w-full h-9 sm:h-10 text-sm sm:text-base m-2 sm:m-4">
+                      <div className="flex gap-2 py-4 border-t px-4 sm:px-6 flex-shrink-0 bg-background">
+                        <Button type="button" onClick={handleDispense} className="w-full h-9 sm:h-10 text-sm sm:text-base">
                           
                           Confirm Dispensing
                         </Button>
@@ -1173,7 +1173,7 @@ export function MedicationDetail({
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDeleteLot(inv.id)}
-                            className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                            className="h-8 w-8 p-0 text-red-600 hover:text-red-600 hover:bg-red-50"
                           >
                             <Trash2 className="size-4" />
                           </Button>
@@ -1231,7 +1231,7 @@ export function MedicationDetail({
             <DialogHeader>
               <DialogTitle>{editingLot ? 'Edit Lot Number' : 'Add Lot Number'}</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 py-4">
+            <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="lot-number">Lot Number *</Label>
                 <Input
@@ -1261,7 +1261,7 @@ export function MedicationDetail({
                   onChange={(e) => setLotExpiration(e.target.value)}
                 />
               </div>
-              <div className="flex justify-end gap-3 pt-4">
+              <div className="flex justify-end gap-3 mt-6">
                 <Button variant="outline" onClick={() => setIsLotDialogOpen(false)}>
                   Cancel
                 </Button>
