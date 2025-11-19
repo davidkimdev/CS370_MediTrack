@@ -334,34 +334,26 @@ export function StockManagement({
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="space-y-1">
-          <h1 className="hidden sm:block text-xl font-semibold">Stock Management</h1>
-          <Badge variant="outline" className="hidden sm:inline-flex text-xs sm:text-sm">
-            Pharmacy Staff Access
-          </Badge>
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 w-full sm:w-auto">
-          <Button
-            variant="default"
-            onClick={() => {
-              setSelectedMedicationForLot(null);
-              setIsAddLotDialogOpen(true);
-            }}
-            className="gap-2 w-full sm:w-auto"
-          >
-            <Plus className="size-4" />
-            Add New Lot
-          </Button>
-          <Button
-            variant="default"
-            onClick={() => setIsImportDialogOpen(true)}
-            className="gap-2 w-full sm:w-auto"
-          >
-            <Upload className="size-4" />
-            Bulk Import
-          </Button>
-        </div>
+      <div className="flex flex-col gap-2">
+        <Button
+          variant="default"
+          onClick={() => {
+            setSelectedMedicationForLot(null);
+            setIsAddLotDialogOpen(true);
+          }}
+          className="gap-2 w-full"
+        >
+          <Plus className="size-4 flex-shrink-0" />
+          <span className="truncate">Add New Lot</span>
+        </Button>
+        <Button
+          variant="default"
+          onClick={() => setIsImportDialogOpen(true)}
+          className="gap-2 w-full"
+        >
+          <Upload className="size-4 flex-shrink-0" />
+          <span className="truncate">Bulk Import</span>
+        </Button>
       </div>
 
       {/* Summary Cards */}
