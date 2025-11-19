@@ -147,7 +147,7 @@ export function ProfilePage() {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
+        <div className="space-y-4">
           {emailModal?.mode === 'add' && (
             <div className="space-y-2">
               <Label htmlFor="new-email">Backup email</Label>
