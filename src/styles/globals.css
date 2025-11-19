@@ -353,6 +353,38 @@ html {
     letter-spacing: 0.025em;
   }
 
+  /* Fix dialog and input colors */
+  [data-slot='input'] {
+    background-color: white !important;
+    color: #1a2332 !important;
+    border-color: rgba(148, 163, 184, 0.3) !important;
+  }
+
+  [data-slot='input']:focus-visible {
+    border-color: #2563eb !important;
+    outline: none !important;
+  }
+
+  [data-slot='input']::placeholder {
+    color: #94a3b8 !important;
+  }
+
+  /* Dialog content background */
+  [data-slot='dialog-content'] {
+    background-color: white !important;
+    color: #1a2332 !important;
+  }
+
+  /* Button styling fixes */
+  [data-slot='button'][class*='bg-primary'] {
+    background-color: #2563eb !important;
+    color: white !important;
+  }
+
+  [data-slot='button'][class*='bg-primary']:hover {
+    background-color: #1d4ed8 !important;
+  }
+
   /* Dialog responsive improvements */
   @media (max-width: 640px) {
     [role='dialog'] {
