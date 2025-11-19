@@ -334,28 +334,26 @@ export function StockManagement({
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Stock Management</h1>
-        <div className="flex items-center gap-3">
-          <Button
-            variant="default"
-            onClick={() => {
-              setSelectedMedicationForLot(null);
-              setIsAddLotDialogOpen(true);
-            }}
-            className="gap-2"
-          >
-            <Plus className="size-4" />
-            Add New Lot
-          </Button>
-          <Button variant="default" onClick={() => setIsImportDialogOpen(true)} className="gap-2">
-            <Upload className="size-4" />
-            Bulk Import
-          </Button>
-          <Badge variant="outline" className="text-sm">
-            Pharmacy Staff Access
-          </Badge>
-        </div>
+      <div className="flex flex-col gap-2">
+        <Button
+          variant="default"
+          onClick={() => {
+            setSelectedMedicationForLot(null);
+            setIsAddLotDialogOpen(true);
+          }}
+          className="gap-2 w-full"
+        >
+          <Plus className="size-4 flex-shrink-0" />
+          <span className="truncate">Add New Lot</span>
+        </Button>
+        <Button
+          variant="default"
+          onClick={() => setIsImportDialogOpen(true)}
+          className="gap-2 w-full"
+        >
+          <Upload className="size-4 flex-shrink-0" />
+          <span className="truncate">Bulk Import</span>
+        </Button>
       </div>
 
       {/* Summary Cards */}

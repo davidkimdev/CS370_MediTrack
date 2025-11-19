@@ -12,6 +12,13 @@ import {
 } from './ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Search, Download, Calendar, Package, User, ChevronDown, Edit } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from './ui/dialog';
 import { DispensingRecord } from '../types/medication';
 import { formatDateEST } from '../utils/timezone';
 import { toESTDateString, logDateToUTCNoon } from '../utils/timezone';
@@ -25,6 +32,7 @@ interface DispensingLogProps {
 export function DispensingLog({ records, onEditRecord }: DispensingLogProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState<string>('all');
+  const [activeNoteRecord, setActiveNoteRecord] = useState<DispensingRecord | null>(null);
 
   const dateFilterOptions = [
     { value: 'all', label: 'All Time' },
@@ -284,27 +292,29 @@ export function DispensingLog({ records, onEditRecord }: DispensingLogProps) {
       {/* Dispensing Records Table */}
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
+          <div className="overflow-hidden">
+            <Table className="w-full table-fixed">
               <TableHeader>
                 <TableRow>
                   {onEditRecord && <TableHead className="w-[80px]">Actions</TableHead>}
-                  <TableHead>Date</TableHead>
-                  <TableHead>Patient ID</TableHead>
-                  <TableHead>Medication</TableHead>
-                  <TableHead>Dose</TableHead>
-                  <TableHead>Lot #</TableHead>
-                  <TableHead>Exp</TableHead>
-                  <TableHead>Qty</TableHead>
-                  <TableHead>Physician</TableHead>
-                  <TableHead>Student</TableHead>
-                  <TableHead>Clinic Site</TableHead>
-                  <TableHead>Notes</TableHead>
+                  <TableHead className="w-[110px]">Date</TableHead>
+                  <TableHead className="w-[140px]">Patient</TableHead>
+                  <TableHead className="w-[220px]">Prescription</TableHead>
+                  <TableHead className="w-[180px]">Provider</TableHead>
+                  <TableHead className="w-[160px]">Inventory</TableHead>
+                  <TableHead className="w-[160px]">Notes</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredRecords.map((record) => (
-                  <TableRow key={record.id}>
+                {filteredRecords.map((record) => {
+                  const doseText = record.dose?.trim() || '';
+                  const indicationText = record.indication?.trim() || '';
+                  const showIndication =
+                    Boolean(indicationText) &&
+                    (!doseText || indicationText.toLowerCase() !== doseText.toLowerCase());
+
+                  return (
+                    <TableRow key={record.id}>
                     {onEditRecord && (
                       <TableCell>
                         <Button
@@ -317,41 +327,94 @@ export function DispensingLog({ records, onEditRecord }: DispensingLogProps) {
                         </Button>
                       </TableCell>
                     )}
-                    <TableCell className="text-sm">{formatDateEST(record.dispensedAt)}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="text-xs font-mono">
-                        {record.patientId}
-                      </Badge>
+                    <TableCell className="text-sm align-top break-words">
+                      {formatDateEST(record.dispensedAt)}
                     </TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        <p className="font-medium">{record.medicationName}</p>
+                    <TableCell className="align-top break-words">
+                      <div className="flex flex-col gap-1 break-words">
+                        <Badge variant="outline" className="text-xs font-mono w-fit">
+                          {record.patientId}
+                        </Badge>
+                        {record.clinicSite && (
+                          <p className="text-xs text-muted-foreground break-words">
+                            {record.clinicSite}
+                          </p>
+                        )}
                       </div>
                     </TableCell>
-                    <TableCell className="text-sm">{record.dose}</TableCell>
-                    <TableCell>
-                      <span className="text-sm font-mono">{record.lotNumber}</span>
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {record.expirationDate ? formatDateEST(record.expirationDate) : '-'}
-                    </TableCell>
-                    <TableCell>
-                      <span className="font-medium">{record.quantity}</span>
-                    </TableCell>
-                    <TableCell className="text-sm">{record.physicianName}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {record.studentName || '-'}
-                    </TableCell>
-                    <TableCell className="text-sm">{record.clinicSite || '-'}</TableCell>
-                    <TableCell className="max-w-[150px]">
-                      {record.notes && (
-                        <p className="text-sm text-muted-foreground truncate" title={record.notes}>
-                          {record.notes}
+                    <TableCell className="align-top break-words">
+                      <div className="space-y-1 break-words">
+                        <p className="text-sm font-semibold leading-tight">{record.medicationName}</p>
+                        <p className="text-xs text-muted-foreground flex flex-wrap gap-2 break-words">
+                          {doseText && (
+                            <span>
+                              <span className="text-foreground font-medium">Dose:</span> {doseText}
+                            </span>
+                          )}
+                          <span className="font-medium text-foreground">• Qty {record.quantity}</span>
                         </p>
+                        {showIndication && (
+                          <p className="text-xs text-muted-foreground break-words">
+                            <span className="text-foreground font-medium">Indication:</span>{' '}
+                            {indicationText}
+                          </p>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="align-top break-words">
+                      <div className="text-xs text-muted-foreground space-y-1 break-words">
+                        <p>
+                          <span className="text-foreground font-medium">Physician:</span>{' '}
+                          {record.physicianName}
+                        </p>
+                        <p>
+                          <span className="text-foreground font-medium">Student:</span>{' '}
+                          {record.studentName || '—'}
+                        </p>
+                      </div>
+                    </TableCell>
+                    <TableCell className="align-top break-words">
+                      <div className="text-xs text-muted-foreground space-y-1 break-words">
+                        <p>
+                          <span className="text-foreground font-medium">Lot:</span> {record.lotNumber}
+                        </p>
+                        <p>
+                          <span className="text-foreground font-medium">Exp:</span>{' '}
+                          {record.expirationDate ? formatDateEST(record.expirationDate) : '—'}
+                        </p>
+                      </div>
+                    </TableCell>
+                    <TableCell className="align-top break-words">
+                      {record.notes ? (
+                        <div className="space-y-1">
+                          <p
+                            className="text-sm text-muted-foreground overflow-hidden text-ellipsis"
+                            style={{
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                            }}
+                          >
+                            {record.notes}
+                          </p>
+                          {record.notes.length > 60 && (
+                            <Button
+                              variant="link"
+                              size="sm"
+                              className="px-0 text-xs"
+                              onClick={() => setActiveNoteRecord(record)}
+                            >
+                              View full note
+                            </Button>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">—</span>
                       )}
                     </TableCell>
-                  </TableRow>
-                ))}
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
@@ -364,6 +427,21 @@ export function DispensingLog({ records, onEditRecord }: DispensingLogProps) {
           )}
         </CardContent>
       </Card>
+      {activeNoteRecord && (
+        <Dialog open onOpenChange={(open) => !open && setActiveNoteRecord(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Dispensing Note</DialogTitle>
+              <DialogDescription>
+                {formatDateEST(activeNoteRecord.dispensedAt)} • {activeNoteRecord.medicationName}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="mt-2 text-sm text-foreground whitespace-pre-wrap">
+              {activeNoteRecord.notes}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

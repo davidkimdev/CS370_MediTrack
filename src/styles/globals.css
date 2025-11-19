@@ -4,8 +4,9 @@
   --font-size: 16px;
 
   /* Modern gradient background */
-  --background: linear-gradient(135deg, #f5f7fa 0%, #e8f0f7 100%);
+  --background: #f5f7fa;
   --background-solid: #f5f7fa;
+  --page-background: linear-gradient(135deg, #f5f7fa 0%, #e8f0f7 100%);
   --foreground: #1a2332;
 
   /* Card with subtle depth */
@@ -75,6 +76,7 @@
 
 .dark {
   --background: #0f172a;
+  --page-background: linear-gradient(160deg, #020617 0%, #0f172a 100%);
   --foreground: #f8fafc;
   --card: #1e293b;
   --card-foreground: #f8fafc;
@@ -169,7 +171,7 @@
   }
 
   body {
-    background: var(--background);
+    background: var(--page-background, var(--background));
     color: var(--foreground);
     /* Better font rendering for mobile */
     -webkit-font-smoothing: antialiased;
@@ -375,6 +377,29 @@ html {
     color: #1a2332 !important;
   }
 
+  /* Sheet (mobile menu) styling - unified with app theme */
+  [data-slot='sheet-content'] {
+    background-color: #ffffff !important;
+    color: #1a2332 !important;
+    border-color: rgba(148, 163, 184, 0.2) !important;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1) !important;
+  }
+
+  /* Specific override for active menu items inside Sheet */
+  [data-slot='sheet-content'] button[class*='bg-secondary'],
+  [data-slot='sheet-content'] .bg-secondary {
+    background: linear-gradient(135deg, #012066 0%, #3b82f6 100%) !important;
+    color: white !important;
+    box-shadow: 0 2px 4px 0 rgba(37, 99, 235, 0.3) !important;
+    border: none !important;
+  }
+
+  [data-slot='sheet-content'] button[class*='bg-secondary']:hover,
+  [data-slot='sheet-content'] .bg-secondary:hover {
+    background: linear-gradient(135deg, #1d4ed8 0%, #60a5fa 100%) !important;
+    box-shadow: 0 4px 6px 0 rgba(37, 99, 235, 0.4) !important;
+  }
+
   /* Button styling fixes */
   [data-slot='button'][class*='bg-primary'] {
     background-color: #012066 !important;
@@ -383,6 +408,68 @@ html {
 
   [data-slot='button'][class*='bg-primary']:hover {
     background-color: #1d4ed8 !important;
+  }
+
+  /* Secondary button - default teal accent */
+  [data-slot='button'][class*='bg-secondary'] {
+    background-color: var(--secondary) !important;
+    color: var(--secondary-foreground) !important;
+  }
+
+  [data-slot='button'][class*='bg-secondary']:hover {
+    background-color: color-mix(in srgb, var(--secondary) 90%, black) !important;
+  }
+
+  /* Ghost button hover state */
+  [data-slot='button'][class*='hover:bg-accent']:hover {
+    background-color: var(--accent) !important;
+    color: var(--accent-foreground) !important;
+  }
+
+  /* Outline button styling */
+  [data-slot='button'][class*='border'] {
+    border-color: var(--border) !important;
+  }
+
+  /* Mobile nav buttons inside sheet */
+  [data-mobile-nav-button='true'] {
+    background-color: transparent !important;
+    color: var(--foreground) !important;
+    border-radius: calc(var(--radius) - 2px);
+    justify-content: flex-start;
+  }
+
+  [data-mobile-nav-button='true'] svg {
+    color: inherit;
+  }
+
+  [data-mobile-nav-button='true'][data-active='true'] {
+    background: linear-gradient(135deg, #012066 0%, #3b82f6 100%) !important;
+    color: white !important;
+    box-shadow: 0 4px 10px rgba(2, 32, 102, 0.25) !important;
+  }
+
+  [data-mobile-nav-button='true'][data-active='true'] svg {
+    color: white !important;
+  }
+
+  /* Sheet title styling */
+  [data-slot='sheet-title'] {
+    color: var(--card-foreground) !important;
+  }
+
+  /* Sheet header divider */
+  [data-slot='sheet-header'] {
+    border-bottom-color: var(--border) !important;
+  }
+
+  /* Ensure buttons in sheet have proper spacing and styling */
+  [data-slot='sheet-content'] [data-slot='button'] {
+    transition: all 0.2s ease !important;
+  }
+
+  [data-slot='sheet-content'] [data-slot='button']:active {
+    transform: scale(0.98) !important;
   }
 
   /* Dialog responsive improvements */
