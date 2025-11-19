@@ -701,6 +701,8 @@ export default function App() {
     return baseSections;
   }, [isAdmin]);
 
+  const mobileNavButtonBaseClasses = 'justify-start gap-2 transition-all w-full text-sm';
+
   const tabValue = navigationSections.some(({ key }) => key === activeSection)
     ? activeSection
     : '__none';
@@ -894,14 +896,19 @@ export default function App() {
 
                             return (
                               <SheetClose asChild key={key}>
-                                <Button
-                                  variant={isActive ? 'secondary' : 'ghost'}
-                                  size="sm"
-                                  className={`justify-start gap-2 ${isRestricted ? 'opacity-70' : ''}`}
-                                  disabled={isRestricted}
-                                  onClick={() => handleSectionChange(key)}
-                                  title={isRestricted ? 'Log in to access this area' : undefined}
-                                >
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                data-mobile-nav-button="true"
+                                data-active={isActive}
+                                className={cn(
+                                  mobileNavButtonBaseClasses,
+                                  isRestricted && 'opacity-70 pointer-events-none',
+                                )}
+                                disabled={isRestricted}
+                                onClick={() => handleSectionChange(key)}
+                                title={isRestricted ? 'Log in to access this area' : undefined}
+                              >
                                   <Icon className="size-4" />
                                   {label}
                                 </Button>
@@ -911,9 +918,11 @@ export default function App() {
                           {isAdmin && (
                             <SheetClose asChild>
                               <Button
-                                variant={activeSection === 'admin' ? 'secondary' : 'ghost'}
+                                variant="ghost"
                                 size="sm"
-                                className="justify-start gap-2"
+                                data-mobile-nav-button="true"
+                                data-active={activeSection === 'admin'}
+                                className={mobileNavButtonBaseClasses}
                                 onClick={() => handleSectionChange('admin')}
                               >
                                 <ShieldCheck className="size-4" />
@@ -923,9 +932,11 @@ export default function App() {
                           )}
                           <SheetClose asChild>
                             <Button
-                              variant={activeSection === 'profile' ? 'secondary' : 'ghost'}
+                              variant="ghost"
                               size="sm"
-                              className="justify-start gap-2"
+                              data-mobile-nav-button="true"
+                              data-active={activeSection === 'profile'}
+                              className={mobileNavButtonBaseClasses}
                               onClick={() => handleSectionChange('profile')}
                             >
                               <User className="size-4" />
