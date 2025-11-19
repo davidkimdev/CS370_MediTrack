@@ -1,10 +1,10 @@
-const CACHE_NAME = 'meditrack-v1';
+const CACHE_NAME = 'meditrack-v2';
 const RUNTIME_CACHE = 'meditrack-runtime';
 
 const PRECACHE_URLS = [
   '/',
   '/index.html',
-  '/logo.svg',
+  '/logo.jpg',
   '/manifest.json'
 ];
 
