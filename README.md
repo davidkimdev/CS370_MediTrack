@@ -19,3 +19,4 @@ This project is a Progressive Web App designed to help the Emory Farmworker Proj
 * **Database:** Supabase (PostgreSQL)
 * **Styling:** Tailwind CSS
 * **Offline:** Custom service worker implementation with IndexedDB
+
