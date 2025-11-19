@@ -403,7 +403,12 @@ export function StockManagement({
             placeholder="Search medications..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            style={{
+              backgroundColor: '#86efac', // Tailwind's green-300 hex
+              borderColor: '#22c55e',     // Tailwind's green-500
+              color: '#064e3b',           // Tailwind's green-900 (text)
+              }}
+            className="pl-10 border-2 focus:ring-2 focus:ring-green-600 focus:border-green-600"
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>

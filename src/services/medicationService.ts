@@ -396,11 +396,9 @@ export class MedicationService {
           medicationId: record.medication_id || record.medication_name || '',
           medicationName: record.medication_name,
           patientId: record.patient_id || '',
-          patientInitials:
-            record.patient_id?.split('-')[0] +
-            '.' +
-            (record.patient_id?.split('-')[1]?.slice(0, 1) || '') +
-            '.',
+          
+    
+
           quantity: (() => {
             const raw = record.amount_dispensed;
             const s = raw === null || raw === undefined ? '' : String(raw);
@@ -464,11 +462,6 @@ export class MedicationService {
       medicationId: data.medication_id || data.medication_name,
       medicationName: data.medication_name,
       patientId: data.patient_id,
-      patientInitials:
-        data.patient_id?.split('-')[0] +
-        '.' +
-        (data.patient_id?.split('-')[1]?.slice(0, 1) || '') +
-        '.',
       quantity: (() => {
         const raw = data.amount_dispensed;
         const s = raw === null || raw === undefined ? '' : String(raw);
@@ -543,11 +536,6 @@ export class MedicationService {
       medicationId: record.medicationId,
       medicationName: data.medication_name,
       patientId: data.patient_id,
-      patientInitials:
-        data.patient_id?.split('-')[0] +
-        '.' +
-        (data.patient_id?.split('-')[1]?.slice(0, 1) || '') +
-        '.',
       quantity: record.quantity,
       dose: data.dose_instructions,
       lotNumber: record.lotNumber || '',

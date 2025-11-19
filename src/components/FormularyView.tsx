@@ -279,8 +279,15 @@ export function FormularyView({
           <Input
             placeholder="Search medications, conditions, or uses..."
             value={searchTerm}
-            onChange={(e) => onSearchTermChange(e.target.value)}
-            className="pl-10 pr-10"
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{
+              backgroundColor: '#86efac', // Tailwind's green-300 hex
+              borderColor: '#22c55e',     // Tailwind's green-500
+              color: '#064e3b',           // Tailwind's green-900 (text)
+            }}
+            className="pl-10 border-2 focus:ring-2 focus:ring-green-600 focus:border-green-600"
+            //            onChange={(e) => setSearchTerm(e.target.value)}
+            //            className="pl-10"
           />
           {searchTerm && (
             <Button
