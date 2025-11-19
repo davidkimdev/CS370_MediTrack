@@ -805,19 +805,19 @@ export default function App() {
 
   // Show main app layout
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #e8f0f7 100%)' }}>
       {/* Header */}
-      <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-8 flex items-center justify-between gap-4">
+      <header className="border-b border-slate-200/60 bg-white/80 backdrop-blur-md sticky top-0 z-50 shadow-sm">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
           {/* Logo */}
-          <div className="flex items-center gap-2">
-            <div className="size-8 bg-primary rounded-lg flex items-center justify-center">
-              <Pill className="size-4 text-primary-foreground" />
+          <div className="flex items-center gap-3">
+            <div className="size-12 bg-gradient-to-br from-blue-600 to-blue-500 rounded-xl flex items-center justify-center shadow-lg pill-icon-animated relative">
+              <Pill className="size-6 text-white pill-icon-spin" style={{ strokeWidth: 2.5 }} />
             </div>
             <div>
-              <h1 className="text-lg font-semibold">EFWP Formulary</h1>
+              <h1 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-teal-500 bg-clip-text text-transparent">EFWP Formulary</h1>
               {!isAuthenticated && (
-                <p className="text-xs text-muted-foreground">Viewing limited access</p>
+                <p className="text-xs text-slate-500">Viewing limited access</p>
               )}
             </div>
           </div>
