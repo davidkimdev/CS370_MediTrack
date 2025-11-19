@@ -95,7 +95,12 @@ export class MedicationService {
           genericName: med.name,
           strength: med.strength || '',
           dosageForm: med.dosage_form || 'tablet',
-          category: 'General',
+          // Normalize category to string[] (text[] in DB); fallback to ['General']
+          category: Array.isArray(med.category)
+            ? (med.category as string[]).map((c) => (c ?? '').trim()).filter(Boolean)
+            : med.category
+            ? [String(med.category).trim()]
+            : ['General'],
           currentStock: totalStock,
           minStock: 20,
           maxStock: 100,
@@ -114,6 +119,7 @@ export class MedicationService {
     name: string;
     strength: string;
     dosageForm?: string;
+    categories?: string[]; // Supabase text[] column
     isActive?: boolean;
   }): Promise<{ id: string }> {
     const { data, error } = await supabase
@@ -122,6 +128,7 @@ export class MedicationService {
         name: input.name,
         strength: input.strength,
         dosage_form: input.dosageForm || 'tablet',
+        category: input.categories && input.categories.length > 0 ? input.categories : null,
         is_active: input.isActive ?? true,
       })
       .select('id')
@@ -151,7 +158,11 @@ export class MedicationService {
       genericName: data.generic_name,
       strength: data.strength,
       dosageForm: data.dosage_form,
-      category: data.category,
+      category: Array.isArray(data.category)
+        ? (data.category as string[]).map((c) => (c ?? '').trim()).filter(Boolean)
+        : data.category
+        ? [String(data.category).trim()]
+        : ['General'],
       currentStock: data.current_stock,
       minStock: data.min_stock,
       maxStock: data.max_stock,
@@ -309,6 +320,8 @@ export class MedicationService {
       logger.error('Error updating inventory item', error);
       throw new Error('Failed to update inventory item');
     }
+
+    logger.info('Inventory item updated successfully', { id, updates });
 
     return {
       id: data.id,
@@ -486,7 +499,7 @@ export class MedicationService {
       .select('id')
       .ilike('first_name', `%${record.dispensedBy.split(' ')[0]}%`)
       .limit(1)
-      .single();
+      .maybeSingle();
 
     const enteredBy = userData?.id || null;
 
@@ -540,6 +553,88 @@ export class MedicationService {
       indication: record.indication,
       notes: data.notes || undefined,
     };
+  }
+
+  /**
+   * Faster variant when we already know the authenticated user's id.
+   * Skips the name-based lookup in `users` table to reduce latency.
+   * Falls back to the slower path if userId not provided.
+   */
+  static async createDispensingRecordFast(
+    record: Omit<DispensingRecord, 'id'>,
+    userId?: string,
+  ): Promise<DispensingRecord> {
+    if (!userId) {
+      return this.createDispensingRecord(record);
+    }
+
+    const { data, error } = await supabase
+      .from('dispensing_logs')
+      .insert({
+        log_date: toESTDateString(record.dispensedAt),
+        patient_id: record.patientId,
+        medication_id: record.medicationId,
+        medication_name: record.medicationName,
+        dose_instructions: record.dose,
+        lot_number: record.lotNumber,
+        expiration_date: record.expirationDate
+          ? record.expirationDate.toISOString().split('T')[0]
+          : null,
+        amount_dispensed: `${record.quantity} tabs`,
+        physician_name: record.physicianName,
+        student_name: record.studentName || null,
+        entered_by: userId,
+        clinic_site: record.clinicSite || null,
+        notes: record.notes || null,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      logger.error('Error creating dispensing record (fast path)', error);
+      throw new Error('Failed to create dispensing record');
+    }
+
+    return {
+      id: data.id,
+      medicationId: record.medicationId,
+      medicationName: data.medication_name,
+      patientId: data.patient_id,
+      patientInitials:
+        data.patient_id?.split('-')[0] +
+        '.' +
+        (data.patient_id?.split('-')[1]?.slice(0, 1) || '') +
+        '.',
+      quantity: record.quantity,
+      dose: data.dose_instructions,
+      lotNumber: record.lotNumber || '',
+      expirationDate: record.expirationDate,
+      dispensedBy: record.dispensedBy,
+      physicianName: data.physician_name,
+      studentName: data.student_name || undefined,
+      clinicSite: data.clinic_site || record.clinicSite || undefined,
+      dispensedAt: data.log_date
+        ? logDateToUTCNoon(data.log_date)
+        : data.created_at
+          ? new Date(data.created_at)
+          : record.dispensedAt,
+      indication: record.indication,
+      notes: data.notes || undefined,
+    };
+  }
+
+  static async deleteDispensingRecord(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('dispensing_logs')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      logger.error('Error deleting dispensing record', error);
+      throw new Error('Failed to delete dispensing record');
+    }
+
+    logger.info('Dispensing record deleted successfully', { id });
   }
 
   // Users

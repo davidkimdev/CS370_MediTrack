@@ -84,7 +84,7 @@ export function EditDispensingRecordDialog({
           <DialogTitle>Edit Dispensing Record</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="space-y-4">
           {/* Read-only fields */}
           <div className="p-3 bg-muted rounded-md space-y-2">
             <div>
@@ -187,7 +187,7 @@ export function EditDispensingRecordDialog({
           </div>
 
           {/* Action buttons */}
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex justify-end gap-3 mt-6">
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
               Cancel
             </Button>

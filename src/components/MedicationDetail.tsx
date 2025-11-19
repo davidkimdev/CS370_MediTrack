@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+ 
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -20,13 +21,15 @@ import {
   ArrowLeft,
   Package,
   Clock,
-  AlertCircle,
   Plus,
   Edit2,
   Trash2,
 } from 'lucide-react';
 import { Medication, DispensingRecord, InventoryItem, User } from '../types/medication';
+import { useFieldHistory } from '../hooks/useFieldHistory';
 import { showErrorToast } from '../utils/toastUtils';
+
+ 
 
 interface MedicationDetailProps {
   medication: Medication;
@@ -52,6 +55,7 @@ interface LotSelection {
   expirationDate?: Date;
 }
 
+
 export function MedicationDetail({
   medication,
   alternatives,
@@ -66,7 +70,27 @@ export function MedicationDetail({
   onDeleteLot,
   onRequireAuth,
 }: MedicationDetailProps) {
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
+  }, []);
+
+  const handleAlternativeSelect = (med: Medication) => {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    onSelectAlternative(med);
+  };
+
   const [isDispenseDialogOpen, setIsDispenseDialogOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 640);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   const [patientId, setPatientId] = useState('');
   //const [patientInitials, setPatientInitials] = useState('');
   const [dose, setDose] = useState('');
@@ -78,6 +102,55 @@ export function MedicationDetail({
   const [clinicSite, setClinicSite] = useState('');
   const [notes, setNotes] = useState('');
 
+  const patientIdInputRef = useRef<HTMLInputElement>(null);
+  const patientInitialsInputRef = useRef<HTMLInputElement>(null);
+  const doseInputRef = useRef<HTMLInputElement>(null);
+  const physicianInputRef = useRef<HTMLInputElement>(null);
+  const studentInputRef = useRef<HTMLInputElement>(null);
+  const clinicInputRef = useRef<HTMLInputElement>(null);
+
+  const patientIdHistory = useFieldHistory('dispense_patient_id', { minLength: 2 });
+  const patientInitialsHistory = useFieldHistory('dispense_patient_initials', { minLength: 2 });
+  const doseHistory = useFieldHistory('dispense_dose', { minLength: 1 });
+  const physicianHistory = useFieldHistory('dispense_physician_name', { minLength: 2 });
+  const studentHistory = useFieldHistory('dispense_student_name', { minLength: 2 });
+  const clinicSiteHistory = useFieldHistory('dispense_clinic_site', { minLength: 2 });
+  // Per-field open flags
+  const [openPatientId, setOpenPatientId] = useState(false);
+  const [openPatientInitials, setOpenPatientInitials] = useState(false);
+  const [openDose, setOpenDose] = useState(false);
+  const [openPhysician, setOpenPhysician] = useState(false);
+  const [openStudent, setOpenStudent] = useState(false);
+  const [openClinic, setOpenClinic] = useState(false);
+
+  const closeAllSuggestions = () => {
+    setOpenPatientId(false);
+    setOpenPatientInitials(false);
+    setOpenDose(false);
+    setOpenPhysician(false);
+    setOpenStudent(false);
+    setOpenClinic(false);
+  };
+ 
+  useEffect(() => {
+    if (!isDispenseDialogOpen) {
+      closeAllSuggestions();
+    }
+  }, [isDispenseDialogOpen]);
+
+  // Outside click listener
+  useEffect(() => {
+    if (!isDispenseDialogOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.history-suggestion-container')) {
+        closeAllSuggestions();
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [isDispenseDialogOpen]);
+
   // Lot editing state
   const [isLotDialogOpen, setIsLotDialogOpen] = useState(false);
   const [editingLot, setEditingLot] = useState<InventoryItem | null>(null);
@@ -86,11 +159,6 @@ export function MedicationDetail({
   const [lotExpiration, setLotExpiration] = useState('');
 
   const readOnly = isReadOnly || !currentUser;
-  useEffect(() => {
-    if (!readOnly && currentUser?.name && !studentName) {
-      setStudentName(currentUser.name);
-    }
-  }, [currentUser?.name, readOnly]); // Removed studentName from deps to prevent loop
   const medicationInventory = inventory.filter((inv) => inv.medicationId === medication.id);
   const availableLots = medicationInventory.filter((inv) => !inv.isExpired && inv.quantity > 0);
 
@@ -160,8 +228,16 @@ export function MedicationDetail({
         clinicSite: clinicSite.trim() || undefined,
       };
 
+      console.log('🚀 MedicationDetail: About to call onDispense with record:', record);
       onDispense(record);
     });
+
+  patientIdHistory.recordValue(patientId);
+  patientInitialsHistory.recordValue(patientInitials);
+  doseHistory.recordValue(dose);
+  physicianHistory.recordValue(physicianName);
+  studentHistory.recordValue(studentName);
+  clinicSiteHistory.recordValue(clinicSite);
 
     console.log(`Medication dispensed successfully from ${validLots.length} lot(s)`);
     setIsDispenseDialogOpen(false);
@@ -175,6 +251,12 @@ export function MedicationDetail({
     setStudentName('');
     setClinicSite('');
     setNotes('');
+  patientIdHistory.updateQuery('');
+  patientInitialsHistory.updateQuery('');
+  doseHistory.updateQuery('');
+  physicianHistory.updateQuery('');
+  studentHistory.updateQuery('');
+  clinicSiteHistory.updateQuery('');
   };
 
   // Multi-lot helpers for dispensing
@@ -223,7 +305,7 @@ export function MedicationDetail({
     setEditingLot(lot);
     setLotNumber(lot.lotNumber);
     setLotQuantity(lot.quantity.toString());
-    setLotExpiration(lot.expirationDate.toISOString().split('T')[0]);
+    setLotExpiration(lot.expirationDate.toISOString().slice(0, 7));
     setIsLotDialogOpen(true);
   };
 
@@ -239,12 +321,18 @@ export function MedicationDetail({
       return;
     }
 
+    const expirationDate = new Date(`${lotExpiration}-01T00:00:00Z`);
+
+// Move to *last day* of the month in UTC
+    expirationDate.setUTCMonth(expirationDate.getUTCMonth() + 1);
+    expirationDate.setUTCDate(0);
+
     if (editingLot) {
       // Update existing lot
       onUpdateLot?.(editingLot.id, {
         lotNumber: lotNumber.trim(),
         quantity: qty,
-        expirationDate: new Date(lotExpiration),
+        expirationDate,
       });
     } else {
       // Add new lot
@@ -252,7 +340,7 @@ export function MedicationDetail({
         medicationId: medication.id,
         lotNumber: lotNumber.trim(),
         quantity: qty,
-        expirationDate: new Date(lotExpiration),
+        expirationDate,
       });
     }
 
@@ -270,22 +358,23 @@ export function MedicationDetail({
   const canEditLots = !readOnly && currentUser?.role === 'pharmacy_staff';
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={onBack}>
-          <ArrowLeft className="size-4" />
-        </Button>
-        <div className="flex-1">
-          <h1 className="text-xl font-semibold">{medication.name}</h1>
-          <p className="text-muted-foreground">{medication.genericName}</p>
-        </div>
-        {readOnly && (
-          <Button variant="outline" size="sm" onClick={() => onRequireAuth?.()}>
-            Log in
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto px-4 pt-12 pb-6 space-y-4">
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={onBack}>
+            <ArrowLeft className="size-4" />
           </Button>
-        )}
-      </div>
+          <div className="flex-1">
+            <h1 className="text-xl font-semibold">{medication.name}</h1>
+            <p className="text-muted-foreground">{medication.genericName}</p>
+          </div>
+          {readOnly && (
+            <Button variant="outline" size="sm" onClick={() => onRequireAuth?.()}>
+              Log in
+            </Button>
+          )}
+        </div>
 
       {/* Stock Status Card */}
       <Card>
@@ -312,28 +401,123 @@ export function MedicationDetail({
                     <Button>
                       <Plus className="size-4 mr-2" />
                       Dispense
-                    </Button>
+                    </Button> 
                   </DialogTrigger>
-                  <DialogContent className="w-11/12 max-w-2xl max-h-[90vh] !flex !flex-col !p-0 !gap-0 overflow-hidden">
-                    {/* Header - Fixed */}
-                    <div className="p-6 border-b flex-shrink-0">
-                      <h2 className="text-lg font-semibold leading-none">Dispense {medication.name}</h2>
-                      <p className="text-sm text-muted-foreground mt-2">Record medication dispensing for patient</p>
-                    </div>
-
-                    {/* Content - Scrollable */}
-                    <div className="flex-1 overflow-y-auto p-6">
-                      <div className="space-y-4">
+                  <DialogContent
+                    className="max-h-[calc(100vh-5rem)] sm:max-h-[calc(100vh-10rem)] w-[90vw] max-w-[700px] p-0 flex flex-col gap-0 overflow-hidden"
+                    style={
+                      isMobile
+                        ? {
+                            top: '22.5rem',
+                            height: 'calc(100vh - 10rem)',
+                            transform: 'none',
+                          }
+                        : {
+                          height: 'calc(100vh - 10rem)',
+                        }
+                    }
+                    onOpenAutoFocus={(event) => event.preventDefault()}
+                  >
+                      <DialogHeader className="flex-shrink-0 px-4 sm:px-6 pt-3 pb-2 border-b">
+                        <DialogTitle className="text-base sm:text-lg">Dispense {medication.name}</DialogTitle>
+                        <DialogDescription className="text-xs sm:text-sm">
+                          Record medication dispensing for patient
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="flex-1 overflow-y-auto px-4 sm:px-6">
+                    <form
+                      autoComplete="off"
+                      className="space-y-2 sm:space-y-3 py-2 sm:py-3"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        handleDispense();
+                      }}
+                    >
                       {/* Patient Information */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-2">
-                          <Label htmlFor="patientId">Patient ID *</Label>
-                          <Input
-                            id="patientId"
-                            placeholder="e.g., 2025-196"
-                            value={patientId}
-                            onChange={(e) => setPatientId(e.target.value)}
-                          />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="patientId" className="text-sm sm:text-base">Patient ID *</Label>
+                          <div className="space-y-1">
+                            <div className="relative">
+                              <div className="history-suggestion-container">
+                                <Input
+                                  id="patientId"
+                                  placeholder="e.g., 2025-196"
+                                  autoComplete="off"
+                                  ref={patientIdInputRef}
+                                  value={patientId}
+                                  className="h-8 sm:h-9 text-sm sm:text-base"
+                                  onFocus={() => {
+                                    setOpenPatientId(true);
+                                    patientIdHistory.updateQuery(patientId);
+                                  }}
+                                  onMouseDown={(event) => {
+                                    if (
+                                      document.activeElement === event.currentTarget &&
+                                      event.currentTarget.value.trim() === ''
+                                    ) {
+                                      event.preventDefault();
+                                      setOpenPatientId((prev) => {
+                                        const next = !prev;
+                                        if (next) {
+                                          patientIdHistory.updateQuery(event.currentTarget.value);
+                                        }
+                                        return next;
+                                      });
+                                    }
+                                  }}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    setPatientId(value);
+                                    patientIdHistory.updateQuery(value);
+                                    if (!openPatientId) setOpenPatientId(true);
+                                  }}
+                                />
+                                {openPatientId && patientIdHistory.suggestions.length > 0 && (
+                                  <ul className="absolute z-50 mt-1 w-full max-h-48 overflow-auto rounded-md border bg-popover text-sm shadow" role="listbox">
+                                    {patientIdHistory.suggestions.map((s) => (
+                                      <li key={s.value}>
+                                        <button
+                                          type="button"
+                                          className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-muted"
+                                          onClick={() => {
+                                            setPatientId(s.value);
+                                            patientIdHistory.recordValue(s.value);
+                                            patientIdHistory.updateQuery(s.value);
+                                            setOpenPatientId(false);
+                                          }}
+                                        >
+                                          <span>{s.value}</span>
+                                          <span
+                                            className="text-xs text-muted-foreground hover:text-destructive"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              patientIdHistory.clearEntry(s.value);
+                                              patientIdHistory.updateQuery(patientId);
+                                            }}
+                                          >
+                                            Clear
+                                          </span>
+                                        </button>
+                                      </li>
+                                    ))}
+                                    <li className="border-t">
+                                      <button
+                                        type="button"
+                                        className="w-full px-3 py-1.5 text-left text-xs text-muted-foreground hover:text-destructive hover:bg-muted"
+                                        onClick={() => {
+                                          patientIdHistory.clearAll();
+                                          patientIdHistory.updateQuery(patientId);
+                                        }}
+                                      >
+                                        Clear all
+                                      </button>
+                                    </li>
+                                  </ul>
+                                )}
+                              </div>
+                            </div>
+                          </div>
                         </div>
                         {/*}
                         <div className="space-y-2">
@@ -349,18 +533,93 @@ export function MedicationDetail({
                       </div>
 
                       {/* Dose */}
-                      <div className="space-y-2">
-                        <Label htmlFor="dose">Dose *</Label>
-                        <Input
-                          id="dose"
-                          placeholder="e.g., 1 tab, PRN, 1 gtt"
-                          value={dose}
-                          onChange={(e) => setDose(e.target.value)}
-                        />
+                      <div className="space-y-1.5">
+                        <Label htmlFor="dose" className="text-sm sm:text-base">Dose Instructions *</Label>
+                        <div className="space-y-1">
+                          <div className="relative">
+                            <div className="history-suggestion-container">
+                              <Input
+                                id="dose"
+                                placeholder="e.g., 1 tab, PRN, 1 gtt"
+                                autoComplete="off"
+                                ref={doseInputRef}
+                                value={dose}
+                                className="h-8 sm:h-9 text-sm sm:text-base"
+                                onFocus={() => {
+                                  setOpenDose(true);
+                                  doseHistory.updateQuery(dose);
+                                }}
+                                onMouseDown={(event) => {
+                                  if (
+                                    document.activeElement === event.currentTarget &&
+                                    event.currentTarget.value.trim() === ''
+                                  ) {
+                                    event.preventDefault();
+                                    setOpenDose((prev) => {
+                                      const next = !prev;
+                                      if (next) {
+                                        doseHistory.updateQuery(event.currentTarget.value);
+                                      }
+                                      return next;
+                                    });
+                                  }
+                                }}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  setDose(value);
+                                  doseHistory.updateQuery(value);
+                                  if (!openDose) setOpenDose(true);
+                                }}
+                              />
+                              {openDose && doseHistory.suggestions.length > 0 && (
+                                <ul className="absolute z-50 mt-1 w-full max-h-48 overflow-auto rounded-md border bg-popover text-sm shadow" role="listbox">
+                                  {doseHistory.suggestions.map((s) => (
+                                    <li key={s.value}>
+                                      <button
+                                        type="button"
+                                        className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-muted"
+                                        onClick={() => {
+                                          setDose(s.value);
+                                          doseHistory.recordValue(s.value);
+                                          doseHistory.updateQuery(s.value);
+                                          setOpenDose(false);
+                                        }}
+                                      >
+                                        <span>{s.value}</span>
+                                        <span
+                                          className="text-xs text-muted-foreground hover:text-destructive"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            doseHistory.clearEntry(s.value);
+                                            doseHistory.updateQuery(dose);
+                                          }}
+                                        >
+                                          Clear
+                                        </span>
+                                      </button>
+                                    </li>
+                                  ))}
+                                  <li className="border-t">
+                                    <button
+                                      type="button"
+                                      className="w-full px-3 py-1.5 text-left text-xs text-muted-foreground hover:text-destructive hover:bg-muted"
+                                      onClick={() => {
+                                        doseHistory.clearAll();
+                                        doseHistory.updateQuery(dose);
+                                      }}
+                                    >
+                                      Clear all
+                                    </button>
+                                  </li>
+                                </ul>
+                              )}
+                            </div>
+                          </div>
+                        </div>
                       </div>
 
                       {/* Multi-Lot Selection */}
-                      <div className="space-y-3">
+                      <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <Label>Lots to Dispense *</Label>
                           <p className="text-sm text-muted-foreground">
@@ -377,11 +636,11 @@ export function MedicationDetail({
                           return (
                             <div
                               key={index}
-                              className="flex gap-2 items-start p-3 border rounded-md bg-muted/30"
+                              className="flex flex-col sm:flex-row gap-2 items-start p-3 border rounded-md bg-muted/30"
                             >
-                              <div className="flex-1 space-y-2">
+                              <div className="flex-1 w-full space-y-2">
                                 <div className="space-y-1">
-                                  <Label htmlFor={lotSelectId} className="text-xs">
+                                  <Label htmlFor={lotSelectId} className="text-xs sm:text-sm">
                                     Lot Number
                                   </Label>
                                   <Select
@@ -390,7 +649,7 @@ export function MedicationDetail({
                                       updateLotSelection(index, 'lotNumber', value)
                                     }
                                   >
-                                    <SelectTrigger id={lotSelectId} className="h-9">
+                                    <SelectTrigger id={lotSelectId} className="h-8 sm:h-9 w-full">
                                       <SelectValue placeholder="Select lot" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -399,9 +658,11 @@ export function MedicationDetail({
                                           key={availLot.lotNumber}
                                           value={availLot.lotNumber}
                                         >
-                                          {availLot.lotNumber} - Exp:{' '}
-                                          {availLot.expirationDate.toLocaleDateString()} - Qty:{' '}
-                                          {availLot.quantity}
+                                          <span className="text-xs sm:text-sm">
+                                            {availLot.lotNumber} - Exp:{' '}
+                                            {availLot.expirationDate.toLocaleDateString()} - Qty:{' '}
+                                            {availLot.quantity}
+                                          </span>
                                         </SelectItem>
                                       ))}
                                     </SelectContent>
@@ -409,7 +670,7 @@ export function MedicationDetail({
                                 </div>
                                 <div className="grid grid-cols-2 gap-2">
                                   <div className="space-y-1">
-                                    <Label htmlFor={lotQuantityId} className="text-xs">
+                                    <Label htmlFor={lotQuantityId} className="text-xs sm:text-sm">
                                       Quantity
                                     </Label>
                                     <Input
@@ -422,11 +683,11 @@ export function MedicationDetail({
                                         updateLotSelection(index, 'quantity', e.target.value)
                                       }
                                       placeholder="0"
-                                      className="h-9"
+                                      className="h-8 sm:h-9"
                                     />
                                   </div>
                                   <div className="space-y-1">
-                                    <Label className="text-xs">Available</Label>
+                                    <Label className="text-xs sm:text-sm">Available</Label>
                                     <p className="text-sm font-medium py-2">
                                       {inventoryLot ? `${inventoryLot.quantity} units` : '-'}
                                     </p>
@@ -439,7 +700,7 @@ export function MedicationDetail({
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => removeLotSelection(index)}
-                                  className="h-9 px-2 text-destructive hover:text-destructive"
+                                  className="h-9 px-2 text-destructive hover:text-destructive sm:mt-5"
                                 >
                                   <Trash2 className="size-4" />
                                 </Button>
@@ -461,40 +722,266 @@ export function MedicationDetail({
                       </div>
 
                       {/* Provider Information */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-2">
-                          <Label htmlFor="physician">Physician Name *</Label>
-                          <Input
-                            id="physician"
-                            placeholder="e.g., Dr. Smith"
-                            value={physicianName}
-                            onChange={(e) => setPhysicianName(e.target.value)}
-                          />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="physician" className="text-sm sm:text-base">Physician Name *</Label>
+                          <div className="space-y-1">
+                            <div className="relative">
+                              <div className="history-suggestion-container">
+                                <Input
+                                  id="physician"
+                                  name="physician-name"
+                                  placeholder="e.g., Dr. Smith"
+                                  autoComplete="off"
+                                  autoCapitalize="words"
+                                  ref={physicianInputRef}
+                                  value={physicianName}
+                                  className="h-8 sm:h-9 text-sm sm:text-base"
+                                  onFocus={() => {
+                                    setOpenPhysician(true);
+                                    physicianHistory.updateQuery(physicianName);
+                                  }}
+                                  onMouseDown={(event) => {
+                                    if (
+                                      document.activeElement === event.currentTarget &&
+                                      event.currentTarget.value.trim() === ''
+                                    ) {
+                                      event.preventDefault();
+                                      setOpenPhysician((prev) => {
+                                        const next = !prev;
+                                        if (next) {
+                                          physicianHistory.updateQuery(event.currentTarget.value);
+                                        }
+                                        return next;
+                                      });
+                                    }
+                                  }}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    setPhysicianName(value);
+                                    physicianHistory.updateQuery(value);
+                                    if (!openPhysician) setOpenPhysician(true);
+                                  }}
+                                />
+                                {openPhysician && physicianHistory.suggestions.length > 0 && (
+                                  <ul className="absolute z-50 mt-1 w-full max-h-48 overflow-auto rounded-md border bg-popover text-sm shadow" role="listbox">
+                                    {physicianHistory.suggestions.map((s) => (
+                                      <li key={s.value}>
+                                        <button
+                                          type="button"
+                                          className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-muted"
+                                          onClick={() => {
+                                            setPhysicianName(s.value);
+                                            physicianHistory.recordValue(s.value);
+                                            physicianHistory.updateQuery(s.value);
+                                            setOpenPhysician(false);
+                                          }}
+                                        >
+                                          <span>{s.value}</span>
+                                          <span
+                                            className="text-xs text-muted-foreground hover:text-destructive"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              physicianHistory.clearEntry(s.value);
+                                              physicianHistory.updateQuery(physicianName);
+                                            }}
+                                          >
+                                            Clear
+                                          </span>
+                                        </button>
+                                      </li>
+                                    ))}
+                                    <li className="border-t">
+                                      <button
+                                        type="button"
+                                        className="w-full px-3 py-1.5 text-left text-xs text-muted-foreground hover:text-destructive hover:bg-muted"
+                                        onClick={() => {
+                                          physicianHistory.clearAll();
+                                          physicianHistory.updateQuery(physicianName);
+                                        }}
+                                      >
+                                        Clear all
+                                      </button>
+                                    </li>
+                                  </ul>
+                                )}
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="student">Student Name</Label>
-                          <Input
-                            id="student"
-                            placeholder="e.g., Jane Doe (optional)"
-                            value={studentName}
-                            onChange={(e) => setStudentName(e.target.value)}
-                          />
+                        <div className="space-y-1.5">
+                          <Label htmlFor="student" className="text-sm sm:text-base">Student Name</Label>
+                          <div className="space-y-1">
+                            <div className="relative">
+                              <div className="history-suggestion-container">
+                                <Input
+                                  id="student"
+                                  placeholder="e.g., Jane Doe (optional)"
+                                  autoComplete="off"
+                                  ref={studentInputRef}
+                                  value={studentName}
+                                  className="h-8 sm:h-9 text-sm sm:text-base"
+                                  onFocus={() => {
+                                    setOpenStudent(true);
+                                    studentHistory.updateQuery(studentName);
+                                  }}
+                                  onMouseDown={(event) => {
+                                    if (
+                                      document.activeElement === event.currentTarget &&
+                                      event.currentTarget.value.trim() === ''
+                                    ) {
+                                      event.preventDefault();
+                                      setOpenStudent((prev) => {
+                                        const next = !prev;
+                                        if (next) {
+                                          studentHistory.updateQuery(event.currentTarget.value);
+                                        }
+                                        return next;
+                                      });
+                                    }
+                                  }}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    setStudentName(value);
+                                    studentHistory.updateQuery(value);
+                                    if (!openStudent) setOpenStudent(true);
+                                  }}
+                                />
+                                {openStudent && studentHistory.suggestions.length > 0 && (
+                                  <ul className="absolute z-50 mt-1 w-full max-h-48 overflow-auto rounded-md border bg-popover text-sm shadow" role="listbox">
+                                    {studentHistory.suggestions.map((s) => (
+                                      <li key={s.value}>
+                                        <button
+                                          type="button"
+                                          className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-muted"
+                                          onClick={() => {
+                                            setStudentName(s.value);
+                                            studentHistory.recordValue(s.value);
+                                            studentHistory.updateQuery(s.value);
+                                            setOpenStudent(false);
+                                          }}
+                                        >
+                                          <span>{s.value}</span>
+                                          <span
+                                            className="text-xs text-muted-foreground hover:text-destructive"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              studentHistory.clearEntry(s.value);
+                                              studentHistory.updateQuery(studentName);
+                                            }}
+                                          >
+                                            Clear
+                                          </span>
+                                        </button>
+                                      </li>
+                                    ))}
+                                    <li className="border-t">
+                                      <button
+                                        type="button"
+                                        className="w-full px-3 py-1.5 text-left text-xs text-muted-foreground hover:text-destructive hover:bg-muted"
+                                        onClick={() => {
+                                          studentHistory.clearAll();
+                                          studentHistory.updateQuery(studentName);
+                                        }}
+                                      >
+                                        Clear all
+                                      </button>
+                                    </li>
+                                  </ul>
+                                )}
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </div>
 
                       {/* Clinic Site */}
-                      <div className="space-y-2">
+                      <div className="space-y-1.5">
                         <Label htmlFor="clinic-site">Clinic Site</Label>
-                        <Input
-                          id="clinic-site"
-                          placeholder="e.g., Bainbridge, Moultrie, etc."
-                          value={clinicSite}
-                          onChange={(e) => setClinicSite(e.target.value)}
-                        />
+                        <div className="space-y-1">
+                          <div className="relative">
+                            <div className="history-suggestion-container">
+                              <Input
+                                id="clinic-site"
+                                placeholder="e.g., Bainbridge, Moultrie, etc."
+                                autoComplete="off"
+                                ref={clinicInputRef}
+                                value={clinicSite}
+                                onFocus={() => {
+                                  setOpenClinic(true);
+                                  clinicSiteHistory.updateQuery(clinicSite);
+                                }}
+                                onMouseDown={(event) => {
+                                  if (
+                                    document.activeElement === event.currentTarget &&
+                                    event.currentTarget.value.trim() === ''
+                                  ) {
+                                    event.preventDefault();
+                                    setOpenClinic((prev) => {
+                                      const next = !prev;
+                                      if (next) {
+                                        clinicSiteHistory.updateQuery(event.currentTarget.value);
+                                      }
+                                      return next;
+                                    });
+                                  }
+                                }}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  setClinicSite(value);
+                                  clinicSiteHistory.updateQuery(value);
+                                  if (!openClinic) setOpenClinic(true);
+                                }}
+                              />
+                              {openClinic && clinicSiteHistory.suggestions.length > 0 && (
+                                <ul className="absolute z-50 mt-1 w-full max-h-48 overflow-auto rounded-md border bg-popover text-sm shadow" role="listbox">
+                                  {clinicSiteHistory.suggestions.map((s) => (
+                                    <li key={s.value}>
+                                      <button
+                                        type="button"
+                                        className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-muted"
+                                        onClick={() => {
+                                          setClinicSite(s.value);
+                                          clinicSiteHistory.recordValue(s.value);
+                                          clinicSiteHistory.updateQuery(s.value);
+                                          setOpenClinic(false);
+                                        }}
+                                      >
+                                        <span>{s.value}</span>
+                                        <span
+                                          className="text-xs text-muted-foreground hover:text-destructive"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            clinicSiteHistory.clearEntry(s.value);
+                                            clinicSiteHistory.updateQuery(clinicSite);
+                                          }}
+                                        >
+                                          Clear
+                                        </span>
+                                      </button>
+                                    </li>
+                                  ))}
+                                  <li className="border-t">
+                                    <button
+                                      type="button"
+                                      className="w-full px-3 py-1.5 text-left text-xs text-muted-foreground hover:text-destructive hover:bg-muted"
+                                      onClick={() => {
+                                        clinicSiteHistory.clearAll();
+                                        clinicSiteHistory.updateQuery(clinicSite);
+                                      }}
+                                    >
+                                      Clear all
+                                    </button>
+                                  </li>
+                                </ul>
+                              )}
+                            </div>
+                          </div>
+                        </div>
                       </div>
 
                       {/* Notes */}
-                      <div className="space-y-2">
+                      <div className="space-y-1.5">
                         <Label htmlFor="notes">Notes</Label>
                         <Textarea
                           id="notes"
@@ -504,16 +991,14 @@ export function MedicationDetail({
                           rows={2}
                         />
                       </div>
-
+                    </form>
                       </div>
-                    </div>
-
-                    {/* Footer - Fixed */}
-                    <div className="p-6 border-t flex-shrink-0">
-                      <Button onClick={handleDispense} className="w-full">
-                        Confirm Dispensing
-                      </Button>
-                    </div>
+                      <div className="flex gap-2 py-4 border-t px-4 sm:px-6 flex-shrink-0 bg-background">
+                        <Button type="button" onClick={handleDispense} className="w-full h-9 sm:h-10 text-sm sm:text-base">
+                          
+                          Confirm Dispensing
+                        </Button>
+                      </div>
                   </DialogContent>
                 </Dialog>
               )
@@ -522,7 +1007,7 @@ export function MedicationDetail({
         </CardContent>
       </Card>
 
-      {/* Medication Details */}
+      {/* Details */}
       <div className="grid md:grid-cols-2 gap-4">
         <Card>
           <CardHeader>
@@ -539,7 +1024,18 @@ export function MedicationDetail({
             </div>
             <div>
               <Label className="text-sm font-medium">Category</Label>
-              <Badge variant="outline">{medication.category}</Badge>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {(Array.isArray(medication.category)
+                  ? medication.category
+                  : medication.category
+                  ? [medication.category as unknown as string]
+                  : []
+                ).map((cat) => (
+                  <Badge key={cat} variant="outline" className="text-xs">
+                    {cat}
+                  </Badge>
+                ))}
+              </div>
             </div>
             <div>
               <Label className="text-sm font-medium">Last Updated</Label>
@@ -552,143 +1048,106 @@ export function MedicationDetail({
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Clinical Information</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div>
-              <Label className="text-sm font-medium">Common Uses</Label>
-              <div className="flex flex-wrap gap-1 mt-1">
-                {medication.commonUses.map((use) => (
-                  <Badge key={use} variant="secondary" className="text-xs">
-                    {use}
-                  </Badge>
-                ))}
-              </div>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Package className="size-4" />
+                Inventory Details
+              </CardTitle>
+              {canEditLots && (
+                <Button variant="outline" size="sm" onClick={handleAddLot}>
+                  <Plus className="size-4 mr-1" />
+                  Add Lot
+                </Button>
+              )}
             </div>
-            <div>
-              <Label className="text-sm font-medium">Contraindications</Label>
-              <div className="space-y-1 mt-1">
-                {medication.contraindications.map((contra) => (
-                  <div key={contra} className="flex items-center gap-2">
-                    <AlertCircle className="size-3 text-amber-500" />
-                    <span className="text-sm">{contra}</span>
+          </CardHeader>
+          <CardContent>
+            {medicationInventory.length > 0 ? (
+              <div className="space-y-2">
+                {medicationInventory.map((inv) => (
+                  <div key={inv.id} className="flex items-center justify-between p-3 border rounded">
+                    <div className="flex-1">
+                      <p className="font-medium">Lot: {inv.lotNumber}</p>
+                      <p className="text-sm text-muted-foreground">Quantity: {inv.quantity} units</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <div className="flex items-center gap-1">
+                          <Clock className="size-3" />
+                          <span className="text-sm">
+                            Exp: {inv.expirationDate.toLocaleDateString()}
+                          </span>
+                        </div>
+                        {inv.isExpired && (
+                          <Badge variant="destructive" className="text-xs mt-1">
+                            Expired
+                          </Badge>
+                        )}
+                      </div>
+                      {canEditLots && (
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditLot(inv)}
+                            className="h-8 w-8 p-0"
+                          >
+                            <Edit2 className="size-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteLot(inv.id)}
+                            className="h-8 w-8 p-0 text-red-600 hover:text-red-600 hover:bg-red-50"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
-            </div>
+            ) : (
+              <div className="text-center py-6 text-muted-foreground">
+                <Package className="size-12 mx-auto mb-2 opacity-30" />
+                <p>No lot numbers recorded</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Inventory Details */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Package className="size-4" />
-              Inventory Details
-            </CardTitle>
-            {canEditLots && (
-              <Button variant="outline" size="sm" onClick={handleAddLot}>
-                <Plus className="size-4 mr-1" />
-                Add Lot
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {medicationInventory.length > 0 ? (
+      {/* Alternatives */}
+      {alternatives.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Alternative Medications</CardTitle>
+          </CardHeader>
+          <CardContent>
             <div className="space-y-2">
-              {medicationInventory.map((inv) => (
-                <div key={inv.id} className="flex items-center justify-between p-3 border rounded">
-                  <div className="flex-1">
-                    <p className="font-medium">Lot: {inv.lotNumber}</p>
-                    <p className="text-sm text-muted-foreground">Quantity: {inv.quantity} units</p>
+              {alternatives.map((alt) => (
+                <div
+                  key={alt.id}
+                  className="flex items-center justify-between p-3 border rounded cursor-pointer hover:bg-muted/50"
+                  onClick={() => handleAlternativeSelect(alt)}
+                >
+                  <div>
+                    <p className="font-medium">
+                      {alt.name} {alt.strength}
+                    </p>
+                    <p className="text-sm text-muted-foreground">{alt.genericName}</p>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <div className="flex items-center gap-1">
-                        <Clock className="size-3" />
-                        <span className="text-sm">
-                          Exp: {inv.expirationDate.toLocaleDateString()}
-                        </span>
-                      </div>
-                      {inv.isExpired && (
-                        <Badge variant="destructive" className="text-xs mt-1">
-                          Expired
-                        </Badge>
-                      )}
-                    </div>
-                    {canEditLots && (
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEditLot(inv)}
-                          className="h-8 w-8 p-0"
-                        >
-                          <Edit2 className="size-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteLot(inv.id)}
-                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </div>
-                    )}
+                  <div className="text-right">
+                    <p className="font-medium text-green-600">{alt.currentStock} available</p>
+                    <p className="text-xs text-muted-foreground">Click to view</p>
                   </div>
                 </div>
               ))}
             </div>
-          ) : (
-            <div className="text-center py-6 text-muted-foreground">
-              <Package className="size-12 mx-auto mb-2 opacity-30" />
-              <p>No lot numbers recorded</p>
-              {canEditLots && (
-                <Button variant="outline" size="sm" onClick={handleAddLot} className="mt-3">
-                  <Plus className="size-4 mr-1" />
-                  Add First Lot
-                </Button>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Alternatives */}
-      {(!medication.isAvailable || medication.currentStock <= medication.minStock) &&
-        alternatives.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Alternative Medications</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {alternatives.map((alt) => (
-                  <div
-                    key={alt.id}
-                    className="flex items-center justify-between p-3 border rounded cursor-pointer hover:bg-muted/50"
-                    onClick={() => onSelectAlternative(alt)}
-                  >
-                    <div>
-                      <p className="font-medium">
-                        {alt.name} {alt.strength}
-                      </p>
-                      <p className="text-sm text-muted-foreground">{alt.genericName}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium text-green-600">{alt.currentStock} available</p>
-                      <p className="text-xs text-muted-foreground">Click to view</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Lot Edit/Add Dialog */}
       {canEditLots && (
@@ -697,7 +1156,7 @@ export function MedicationDetail({
             <DialogHeader>
               <DialogTitle>{editingLot ? 'Edit Lot Number' : 'Add Lot Number'}</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 py-4">
+            <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="lot-number">Lot Number *</Label>
                 <Input
@@ -722,12 +1181,12 @@ export function MedicationDetail({
                 <Label htmlFor="lot-expiration">Expiration Date *</Label>
                 <Input
                   id="lot-expiration"
-                  type="date"
+                  type="month"
                   value={lotExpiration}
                   onChange={(e) => setLotExpiration(e.target.value)}
                 />
               </div>
-              <div className="flex justify-end gap-3 pt-4">
+              <div className="flex justify-end gap-3 mt-6">
                 <Button variant="outline" onClick={() => setIsLotDialogOpen(false)}>
                   Cancel
                 </Button>
@@ -737,6 +1196,7 @@ export function MedicationDetail({
           </DialogContent>
         </Dialog>
       )}
+      </div>
     </div>
   );
 }

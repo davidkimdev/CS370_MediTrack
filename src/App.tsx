@@ -20,6 +20,8 @@ import { MedicationService } from './services/medicationService';
 import { syncService } from './services/syncService';
 import { OfflineStore } from './utils/offlineStore';
 import { logger } from './utils/logger';
+import { showSuccessToast, showErrorToast, showProgressToast } from './utils/toastUtils';
+import { RotateCcw } from 'lucide-react';
 
 type AppSection = 'formulary' | 'dispensing' | 'inventory' | 'profile' | 'admin';
 
@@ -39,9 +41,19 @@ export default function App() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [lastLoadedMode, setLastLoadedMode] = useState<'authenticated' | 'public' | null>(null);
+  const [formularySearchTerm, setFormularySearchTerm] = useState('');
+  const [formularyCategoryFilter, setFormularyCategoryFilter] = useState<string>('all');
+  const [formularyAvailabilityFilter, setFormularyAvailabilityFilter] = useState<string>('all');
+  const [formularyCategorySearch, setFormularyCategorySearch] = useState('');
+  // State for withdrawal functionality
+  const undoDispenseMapRef = useRef<Record<string, {
+    record: DispensingRecord;
+    inventoryChange: { oldQuantity: number; inventoryId: string };
+  }>>({});
   const isLoadingDataRef = useRef(false);
   const lastLoadedModeRef = useRef<'authenticated' | 'public' | null>(null);
   const isMountedRef = useRef(true);
+  const hasLoadedForCurrentAuthRef = useRef(false);
 
   const isAdmin = profile?.role === 'admin';
 
@@ -49,6 +61,13 @@ export default function App() {
   useEffect(() => {
     console.log('🚀 App component mounted');
     isMountedRef.current = true;
+
+    // CRITICAL FIX: Reset loading flag on mount to prevent stuck "Loading..." state
+    // This can happen if page refreshes while data is loading
+    isLoadingDataRef.current = false;
+    lastLoadedModeRef.current = null;
+    hasLoadedForCurrentAuthRef.current = false;
+
     return () => {
       console.log('🛑 App component unmounting, cleaning up...');
       isMountedRef.current = false;
@@ -117,12 +136,6 @@ export default function App() {
     }
 
     const mode = authenticated ? 'authenticated' : 'public';
-    
-    // Check if already loaded in this mode (using ref to avoid stale closure)
-    if (!force && lastLoadedModeRef.current === mode) {
-      console.log(`⏸️ Already loaded in ${mode} mode, skipping...`);
-      return;
-    }
 
     isLoadingDataRef.current = true;
     setIsLoadingData(true);
@@ -217,7 +230,7 @@ export default function App() {
       setInventory(inventoryData);
       setPendingChanges(0);
       setLastLoadedMode(mode);
-      lastLoadedModeRef.current = mode; // Update ref
+      lastLoadedModeRef.current = mode;
 
       logger.info('All data loaded successfully', {
         mode,
@@ -241,18 +254,22 @@ export default function App() {
     }
   }, []);
 
-  // Reset loaded mode when auth state changes significantly
+  // Reset load flag when auth state changes
   useEffect(() => {
     if (!isLoading) {
       const currentMode = isAuthenticated ? 'authenticated' : 'public';
-      // If auth state changed, reset the ref so data reloads
+      // If auth mode changed, reset the flag so we reload
       if (lastLoadedModeRef.current !== null && lastLoadedModeRef.current !== currentMode) {
-        console.log(`🔄 Auth mode changed from ${lastLoadedModeRef.current} to ${currentMode}, resetting...`);
-        lastLoadedModeRef.current = null;
-        setLastLoadedMode(null);
+        console.log(`🔄 Auth mode changed from ${lastLoadedModeRef.current} to ${currentMode}, resetting load flag`);
+        hasLoadedForCurrentAuthRef.current = false;
+      }
+      // Also reset if we're in authenticated mode but profile isn't loaded yet
+      if (currentMode === 'authenticated' && !profile) {
+        console.log('🔄 Waiting for profile to load before marking as loaded');
+        hasLoadedForCurrentAuthRef.current = false;
       }
     }
-  }, [isLoading, isAuthenticated]);
+  }, [isLoading, isAuthenticated, profile]);
 
   // Load medications when user is authenticated
   useEffect(() => {
@@ -261,16 +278,26 @@ export default function App() {
       return;
     }
 
-    const desiredMode = isAuthenticated ? 'authenticated' : 'public';
-    // Use ref to check current mode without causing re-renders
-    if (lastLoadedModeRef.current === desiredMode) {
-      console.log(`✅ Already loaded in ${desiredMode} mode, skipping reload`);
+    // If user exists but profile isn't loaded yet, wait for it
+    if (user && !profile) {
+      console.log('⏳ Waiting for user profile to load...');
       return;
     }
 
-    console.log(`🚀 Starting to load data in ${desiredMode} mode...`);
-    void loadInitialData(isAuthenticated);
-  }, [isLoading, isAuthenticated, loadInitialData]);
+    // Prevent duplicate loads for the same auth state
+    if (hasLoadedForCurrentAuthRef.current) {
+      console.log('✅ Data already loaded for current auth state, skipping...');
+      return;
+    }
+
+    const mode = isAuthenticated ? 'authenticated' : 'public';
+    console.log(`🚀 Starting to load data in ${mode} mode...`);
+    hasLoadedForCurrentAuthRef.current = true; // Mark as loading before starting
+    void loadInitialData(isAuthenticated).catch(() => {
+      // Reset flag on error so we can retry
+      hasLoadedForCurrentAuthRef.current = false;
+    });
+  }, [isLoading, isAuthenticated, loadInitialData, user, profile]);
 
   // Safety timeout: if data loading takes too long, show error
   useEffect(() => {
@@ -298,26 +325,139 @@ export default function App() {
   };
 
   const getAlternatives = (medication: Medication): Medication[] => {
-    return medications.filter(m => 
-      medication.alternatives.includes(m.id) || 
-      m.category === medication.category && m.id !== medication.id
-    ).slice(0, 3); // Limit to 3 alternatives
+    return medications.filter((m) => {
+      if (medication.alternatives.includes(m.id)) return true;
+      const a = new Set((Array.isArray(medication.category) ? medication.category : []).map((c) => (c ?? '').trim()));
+      const b = (Array.isArray(m.category) ? m.category : []).map((c) => (c ?? '').trim());
+      const intersects = b.some((c) => a.has(c));
+      return intersects && m.id !== medication.id;
+    });
+  };
+
+  const handleUndoDispensing = async (recordId: string) => {
+    const key = String(recordId);
+    console.log('🔄 handleUndoDispensing called with recordId:', key);
+    console.log('🔎 Available undo keys:', Object.keys(undoDispenseMapRef.current));
+    try {
+      const undoEntry = undoDispenseMapRef.current[key];
+      const recentRecord = undoEntry?.record;
+      const recentChange = undoEntry?.inventoryChange;
+      
+      if (!recentRecord || !recentChange) {
+        console.error('Cannot undo: record or inventory change not found', {
+          recentRecord,
+          recentChange,
+          undoMap: undoDispenseMapRef.current,
+        });
+        showErrorToast('Undo window expired or data unavailable.');
+        return;
+      }
+
+      // Delete the dispensing record from database
+      await MedicationService.deleteDispensingRecord(recordId);
+      
+      // Restore inventory quantity
+      await MedicationService.updateInventoryItem(recentChange.inventoryId, { 
+        quantity: recentChange.oldQuantity 
+      });
+
+      // Update local state
+  setDispensingRecords((prev) => prev.filter((rec) => String(rec.id) !== key));
+      
+      // Restore medication stock
+      setMedications((prev) =>
+        prev.map((med) =>
+          med.id === recentRecord.medicationId
+            ? {
+                ...med,
+                currentStock: med.currentStock + recentRecord.quantity,
+                isAvailable: true,
+                lastUpdated: new Date(),
+              }
+            : med,
+        ),
+      );
+      
+      // Restore inventory
+      setInventory((prev) =>
+        prev.map((inv) =>
+          inv.id === recentChange.inventoryId
+            ? { ...inv, quantity: recentChange.oldQuantity }
+            : inv,
+        ),
+      );
+
+      // Clean up tracking
+      delete undoDispenseMapRef.current[key];
+
+      showSuccessToast('Dispensing successfully withdrawn');
+      console.log('✅ Dispensing successfully withdrawn');
+    } catch (error) {
+      console.error('Error withdrawing dispensing:', error);
+      showErrorToast('Failed to withdraw dispensing. Please contact support.');
+    }
   };
 
   const handleDispense = async (record: Omit<DispensingRecord, "id">) => {
+    console.log('🎯 handleDispense called with:', record);
+    // We'll store progress reference to fail gracefully
+    let progress: ReturnType<typeof showProgressToast> | null = null;
     try {
       if (navigator.onLine) {
-        // Online: write-through to server then update local/cache
-        const newRecord = await MedicationService.createDispensingRecord(record);
-        setDispensingRecords((prev: DispensingRecord[]) => [newRecord, ...prev]);
+        // Online: show progress immediately for perceived speed
+        progress = showProgressToast({
+          title: 'Dispensing…',
+          description: 'Writing record and updating inventory',
+          initialProgress: 8,
+        });
+
+        let newRecord: DispensingRecord | null = null;
+        // Attempt fast path first; fall back if it errors (e.g., foreign key constraint)
+        try {
+          newRecord = await MedicationService.createDispensingRecordFast(
+            record,
+            currentUser?.id,
+          );
+        } catch (fastErr) {
+          console.warn('⚠️ Fast path failed, falling back to standard create:', fastErr);
+          try {
+            newRecord = await MedicationService.createDispensingRecord(record);
+          } catch (standardErr) {
+            throw standardErr; // bubble to outer catch
+          }
+        }
+
+        if (!newRecord) throw new Error('Record creation returned null');
+  progress && progress.update(40);
+        console.log('🧾 New dispensing record created with id:', newRecord.id);
+        setDispensingRecords((prev: DispensingRecord[]) => [newRecord!, ...prev]);
 
         // Update inventory lot quantity in database
         const inventoryLot = inventory.find(
           (inv) => inv.lotNumber === record.lotNumber && inv.medicationId === record.medicationId,
         );
         if (inventoryLot) {
+          const oldQuantity = inventoryLot.quantity;
           const newQuantity = Math.max(0, inventoryLot.quantity - record.quantity);
           await MedicationService.updateInventoryItem(inventoryLot.id, { quantity: newQuantity });
+          progress && progress.update(62);
+          
+          // Track for withdrawal functionality
+          const recordKey = String(newRecord.id);
+          undoDispenseMapRef.current = {
+            ...undoDispenseMapRef.current,
+            [recordKey]: {
+              record: newRecord,
+              inventoryChange: { oldQuantity, inventoryId: inventoryLot.id },
+            },
+          };
+          console.log('💾 Stored undo data for', recordKey, 'current keys:', Object.keys(undoDispenseMapRef.current));
+
+          // Auto-cleanup after 10 seconds
+          setTimeout(() => {
+            delete undoDispenseMapRef.current[recordKey];
+            console.log('⏰ Undo window expired for', recordKey);
+          }, 10000);
         }
 
         // Update local state
@@ -345,6 +485,34 @@ export default function App() {
               : inv,
           ),
         );
+        
+        // Show success toast with withdrawal option (with slight delay)
+        const medication = medications.find(m => m.id === record.medicationId);
+        // Show success toast with withdrawal option and navigate back to formulary
+        setTimeout(() => {
+          const medication = medications.find(m => m.id === record.medicationId);
+          const recordKey = String(newRecord.id);
+          progress && progress.update(88);
+          // Dismiss progress to avoid duplicate success toast.
+          progress && progress.dismiss();
+          showSuccessToast(
+            `${medication?.name || 'Medication'} dispensed successfully`,
+            undefined,
+            {
+              label: 'Withdraw',
+              icon: <RotateCcw className="h-3 w-3" />,
+              onClick: () => {
+                console.log('🖱️ Withdraw button clicked! Record ID:', recordKey);
+                handleUndoDispensing(recordKey);
+              },
+            }
+          );
+          console.log('🎉 Success toast with withdrawal displayed');
+          
+          // Navigate back to formulary after successful dispensing
+          setCurrentView('formulary');
+          setSelectedMedication(null);
+        }, 100);
       } else {
         // Offline: queue and update local stock/cache immediately
         await syncService.queueOfflineDispense(record);
@@ -366,9 +534,26 @@ export default function App() {
           id: `temp-${Date.now()}`, // Temporary ID for offline records
         };
         setDispensingRecords((prev: DispensingRecord[]) => [tempRecord, ...prev]);
+        
+        // Show success toast for offline dispensing and navigate back
+        const medication = medications.find(m => m.id === record.medicationId);
+        showSuccessToast(
+          `${medication?.name || 'Medication'} dispensed (offline - will sync when online)`
+        );
+        
+        // Navigate back to formulary after successful offline dispensing
+        setTimeout(() => {
+          setCurrentView('formulary');
+          setSelectedMedication(null);
+        }, 100);
       }
     } catch (error) {
       console.error('Error dispensing medication:', error);
+      if (progress) {
+        progress.fail(error instanceof Error ? error.message : 'Unknown error');
+      } else {
+        showErrorToast('Failed to dispense medication. Please try again.', error instanceof Error ? error.message : undefined);
+      }
     }
   };
 
@@ -516,6 +701,8 @@ export default function App() {
     return baseSections;
   }, [isAdmin]);
 
+  const mobileNavButtonBaseClasses = 'justify-start gap-2 transition-all w-full text-sm';
+
   const tabValue = navigationSections.some(({ key }) => key === activeSection)
     ? activeSection
     : '__none';
@@ -538,9 +725,18 @@ export default function App() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
+        <div className="text-center space-y-4">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading...</p>
+          <p className="text-xs text-muted-foreground">
+            If this takes more than a few seconds, try{' '}
+            <button
+              onClick={() => window.location.reload()}
+              className="underline hover:text-primary"
+            >
+              refreshing the page
+            </button>
+          </p>
         </div>
       </div>
     );
@@ -550,7 +746,7 @@ export default function App() {
     return (
       <div className="min-h-screen bg-background flex flex-col">
         <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="container mx-auto px-4 py-8 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="size-8 bg-primary rounded-lg flex items-center justify-center">
                 <Pill className="size-4 text-primary-foreground" />
@@ -589,6 +785,8 @@ export default function App() {
 
   // Show detail view if medication is selected
   if (currentView === 'detail' && selectedMedication) {
+    console.log('🔐 Authentication status when rendering MedicationDetail:', { isAuthenticated, user: !!user, profile: !!profile });
+    console.log('📋 onDispense prop will be:', isAuthenticated ? 'handleDispense function' : 'undefined');
     return (
       <MedicationDetail
         medication={selectedMedication}
@@ -609,19 +807,19 @@ export default function App() {
 
   // Show main app layout
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #e8f0f7 100%)' }}>
       {/* Header */}
-      <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-4">
+      <header className="border-b border-slate-200/60 bg-white/80 backdrop-blur-md sticky top-0 z-50 shadow-sm">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
           {/* Logo */}
-          <div className="flex items-center gap-2">
-            <div className="size-8 bg-primary rounded-lg flex items-center justify-center">
-              <Pill className="size-4 text-primary-foreground" />
+          <div className="flex items-center gap-3">
+            <div className="size-12 bg-gradient-to-br from-blue-600 to-blue-500 rounded-xl flex items-center justify-center shadow-lg pill-icon-animated relative">
+              <Pill className="size-6 text-white pill-icon-spin" style={{ strokeWidth: 2.5 }} />
             </div>
             <div>
-              <h1 className="text-lg font-semibold">EFWP Formulary</h1>
+              <h1 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-teal-500 bg-clip-text text-transparent">EFWP Formulary</h1>
               {!isAuthenticated && (
-                <p className="text-xs text-muted-foreground">Viewing limited access</p>
+                <p className="text-xs text-slate-500">Viewing limited access</p>
               )}
             </div>
           </div>
@@ -698,14 +896,19 @@ export default function App() {
 
                             return (
                               <SheetClose asChild key={key}>
-                                <Button
-                                  variant={isActive ? 'secondary' : 'ghost'}
-                                  size="sm"
-                                  className={`justify-start gap-2 ${isRestricted ? 'opacity-70' : ''}`}
-                                  disabled={isRestricted}
-                                  onClick={() => handleSectionChange(key)}
-                                  title={isRestricted ? 'Log in to access this area' : undefined}
-                                >
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                data-mobile-nav-button="true"
+                                data-active={isActive}
+                                className={cn(
+                                  mobileNavButtonBaseClasses,
+                                  isRestricted && 'opacity-70 pointer-events-none',
+                                )}
+                                disabled={isRestricted}
+                                onClick={() => handleSectionChange(key)}
+                                title={isRestricted ? 'Log in to access this area' : undefined}
+                              >
                                   <Icon className="size-4" />
                                   {label}
                                 </Button>
@@ -715,9 +918,11 @@ export default function App() {
                           {isAdmin && (
                             <SheetClose asChild>
                               <Button
-                                variant={activeSection === 'admin' ? 'secondary' : 'ghost'}
+                                variant="ghost"
                                 size="sm"
-                                className="justify-start gap-2"
+                                data-mobile-nav-button="true"
+                                data-active={activeSection === 'admin'}
+                                className={mobileNavButtonBaseClasses}
                                 onClick={() => handleSectionChange('admin')}
                               >
                                 <ShieldCheck className="size-4" />
@@ -727,9 +932,11 @@ export default function App() {
                           )}
                           <SheetClose asChild>
                             <Button
-                              variant={activeSection === 'profile' ? 'secondary' : 'ghost'}
+                              variant="ghost"
                               size="sm"
-                              className="justify-start gap-2"
+                              data-mobile-nav-button="true"
+                              data-active={activeSection === 'profile'}
+                              className={mobileNavButtonBaseClasses}
                               onClick={() => handleSectionChange('profile')}
                             >
                               <User className="size-4" />
@@ -791,7 +998,7 @@ export default function App() {
           onValueChange={(value) => handleSectionChange(value as AppSection)}
           className="w-full"
         >
-          <TabsList className="w-full flex flex-wrap justify-start gap-2">
+          <TabsList className="w-full grid grid-cols-3 h-auto p-1">
             {navigationSections.map(({ key, label, icon: Icon, requiresAuth }) => {
               const isRestricted = requiresAuth && !isAuthenticated;
 
@@ -799,12 +1006,12 @@ export default function App() {
                 <TabsTrigger
                   key={key}
                   value={key}
-                  className={`flex items-center gap-2 ${isRestricted ? 'opacity-70' : ''}`}
+                  className={`flex items-center gap-1.5 px-2 py-2 text-xs sm:text-sm ${isRestricted ? 'opacity-70' : ''}`}
                   disabled={isRestricted}
                   title={isRestricted ? 'Log in to access this area' : undefined}
                 >
-                  <Icon className="size-4" />
-                  <span>{label}</span>
+                  <Icon className="size-4 flex-shrink-0" />
+                  <span className="truncate">{label}</span>
                 </TabsTrigger>
               );
             })}
@@ -826,6 +1033,14 @@ export default function App() {
               <FormularyView
                 medications={medications}
                 onMedicationSelect={handleMedicationSelect}
+                searchTerm={formularySearchTerm}
+                onSearchTermChange={setFormularySearchTerm}
+                categoryFilter={formularyCategoryFilter}
+                onCategoryFilterChange={setFormularyCategoryFilter}
+                availabilityFilter={formularyAvailabilityFilter}
+                onAvailabilityFilterChange={setFormularyAvailabilityFilter}
+                categorySearchTerm={formularyCategorySearch}
+                onCategorySearchTermChange={setFormularyCategorySearch}
               />
             )}
 

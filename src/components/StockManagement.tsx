@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -7,6 +7,13 @@ import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+import { ScrollArea, ScrollBar } from './ui/scroll-area';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu';
 import {
   AlertTriangle,
   CheckCircle,
@@ -45,6 +52,8 @@ export function StockManagement({
 }: StockManagementProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [activeCategory, setActiveCategory] = useState<string>('All');
+  const [categorySearch, setCategorySearch] = useState<string>('');
   const [selectedMedication, setSelectedMedication] = useState<Medication | null>(null);
   const [newQuantity, setNewQuantity] = useState('');
   const [updateReason, setUpdateReason] = useState('');
@@ -78,12 +87,16 @@ export function StockManagement({
     let filtered = medications;
 
     if (searchTerm) {
-      filtered = filtered.filter(
-        (med) =>
-          med.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          med.genericName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          med.category.toLowerCase().includes(searchTerm.toLowerCase()),
-      );
+      const q = searchTerm.toLowerCase();
+      filtered = filtered.filter((med) => {
+        const cats = Array.isArray(med.category) ? med.category : [];
+        const catsText = cats.join(' ').toLowerCase();
+        return (
+          med.name.toLowerCase().includes(q) ||
+          med.genericName.toLowerCase().includes(q) ||
+          catsText.includes(q)
+        );
+      });
     }
 
     if (statusFilter !== 'all') {
@@ -114,6 +127,75 @@ export function StockManagement({
       return a.name.localeCompare(b.name);
     });
   }, [medications, searchTerm, statusFilter]);
+
+  // Derive category lists from medications
+  const allCategories = useMemo(() => {
+    const set = new Set<string>();
+    for (const med of medications) {
+      const cats = Array.isArray(med.category) ? med.category : [];
+      for (const c of cats) {
+        const v = (c ?? '').trim();
+        if (v) set.add(v);
+      }
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [medications]);
+
+  const visibleCategories = useMemo(() => {
+    if (!categorySearch) return allCategories;
+    const q = categorySearch.toLowerCase();
+    return allCategories.filter((c) => c.toLowerCase().includes(q));
+  }, [allCategories, categorySearch]);
+
+  // Category counts based on filteredMedications (before category filter)
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const m of filteredMedications) {
+      const cats = Array.isArray(m.category) ? m.category : [];
+      for (const c of cats) {
+        const v = (c ?? '').trim();
+        if (!v) continue;
+        counts.set(v, (counts.get(v) || 0) + 1);
+      }
+    }
+    return counts;
+  }, [filteredMedications]);
+
+  const sortedVisibleCategories = useMemo(() => {
+    return [...visibleCategories].sort((a, b) => {
+      const ca = categoryCounts.get(a) || 0;
+      const cb = categoryCounts.get(b) || 0;
+      if (cb !== ca) return cb - ca;
+      return a.localeCompare(b);
+    });
+  }, [visibleCategories, categoryCounts]);
+
+  const INLINE_LIMIT = 10;
+  const topCategories = useMemo(
+    () => sortedVisibleCategories.slice(0, INLINE_LIMIT),
+    [sortedVisibleCategories],
+  );
+  const overflowCategories = useMemo(
+    () => sortedVisibleCategories.slice(INLINE_LIMIT),
+    [sortedVisibleCategories],
+  );
+  const ensureSelectedChip =
+    activeCategory !== 'All' && !topCategories.includes(activeCategory);
+
+  useEffect(() => {
+    if (activeCategory !== 'All' && !visibleCategories.includes(activeCategory)) {
+      setActiveCategory('All');
+    }
+  }, [visibleCategories, activeCategory]);
+
+  const visibleMedications = useMemo(() => {
+    if (activeCategory === 'All') return filteredMedications;
+    return filteredMedications.filter((m) =>
+      (Array.isArray(m.category) ? m.category : [])
+        .map((c) => (c ?? '').trim())
+        .includes(activeCategory),
+    );
+  }, [filteredMedications, activeCategory]);
 
   const medicationLots = useMemo(() => {
     if (!selectedMedication) return [] as InventoryItem[];
@@ -252,28 +334,26 @@ export function StockManagement({
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Stock Management</h1>
-        <div className="flex items-center gap-3">
-          <Button
-            variant="default"
-            onClick={() => {
-              setSelectedMedicationForLot(null);
-              setIsAddLotDialogOpen(true);
-            }}
-            className="gap-2"
-          >
-            <Plus className="size-4" />
-            Add New Lot
-          </Button>
-          <Button variant="default" onClick={() => setIsImportDialogOpen(true)} className="gap-2">
-            <Upload className="size-4" />
-            Bulk Import
-          </Button>
-          <Badge variant="outline" className="text-sm">
-            Pharmacy Staff Access
-          </Badge>
-        </div>
+      <div className="flex flex-col gap-2">
+        <Button
+          variant="default"
+          onClick={() => {
+            setSelectedMedicationForLot(null);
+            setIsAddLotDialogOpen(true);
+          }}
+          className="gap-2 w-full"
+        >
+          <Plus className="size-4 flex-shrink-0" />
+          <span className="truncate">Add New Lot</span>
+        </Button>
+        <Button
+          variant="default"
+          onClick={() => setIsImportDialogOpen(true)}
+          className="gap-2 w-full"
+        >
+          <Upload className="size-4 flex-shrink-0" />
+          <span className="truncate">Bulk Import</span>
+        </Button>
       </div>
 
       {/* Summary Cards */}
@@ -345,6 +425,82 @@ export function StockManagement({
         </Select>
       </div>
 
+      {/* Category Search + Chips */}
+      <div className="space-y-3">
+        <div className="relative w-full md:w-80">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+          <Input
+            placeholder="Search categories..."
+            value={categorySearch}
+            onChange={(e) => setCategorySearch(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+
+        <div className="w-full flex items-center gap-2">
+          <div className="flex-1 min-w-0">
+            <div className="w-full overflow-x-auto whitespace-nowrap">
+              <div className="inline-flex items-center gap-1 pr-24 sm:pr-28">
+                <Button
+                  variant={activeCategory === 'All' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setActiveCategory('All')}
+                >
+                  All
+                </Button>
+                {topCategories.map((cat) => (
+                  <Button
+                    key={cat}
+                    variant={activeCategory === cat ? 'default' : 'outline'}
+                    size="sm"
+                    title={cat}
+                    onClick={() => setActiveCategory(cat)}
+                  >
+                    {cat}
+                    {categoryCounts.get(cat) ? (
+                      <span className="ml-1 text-[10px] opacity-70">{categoryCounts.get(cat)}</span>
+                    ) : null}
+                  </Button>
+                ))}
+                {ensureSelectedChip && activeCategory !== 'All' && (
+                  <Button
+                    key={`sel-${activeCategory}`}
+                    variant={'default'}
+                    size="sm"
+                    title={activeCategory}
+                    onClick={() => setActiveCategory(activeCategory)}
+                  >
+                    {activeCategory}
+                    {categoryCounts.get(activeCategory) ? (
+                      <span className="ml-1 text-[10px] opacity-70">{categoryCounts.get(activeCategory)}</span>
+                    ) : null}
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+          {overflowCategories.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="ml-1 h-8 whitespace-nowrap">
+                  More +{overflowCategories.length}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="max-h-80 overflow-auto">
+                {overflowCategories.map((cat) => (
+                  <DropdownMenuItem key={cat} onClick={() => setActiveCategory(cat)}>
+                    <span className="mr-2">{cat}</span>
+                    {categoryCounts.get(cat) ? (
+                      <span className="ml-auto text-xs opacity-70">{categoryCounts.get(cat)}</span>
+                    ) : null}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
+      </div>
+
       {/* Stock Table */}
       <Card>
         <CardContent className="p-0">
@@ -362,7 +518,7 @@ export function StockManagement({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredMedications.map((medication) => {
+                {visibleMedications.map((medication) => {
                   const stockStatus = getStockStatus(medication);
                   const StatusIcon = stockStatus.icon;
 
@@ -377,9 +533,15 @@ export function StockManagement({
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="text-xs">
-                          {medication.category}
-                        </Badge>
+                        <div className="flex flex-wrap gap-1">
+                          {(Array.isArray(medication.category) ? medication.category : []).map(
+                            (cat) => (
+                              <Badge key={cat} variant="outline" className="text-xs">
+                                {cat}
+                              </Badge>
+                            ),
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">

@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Badge } from './ui/badge';
 import { Package, AlertCircle } from 'lucide-react';
 import { cn } from './ui/utils';
 import { Medication, InventoryItem } from '../types/medication';
@@ -28,26 +29,28 @@ export function AddLotDialog({
   const [newMedName, setNewMedName] = useState('');
   const [newMedStrength, setNewMedStrength] = useState('');
   const [newMedDosageForm, setNewMedDosageForm] = useState('tablet');
+  const [newMedCategoriesText, setNewMedCategoriesText] = useState('');
   const [lotNumber, setLotNumber] = useState('');
   const [quantity, setQuantity] = useState('');
   const [expirationDate, setExpirationDate] = useState<Date | undefined>(undefined);
   const [expYear, setExpYear] = useState<number | undefined>();
   const [expMonth, setExpMonth] = useState<number | undefined>();
-  const [expDay, setExpDay] = useState<number | undefined>();
+  //const [expDay, setExpDay] = useState<number | undefined>();
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Update expirationDate when year, month, or day changes
   useEffect(() => {
-    if (expYear && expMonth && expDay) {
+    if (expYear && expMonth) {
       // Create date in UTC to avoid timezone issues
-      const newDate = new Date(Date.UTC(expYear, expMonth - 1, expDay));
+      const lastDay = new Date(Date.UTC(expYear, expMonth, 0)).getUTCDate();
+      const newDate = new Date(Date.UTC(expYear, expMonth - 1, lastDay));
       setExpirationDate(newDate);
     } else {
       setExpirationDate(undefined);
     }
-  }, [expYear, expMonth, expDay]);
+  }, [expYear, expMonth]);
 
   // Reset form when dialog opens/closes or medication changes
   useEffect(() => {
@@ -57,16 +60,50 @@ export function AddLotDialog({
       setNewMedName('');
       setNewMedStrength('');
       setNewMedDosageForm('tablet');
+      setNewMedCategoriesText('');
       setLotNumber('');
       setQuantity('');
       setExpirationDate(undefined);
       setExpYear(undefined);
       setExpMonth(undefined);
-      setExpDay(undefined);
+      //setExpDay(undefined);
       setNotes('');
       setErrors({});
     }
   }, [open, medication]);
+
+  // Build category suggestions from existing medications
+  const allCategories = useMemo(() => {
+    const set = new Set<string>();
+    for (const m of medications) {
+      const cats = Array.isArray(m.category) ? m.category : [];
+      for (const c of cats) {
+        const v = (c ?? '').trim();
+        if (v) set.add(v);
+      }
+    }
+    return Array.from(set).sort();
+  }, [medications]);
+
+  const currentCats = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          newMedCategoriesText
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean),
+        ),
+      ),
+    [newMedCategoriesText],
+  );
+
+  const toggleCategory = (cat: string) => {
+    const set = new Set(currentCats);
+    if (set.has(cat)) set.delete(cat);
+    else set.add(cat);
+    setNewMedCategoriesText(Array.from(set).join(', '));
+  };
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -115,10 +152,12 @@ export function AddLotDialog({
           return;
         }
         const { MedicationService } = await import('../services/medicationService');
+        const parsedCats = Array.from(new Set(newMedCategoriesText.split(',').map(s => s.trim()).filter(Boolean)));
         const created = await MedicationService.createMedication({
           name: newMedName.trim(),
           strength: newMedStrength.trim(),
           dosageForm: newMedDosageForm,
+          categories: parsedCats.length ? parsedCats : undefined,
           isActive: true,
         });
         medicationId = created.id;
@@ -257,6 +296,33 @@ export function AddLotDialog({
                     </SelectContent>
                   </Select>
                 </div>
+                {/* Categories input + suggestions */}
+                <div className="space-y-2 sm:col-span-3">
+                  <Label htmlFor="new-med-categories">Categories</Label>
+                  <Input
+                    id="new-med-categories"
+                    value={newMedCategoriesText}
+                    onChange={(e) => setNewMedCategoriesText(e.target.value)}
+                    placeholder="Comma-separated, e.g., Antibiotic, Pediatric"
+                  />
+                  {allCategories.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {allCategories.map((cat) => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => toggleCategory(cat)}
+                          className="focus:outline-none"
+                          title={`Toggle ${cat}`}
+                        >
+                          <Badge variant={currentCats.includes(cat) ? 'default' : 'outline'} className="text-xs">
+                            {cat}
+                          </Badge>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -364,27 +430,6 @@ export function AddLotDialog({
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1">
-                <Select
-                  value={expDay?.toString()}
-                  onValueChange={(v: string) => setExpDay(parseInt(v))}
-                  disabled={!expYear || !expMonth}
-                >
-                  <SelectTrigger className={cn(errors.expirationDate && 'border-red-500')}>
-                    <SelectValue placeholder="Day" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from(
-                      { length: new Date(expYear || 0, expMonth || 0, 0).getDate() },
-                      (_, i) => i + 1,
-                    ).map((day) => (
-                      <SelectItem key={day} value={day.toString()}>
-                        {day}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
             </div>
             {errors.expirationDate && (
               <p className="text-sm text-red-500 flex items-center gap-1">
@@ -416,7 +461,7 @@ export function AddLotDialog({
           )}
 
           {/* Actions */}
-          <div className="flex gap-2 pt-4">
+          <div className="flex gap-2 mt-6">
             <Button onClick={handleSubmit} disabled={isSubmitting} className="flex-1">
               {isSubmitting ? 'Adding...' : 'Add Lot'}
             </Button>
