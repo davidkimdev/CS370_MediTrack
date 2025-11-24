@@ -3,6 +3,27 @@ import { Medication, InventoryItem, DispensingRecord, User } from '../types/medi
 import { toESTDateString, logDateToUTCNoon } from '../utils/timezone';
 import { logger } from '../utils/logger';
 
+const derivePatientInitials = (stored?: string | null, patientId?: string | null): string | undefined => {
+  const normalizedStored = stored?.trim();
+  if (normalizedStored && normalizedStored.length > 0) {
+    return normalizedStored.toUpperCase();
+  }
+  if (!patientId) return undefined;
+  const letterSegments = patientId
+    .split(/[\s-]+/)
+    .map((segment) => segment.replace(/[^A-Za-z]/g, ''))
+    .filter((segment) => segment.length > 0);
+  if (letterSegments.length >= 2) {
+    return `${letterSegments[0].charAt(0).toUpperCase()}.${letterSegments[1]
+      .charAt(0)
+      .toUpperCase()}.`;
+  }
+  if (letterSegments.length === 1) {
+    return `${letterSegments[0].charAt(0).toUpperCase()}.`;
+  }
+  return undefined;
+};
+
 export class MedicationService {
   // Medications
   static async getAllMedications(): Promise<Medication[]> {
@@ -81,7 +102,9 @@ export class MedicationService {
     return (
       medications?.map((med: any) => {
         const inventoryStats = inventoryMap.get(med.id);
-        const totalStock = inventoryStats?.quantity || 0;
+        const totalStock =
+          inventoryStats?.quantity ??
+          (typeof med.current_stock === 'number' ? med.current_stock : 0);
         const lastUpdatedSource =
           inventoryStats?.lastUpdated ||
           med.last_updated ||
@@ -89,26 +112,41 @@ export class MedicationService {
           med.created_at ||
           new Date().toISOString();
 
+        const normalizeStringArray = (value: unknown, fallback: string[] = []) => {
+          if (Array.isArray(value)) {
+            return (value as unknown[])
+              .map((item) => (typeof item === 'string' ? item.trim() : String(item ?? '').trim()))
+              .filter(Boolean);
+          }
+          if (typeof value === 'string' && value.trim().length > 0) {
+            return [value.trim()];
+          }
+          return fallback;
+        };
+
+        const minStock =
+          typeof med.min_stock === 'number'
+            ? med.min_stock
+            : typeof med.low_stock_threshold === 'number'
+              ? med.low_stock_threshold
+              : 0;
+        const maxStock = typeof med.max_stock === 'number' ? med.max_stock : 0;
+
         return {
           id: med.id,
           name: med.name,
-          genericName: med.name,
+          genericName: med.generic_name || med.name,
           strength: med.strength || '',
           dosageForm: med.dosage_form || 'tablet',
-          // Normalize category to string[] (text[] in DB); fallback to ['General']
-          category: Array.isArray(med.category)
-            ? (med.category as string[]).map((c) => (c ?? '').trim()).filter(Boolean)
-            : med.category
-            ? [String(med.category).trim()]
-            : ['General'],
+          category: normalizeStringArray(med.category, ['General']),
           currentStock: totalStock,
-          minStock: 20,
-          maxStock: 100,
-          isAvailable: med.is_active && totalStock > 0,
+          minStock,
+          maxStock,
+          isAvailable: (med.is_available ?? med.is_active ?? true) && totalStock > 0,
           lastUpdated: new Date(lastUpdatedSource),
-          alternatives: [],
-          commonUses: [],
-          contraindications: [],
+          alternatives: normalizeStringArray(med.alternatives),
+          commonUses: normalizeStringArray(med.common_uses),
+          contraindications: normalizeStringArray(med.contraindications),
         };
       }) || []
     );
@@ -396,6 +434,7 @@ export class MedicationService {
           medicationId: record.medication_id || record.medication_name || '',
           medicationName: record.medication_name,
           patientId: record.patient_id || '',
+          patientInitials: derivePatientInitials(record.patient_initials, record.patient_id),
           
     
 
@@ -462,6 +501,7 @@ export class MedicationService {
       medicationId: data.medication_id || data.medication_name,
       medicationName: data.medication_name,
       patientId: data.patient_id,
+        patientInitials: derivePatientInitials(data.patient_initials, data.patient_id),
       quantity: (() => {
         const raw = data.amount_dispensed;
         const s = raw === null || raw === undefined ? '' : String(raw);
@@ -536,6 +576,7 @@ export class MedicationService {
       medicationId: record.medicationId,
       medicationName: data.medication_name,
       patientId: data.patient_id,
+      patientInitials: record.patientInitials || derivePatientInitials(data.patient_initials, data.patient_id),
       quantity: record.quantity,
       dose: data.dose_instructions,
       lotNumber: record.lotNumber || '',
@@ -600,11 +641,7 @@ export class MedicationService {
       medicationId: record.medicationId,
       medicationName: data.medication_name,
       patientId: data.patient_id,
-      patientInitials:
-        data.patient_id?.split('-')[0] +
-        '.' +
-        (data.patient_id?.split('-')[1]?.slice(0, 1) || '') +
-        '.',
+      patientInitials: record.patientInitials || derivePatientInitials(data.patient_initials, data.patient_id),
       quantity: record.quantity,
       dose: data.dose_instructions,
       lotNumber: record.lotNumber || '',

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -50,6 +50,8 @@ export function StockManagement({
   onAddLot,
   onDeleteMedication,
 }: StockManagementProps) {
+  const [medicationList, setMedicationList] = useState<Medication[]>(medications);
+  const [inventoryList, setInventoryList] = useState<InventoryItem[]>(inventory);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [activeCategory, setActiveCategory] = useState<string>('All');
@@ -66,6 +68,27 @@ export function StockManagement({
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [medicationToDelete, setMedicationToDelete] = useState<Medication | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    setMedicationList(medications);
+  }, [medications]);
+
+  useEffect(() => {
+    setInventoryList(inventory);
+  }, [inventory]);
+
+  const refreshMedicationAndInventory = useCallback(async () => {
+    try {
+      const [latestMeds, latestInventory] = await Promise.all([
+        MedicationService.getAllMedications(),
+        MedicationService.getAllInventory(),
+      ]);
+      setMedicationList(latestMeds);
+      setInventoryList(latestInventory);
+    } catch (error) {
+      console.error('Failed to refresh medication or inventory data:', error);
+    }
+  }, []);
 
   const statusOptions = [
     { value: 'all', label: 'All Items' },
@@ -84,7 +107,7 @@ export function StockManagement({
   ];
 
   const filteredMedications = useMemo(() => {
-    let filtered = medications;
+    let filtered = medicationList;
 
     if (searchTerm) {
       const q = searchTerm.toLowerCase();
@@ -126,12 +149,12 @@ export function StockManagement({
 
       return a.name.localeCompare(b.name);
     });
-  }, [medications, searchTerm, statusFilter]);
+  }, [medicationList, searchTerm, statusFilter]);
 
   // Derive category lists from medications
   const allCategories = useMemo(() => {
     const set = new Set<string>();
-    for (const med of medications) {
+    for (const med of medicationList) {
       const cats = Array.isArray(med.category) ? med.category : [];
       for (const c of cats) {
         const v = (c ?? '').trim();
@@ -139,7 +162,7 @@ export function StockManagement({
       }
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [medications]);
+  }, [medicationList]);
 
   const visibleCategories = useMemo(() => {
     if (!categorySearch) return allCategories;
@@ -199,10 +222,10 @@ export function StockManagement({
 
   const medicationLots = useMemo(() => {
     if (!selectedMedication) return [] as InventoryItem[];
-    return inventory
+    return inventoryList
       .filter((lot) => lot.medicationId === selectedMedication.id)
       .sort((a, b) => a.expirationDate.getTime() - b.expirationDate.getTime());
-  }, [inventory, selectedMedication]);
+  }, [inventoryList, selectedMedication]);
 
   const selectedLot = useMemo(() => {
     if (!selectedLotId) return null;
@@ -236,7 +259,7 @@ export function StockManagement({
       return;
     }
 
-    const lotExists = inventory.some((item) => item.id === selectedLotId);
+    const lotExists = inventoryList.some((item) => item.id === selectedLotId);
     if (!lotExists) {
       console.log('Selected inventory lot not found');
       return;
@@ -260,7 +283,7 @@ export function StockManagement({
   const openUpdateDialog = (medication: Medication) => {
     setSelectedMedication(medication);
     setSelectedMedicationForLot(medication);
-    const medLots = inventory
+    const medLots = inventoryList
       .filter((lot) => lot.medicationId === medication.id)
       .sort((a, b) => a.expirationDate.getTime() - b.expirationDate.getTime());
     const defaultLot = medLots[0];
@@ -290,9 +313,8 @@ export function StockManagement({
         alert(
           `Successfully imported ${result.success} items!\n${result.failed > 0 ? `Failed: ${result.failed} items` : ''}`,
         );
-
-        // Refresh the page to show updated inventory
-        window.location.reload();
+        await refreshMedicationAndInventory();
+        setIsImportDialogOpen(false);
       } else {
         alert(`Import failed. ${result.errors.join('\n')}`);
       }
@@ -310,8 +332,14 @@ export function StockManagement({
       await onDeleteMedication(medicationToDelete.id);
       setIsDeleteDialogOpen(false);
       setMedicationToDelete(null);
-      // Refresh the page to show updated list
-      window.location.reload();
+      setMedicationList((prev) => prev.filter((med) => med.id !== medicationToDelete.id));
+      setInventoryList((prev) => prev.filter((lot) => lot.medicationId !== medicationToDelete.id));
+      if (selectedMedication?.id === medicationToDelete.id) {
+        setSelectedMedication(null);
+      }
+      if (selectedMedicationForLot?.id === medicationToDelete.id) {
+        setSelectedMedicationForLot(null);
+      }
     } catch (error) {
       console.error('Failed to delete medication:', error);
       alert('Failed to delete medication. Please try again.');
@@ -325,11 +353,11 @@ export function StockManagement({
     setIsDeleteDialogOpen(true);
   };
 
-  const lowStockCount = medications.filter(
+  const lowStockCount = medicationList.filter(
     (med) => med.isAvailable && med.currentStock <= med.minStock,
   ).length;
-  const outOfStockCount = medications.filter((med) => !med.isAvailable).length;
-  const totalMedications = medications.length;
+  const outOfStockCount = medicationList.filter((med) => !med.isAvailable).length;
+  const totalMedications = medicationList.length;
 
   return (
     <div className="space-y-4">
@@ -764,7 +792,7 @@ export function StockManagement({
         open={isAddLotDialogOpen}
         onOpenChange={setIsAddLotDialogOpen}
         medication={selectedMedicationForLot}
-        medications={medications}
+        medications={medicationList}
         onAddLot={onAddLot}
       />
 

@@ -179,7 +179,7 @@ export function MedicationDetail({
     }
 
     // Validate required fields
-    if (!patientId.trim() || !dose.trim() || !physicianName.trim()) {
+    if (!patientId.trim() || !patientInitials.trim() || !dose.trim() || !physicianName.trim()) {
       showErrorToast(
         'Missing required fields',
         'Please fill in all required fields (marked with *)',
@@ -214,7 +214,7 @@ export function MedicationDetail({
         medicationId: medication.id,
         medicationName: `${medication.name} ${medication.strength}`,
         patientId: patientId.trim(),
-        patientInitials: patientInitials.trim(),
+        patientInitials: patientInitials.trim().toUpperCase(),
         quantity: selectedLot.quantity,
         dose: dose.trim(),
         lotNumber: selectedLot.lotNumber,
@@ -519,17 +519,87 @@ export function MedicationDetail({
                             </div>
                           </div>
                         </div>
-                        {/*}
                         <div className="space-y-2">
                           <Label htmlFor="initials">Patient Initials *</Label>
-                          <Input
-                            id="initials"
-                            placeholder="e.g., J.D."
-                            value={patientInitials}
-                            onChange={(e) => setPatientInitials(e.target.value)}
-                          />
+                          <div className="history-suggestion-container">
+                            <Input
+                              id="initials"
+                              placeholder="e.g., J.D."
+                              autoComplete="off"
+                              maxLength={6}
+                              ref={patientInitialsInputRef}
+                              value={patientInitials}
+                              className="h-8 sm:h-9 text-sm sm:text-base uppercase"
+                              onFocus={() => {
+                                setOpenPatientInitials(true);
+                                patientInitialsHistory.updateQuery(patientInitials);
+                              }}
+                              onMouseDown={(event) => {
+                                if (
+                                  document.activeElement === event.currentTarget &&
+                                  event.currentTarget.value.trim() === ''
+                                ) {
+                                  event.preventDefault();
+                                  setOpenPatientInitials((prev) => {
+                                    const next = !prev;
+                                    if (next) {
+                                      patientInitialsHistory.updateQuery(event.currentTarget.value);
+                                    }
+                                    return next;
+                                  });
+                                }
+                              }}
+                              onChange={(e) => {
+                                const value = e.target.value.toUpperCase().replace(/[^A-Z.]/g, '');
+                                setPatientInitials(value);
+                                patientInitialsHistory.updateQuery(value);
+                                if (!openPatientInitials) setOpenPatientInitials(true);
+                              }}
+                            />
+                            {openPatientInitials && patientInitialsHistory.suggestions.length > 0 && (
+                              <ul className="absolute z-50 mt-1 w-full max-h-48 overflow-auto rounded-md border bg-popover text-sm shadow" role="listbox">
+                                {patientInitialsHistory.suggestions.map((s) => (
+                                  <li key={s.value}>
+                                    <button
+                                      type="button"
+                                      className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-muted"
+                                      onClick={() => {
+                                        setPatientInitials(s.value);
+                                        patientInitialsHistory.recordValue(s.value);
+                                        patientInitialsHistory.updateQuery(s.value);
+                                        setOpenPatientInitials(false);
+                                      }}
+                                    >
+                                      <span>{s.value}</span>
+                                      <span
+                                        className="text-xs text-muted-foreground hover:text-destructive"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          patientInitialsHistory.clearEntry(s.value);
+                                          patientInitialsHistory.updateQuery(patientInitials);
+                                        }}
+                                      >
+                                        Clear
+                                      </span>
+                                    </button>
+                                  </li>
+                                ))}
+                                <li className="border-t">
+                                  <button
+                                    type="button"
+                                    className="w-full px-3 py-1.5 text-left text-xs text-muted-foreground hover:text-destructive hover:bg-muted"
+                                    onClick={() => {
+                                      patientInitialsHistory.clearAll();
+                                      patientInitialsHistory.updateQuery(patientInitials);
+                                    }}
+                                  >
+                                    Clear all
+                                  </button>
+                                </li>
+                              </ul>
+                            )}
+                          </div>
                         </div>
-                        */}
                       </div>
 
                       {/* Dose */}

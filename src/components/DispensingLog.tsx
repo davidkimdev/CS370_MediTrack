@@ -49,13 +49,13 @@ export function DispensingLog({ records, onEditRecord }: DispensingLogProps) {
       const q = searchTerm.toLowerCase();
       filtered = filtered.filter((record) => {
         const med = (record.medicationName || '').toLowerCase();
-       // const initials = (record.patientInitials || '').toLowerCase();
+        const initials = (record.patientInitials || '').toLowerCase();
         const by = (record.dispensedBy || '').toLowerCase();
         const ind = (record.indication || '').toLowerCase();
         const site = (record.clinicSite || '').toLowerCase();
         return (
           med.includes(q) ||
-          //initials.includes(q) ||
+          initials.includes(q) ||
           by.includes(q) ||
           ind.includes(q) ||
           site.includes(q)
@@ -302,20 +302,9 @@ export function DispensingLog({ records, onEditRecord }: DispensingLogProps) {
               <TableHeader>
                 <TableRow>
                   {onEditRecord && <TableHead className="w-[80px]">Actions</TableHead>}
-                  <TableHead>Date</TableHead>
-                  <TableHead className="w-[100px]">Patient ID</TableHead>
-                  <TableHead>Medication</TableHead>
-                  <TableHead>Dose</TableHead>
-                  <TableHead>Lot #</TableHead>
-                  <TableHead>Exp</TableHead>
-                  <TableHead>Qty</TableHead>
-                  <TableHead>Physician</TableHead>
-                  <TableHead>Student</TableHead>
-                  <TableHead>Clinic Site</TableHead>
-                  <TableHead>Notes</TableHead>
                   <TableHead className="w-[110px]">Date</TableHead>
                   <TableHead className="w-[140px]">Patient</TableHead>
-                  <TableHead className="w-[220px]">Prescription</TableHead>
+                  <TableHead className="w-[220px]">Medication & Dose</TableHead>
                   <TableHead className="w-[180px]">Provider</TableHead>
                   <TableHead className="w-[160px]">Inventory</TableHead>
                   <TableHead className="w-[160px]">Notes</TableHead>
@@ -351,6 +340,11 @@ export function DispensingLog({ records, onEditRecord }: DispensingLogProps) {
                         <Badge variant="outline" className="text-xs font-mono w-fit">
                           {record.patientId}
                         </Badge>
+                        {record.patientInitials && (
+                          <span className="text-xs text-muted-foreground uppercase">
+                            {record.patientInitials}
+                          </span>
+                        )}
                         {record.clinicSite && (
                           <p className="text-xs text-muted-foreground break-words">
                             {record.clinicSite}
