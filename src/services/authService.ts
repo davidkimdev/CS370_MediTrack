@@ -222,9 +222,16 @@ export class AuthService {
     try {
       console.log('🔍 AuthService: Fetching profile for user:', userId);
 
-      // Add timeout wrapper like MedicationService
+      // Verify we have a valid session before querying
+      const session = await this.getSession();
+      if (!session) {
+        console.warn('⚠️ No active session found');
+        throw new Error('No active session');
+      }
+
+      // Increase timeout to 30 seconds to handle slow/stale connections
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Profile query timeout after 10 seconds')), 10000)
+        setTimeout(() => reject(new Error('Profile query timeout after 30 seconds')), 30000)
       );
 
       const queryPromise = supabase

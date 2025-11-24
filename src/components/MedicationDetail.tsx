@@ -92,7 +92,7 @@ export function MedicationDetail({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
   const [patientId, setPatientId] = useState('');
-  //const [patientInitials, setPatientInitials] = useState('');
+  const [patientInitials, setPatientInitials] = useState('');
   const [dose, setDose] = useState('');
   const [selectedLots, setSelectedLots] = useState<LotSelection[]>([
     { lotNumber: '', quantity: 0 },
@@ -214,7 +214,7 @@ export function MedicationDetail({
         medicationId: medication.id,
         medicationName: `${medication.name} ${medication.strength}`,
         patientId: patientId.trim(),
-        //patientInitials: patientInitials.trim(),
+        patientInitials: patientInitials.trim(),
         quantity: selectedLot.quantity,
         dose: dose.trim(),
         lotNumber: selectedLot.lotNumber,
@@ -244,7 +244,7 @@ export function MedicationDetail({
 
     // Reset form
     setPatientId('');
-    //setPatientInitials('');
+    setPatientInitials('');
     setDose('');
     setSelectedLots([{ lotNumber: '', quantity: 0 }]);
     setPhysicianName('');

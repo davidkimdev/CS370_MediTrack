@@ -12,9 +12,10 @@ import { AdminPanel } from './components/AdminPanel';
 import { Button } from './components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from './components/ui/tabs';
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './components/ui/sheet';
+import { UserGuide } from './components/UserGuide';
 import { cn } from './components/ui/utils';
 import type { LucideIcon } from 'lucide-react';
-import { Pill, ClipboardList, Package, Menu, LogOut, User, ShieldCheck } from 'lucide-react';
+import { Pill, ClipboardList, Package, Menu, LogOut, User, ShieldCheck, HelpCircle } from 'lucide-react';
 import { Medication, DispensingRecord, InventoryItem, User as UserType } from './types/medication';
 import { MedicationService } from './services/medicationService';
 import { syncService } from './services/syncService';
@@ -45,6 +46,8 @@ export default function App() {
   const [formularyCategoryFilter, setFormularyCategoryFilter] = useState<string>('all');
   const [formularyAvailabilityFilter, setFormularyAvailabilityFilter] = useState<string>('all');
   const [formularyCategorySearch, setFormularyCategorySearch] = useState('');
+  const [isHelpGuideOpen, setIsHelpGuideOpen] = useState(false);
+
   // State for withdrawal functionality
   const undoDispenseMapRef = useRef<Record<string, {
     record: DispensingRecord;
@@ -826,6 +829,18 @@ export default function App() {
 
           {/* User Menu */}
           <div className="flex items-center gap-2">
+            {/* Help Button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsHelpGuideOpen(true)}
+              className="gap-2"
+              title="Help & FAQ"
+            >
+              <HelpCircle className="h-4 w-4" />
+              <span className="hidden md:inline">Help</span>
+            </Button>
+
             {isAuthenticated && (
               <div className="hidden sm:flex items-center overflow-hidden rounded-lg border bg-background/80 shadow-sm">
                 {isAdmin && (
@@ -1088,6 +1103,12 @@ export default function App() {
           onSave={handleUpdateDispensingRecord}
         />
       )}
+
+      {/* Help Guide & FAQ */}
+      <UserGuide
+        isOpen={isHelpGuideOpen}
+        onClose={() => setIsHelpGuideOpen(false)}
+      />
     </div>
   );
 }
