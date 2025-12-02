@@ -467,6 +467,18 @@ export class MedicationService {
     id: string,
     updates: Partial<Omit<DispensingRecord, 'id'>>,
   ): Promise<DispensingRecord> {
+       const { data: oldData } = await supabase
+     .from('dispensing_logs')
+     .select('amount_dispensed, lot_number, medication_id')
+     .eq('id', id)
+     .single();
+
+
+   let oldQty = 0;
+   if (oldData?.amount_dispensed) {
+     oldQty = parseInt(String(oldData.amount_dispensed).replace(/\D/g, ''), 10) || 0;
+   }
+
     const updateData: any = {};
 
     if (updates.patientId !== undefined) updateData.patient_id = updates.patientId;
@@ -483,6 +495,40 @@ export class MedicationService {
 
     // Supabase stores UTC; keep updated_at in UTC
     updateData.updated_at = new Date().toISOString();
+
+       if (updates.quantity !== undefined && oldData) {
+     const newQty = updates.quantity;
+    
+     let qtyDiff = newQty - oldQty;
+
+     if (qtyDiff !== 0) {
+       // Look up correct lot
+       const { data: lot } = await supabase
+         .from('inventory')
+         .select('id, qty_units')
+         .eq('medication_id', oldData.medication_id)
+         .eq('lot_number', oldData.lot_number)
+         .single();
+
+       if (lot) {
+          // SCENARIO 1: OVERDRAFT (Trying to take more than we have)
+          if (qtyDiff > 0 && qtyDiff > lot.qty_units) {
+            throw new Error("Overdraft: Not enough stock");
+        }
+         else if (qtyDiff > 0) {
+           // user dispensed MORE → subtract
+           await MedicationService.updateInventoryItem(lot.id, {
+             quantity: lot.qty_units - qtyDiff
+           });
+         } else {
+           // user dispensed LESS → return stock
+           await MedicationService.updateInventoryItem(lot.id, {
+             quantity: lot.qty_units + Math.abs(qtyDiff)
+           });
+         }
+       }
+       }
+     }
 
     const { data, error } = await supabase
       .from('dispensing_logs')
