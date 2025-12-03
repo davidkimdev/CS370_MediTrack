@@ -29,6 +29,7 @@ export function EditDispensingRecordDialog({
   const [clinicSite, setClinicSite] = useState('');
   const [notes, setNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 640);
 
   // Populate form when record changes
   useEffect(() => {
@@ -43,6 +44,15 @@ export function EditDispensingRecordDialog({
       setNotes(record.notes || '');
     }
   }, [record]);
+
+  // Detect mobile screen size
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const handleSave = async () => {
     if (!record) return;
@@ -79,13 +89,28 @@ export function EditDispensingRecordDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Edit Dispensing Record</DialogTitle>
+      <DialogContent
+        className="w-[90vw] max-w-[700px] p-0 flex flex-col gap-0 overflow-hidden"
+        style={
+          isMobile
+            ? {
+                top: '5rem',
+                height: 'calc(100vh - 10rem)',
+                transform: 'none',
+              }
+            : {
+                maxHeight: 'calc(100vh - 8rem)',
+              }
+        }
+        onOpenAutoFocus={(event) => event.preventDefault()}
+      >
+        <DialogHeader className="flex-shrink-0 px-4 sm:px-6 pt-3 pb-2 border-b">
+          <DialogTitle className="text-base sm:text-lg">Edit Dispensing Record</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
-          {/* Read-only fields */}
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6">
+          <div className="space-y-4 py-4">
+            {/* Read-only fields */}
           <div className="p-3 bg-muted rounded-md space-y-2">
             <div>
               <Label className="text-xs text-muted-foreground">
@@ -187,7 +212,7 @@ export function EditDispensingRecordDialog({
           </div>
 
           {/* Action buttons */}
-          <div className="flex justify-end gap-3 mt-6">
+          <div className="flex justify-end gap-3 mt-6 pb-4">
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
               Cancel
             </Button>
@@ -197,6 +222,7 @@ export function EditDispensingRecordDialog({
             >
               {isSaving ? 'Saving...' : 'Save Changes'}
             </Button>
+          </div>
           </div>
         </div>
       </DialogContent>
