@@ -153,7 +153,7 @@ Thumbs.db
 *.temp
 
 # markdown files
-# *.md
+*.md
 
 # Node modules
 node_modules/
