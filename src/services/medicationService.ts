@@ -478,7 +478,15 @@ export class MedicationService {
    if (oldData?.amount_dispensed) {
      oldQty = parseInt(String(oldData.amount_dispensed).replace(/\D/g, ''), 10) || 0;
    }
+   const oldLotNumber: string | null = oldData?.lot_number ?? null; // NEW
+  const medicationId: string | null = oldData?.medication_id ?? null; // NEW
 
+  // OPTIONAL BUT NICE: server-side validation that matches your UI (natural numbers only)
+  if (updates.quantity !== undefined) { // NEW
+    if (!Number.isInteger(updates.quantity) || updates.quantity <= 0) {
+      throw new Error('Quantity must be a positive whole number');
+    }
+  }
     const updateData: any = {};
 
     if (updates.patientId !== undefined) updateData.patient_id = updates.patientId;
@@ -496,39 +504,81 @@ export class MedicationService {
     // Supabase stores UTC; keep updated_at in UTC
     updateData.updated_at = new Date().toISOString();
 
-       if (updates.quantity !== undefined && oldData) {
-     const newQty = updates.quantity;
-    
-     let qtyDiff = newQty - oldQty;
+      // CHANGED: adjust inventory when quantity and/or lot changes
+  if ((updates.quantity !== undefined || updates.lotNumber !== undefined) && oldData && medicationId) {
+    const newQty = updates.quantity ?? oldQty;               // use updated qty or fall back to old
+    const newLotNumber = updates.lotNumber ?? oldLotNumber;  // use updated lot or fall back to old
 
-     if (qtyDiff !== 0) {
-       // Look up correct lot
-       const { data: lot } = await supabase
-         .from('inventory')
-         .select('id, qty_units')
-         .eq('medication_id', oldData.medication_id)
-         .eq('lot_number', oldData.lot_number)
-         .single();
+    // CASE 1: Lot stayed the same → only adjust by quantity difference
+    if (newLotNumber && newLotNumber === oldLotNumber) {
+      const qtyDiff = newQty - oldQty;
 
-       if (lot) {
-          // SCENARIO 1: OVERDRAFT (Trying to take more than we have)
+      if (qtyDiff !== 0) {
+        const { data: lot } = await supabase
+          .from('inventory')
+          .select('id, qty_units')
+          .eq('medication_id', medicationId)
+          .eq('lot_number', newLotNumber)
+          .single();
+
+        if (lot) {
           if (qtyDiff > 0 && qtyDiff > lot.qty_units) {
-            throw new Error("Overdraft: Not enough stock");
+            throw new Error('Overdraft: Not enough stock in this lot');
+          } else if (qtyDiff > 0) {
+            // user dispensed MORE → subtract
+            await MedicationService.updateInventoryItem(lot.id, {
+              quantity: lot.qty_units - qtyDiff,
+            });
+          } else {
+            // user dispensed LESS → return stock
+            await MedicationService.updateInventoryItem(lot.id, {
+              quantity: lot.qty_units + Math.abs(qtyDiff),
+            });
+          }
         }
-         else if (qtyDiff > 0) {
-           // user dispensed MORE → subtract
-           await MedicationService.updateInventoryItem(lot.id, {
-             quantity: lot.qty_units - qtyDiff
-           });
-         } else {
-           // user dispensed LESS → return stock
-           await MedicationService.updateInventoryItem(lot.id, {
-             quantity: lot.qty_units + Math.abs(qtyDiff)
-           });
-         }
-       }
-       }
-     }
+      }
+    }
+    // CASE 2: Lot changed → refund old lot, debit new lot
+    else {
+      // 2a) Refund OLD lot
+      if (oldLotNumber && oldQty > 0) {
+        const { data: oldLot } = await supabase
+          .from('inventory')
+          .select('id, qty_units')
+          .eq('medication_id', medicationId)
+          .eq('lot_number', oldLotNumber)
+          .single();
+
+        if (oldLot) {
+          await MedicationService.updateInventoryItem(oldLot.id, {
+            quantity: oldLot.qty_units + oldQty,
+          });
+        }
+      }
+
+      // 2b) Debit NEW lot
+      if (newLotNumber && newQty > 0) {
+        const { data: newLot } = await supabase
+          .from('inventory')
+          .select('id, qty_units')
+          .eq('medication_id', medicationId)
+          .eq('lot_number', newLotNumber)
+          .single();
+
+        if (!newLot) {
+          throw new Error('New lot not found in inventory');
+        }
+
+        if (newQty > newLot.qty_units) {
+          throw new Error('Overdraft: Not enough stock in the new lot');
+        }
+
+        await MedicationService.updateInventoryItem(newLot.id, {
+          quantity: newLot.qty_units - newQty,
+        });
+      }
+    }
+  }
 
     const { data, error } = await supabase
       .from('dispensing_logs')
@@ -720,6 +770,49 @@ export class MedicationService {
     logger.info('Dispensing record deleted successfully', { id });
   }
 
+    static async deleteDispensingRecordWithRefund(id: string): Promise<void> {
+    // 1) Fetch old record so we know medication, lot, and quantity
+    const { data: rec, error: fetchErr } = await supabase
+      .from('dispensing_logs')
+      .select('medication_id, lot_number, amount_dispensed')
+      .eq('id', id)
+      .single();
+
+    if (fetchErr || !rec) {
+      throw new Error('Record not found for deletion');
+    }
+
+    const oldQty = parseInt(String(rec.amount_dispensed).replace(/\D/g, ''), 10) || 0;
+
+    // 2) Refund stock back to the lot (if we can find it)
+    if (rec.lot_number && oldQty > 0) {
+      const { data: lot } = await supabase
+        .from('inventory')
+        .select('id, qty_units')
+        .eq('medication_id', rec.medication_id)
+        .eq('lot_number', rec.lot_number)
+        .single();
+
+      if (lot) {
+        await MedicationService.updateInventoryItem(lot.id, {
+          quantity: lot.qty_units + oldQty,
+        });
+      }
+    }
+
+    // 3) Delete the log row itself
+    const { error: delErr } = await supabase
+      .from('dispensing_logs')
+      .delete()
+      .eq('id', id);
+
+    if (delErr) {
+      logger.error('Error deleting dispensing record with refund', delErr);
+      throw new Error('Failed to delete dispensing record');
+    }
+
+    logger.info('Dispensing record deleted with refund', { id });
+  }
   // Users
   static async getAllUsers(): Promise<User[]> {
     const { data, error } = await supabase.from('users').select('*').order('first_name');

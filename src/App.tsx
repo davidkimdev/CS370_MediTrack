@@ -575,6 +575,8 @@ export default function App() {
     }
   };
 
+  
+
   // Handler for StockManagement component (with reason parameter)
   const handleUpdateLotWithReason = async (lotId: string, newQuantity: number, reason: string) => {
     try {
@@ -1101,6 +1103,7 @@ export default function App() {
             }
           }}
           onSave={handleUpdateDispensingRecord}
+
         />
       )}
 
