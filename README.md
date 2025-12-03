@@ -129,7 +129,7 @@ npm install
 
 1. In Supabase dashboard, click **SQL Editor** in sidebar
 2. Click **"New query"**
-3. Copy the entire database schema from `CLAUDE.md` (lines 170-470) or use this:
+3. Copy and run the following SQL schema:
 
 ```sql
 -- Enable required extensions

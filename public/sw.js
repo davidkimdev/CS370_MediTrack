@@ -1,4 +1,4 @@
-const CACHE_NAME = 'meditrack-v2';
+const CACHE_NAME = 'meditrack-v3';
 const RUNTIME_CACHE = 'meditrack-runtime';
 
 const PRECACHE_URLS = [
@@ -33,34 +33,63 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
-  const { request } = event;
-  const url = new URL(request.url);
+  const url = new URL(event.request.url);
 
   // Skip Supabase API calls - handle via IndexedDB in app
   if (url.hostname.includes('supabase')) {
     return;
   }
 
+  // Network First strategy for navigation requests (HTML)
+  // This ensures users always get the latest version when they visit
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          // Check if we received a valid response
+          if (!response || response.status !== 200 || response.type === 'error') {
+            return response;
+          }
+
+          // Update cache with new version
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(event.request, responseToCache);
+          });
+
+          return response;
+        })
+        .catch(() => {
+          // If offline, try to serve from cache
+          return caches.match(event.request)
+            .then(response => {
+              if (response) return response;
+              // Fallback to index.html if specific page not cached (SPA support)
+              return caches.match('/index.html');
+            });
+        })
+    );
+    return;
+  }
+
+  // Cache First strategy for static assets (images, styles, scripts)
   event.respondWith(
-    caches.match(request).then(cachedResponse => {
+    caches.match(event.request).then(cachedResponse => {
       if (cachedResponse) {
         return cachedResponse;
       }
 
-      return fetch(request).then(response => {
+      return fetch(event.request).then(response => {
         if (!response || response.status !== 200 || response.type === 'error') {
           return response;
         }
 
         const responseToCache = response.clone();
         caches.open(RUNTIME_CACHE).then(cache => {
-          cache.put(request, responseToCache);
+          cache.put(event.request, responseToCache);
         });
 
         return response;
-      }).catch(() => {
-        // Return offline page or cached content
-        return caches.match('/index.html');
       });
     })
   );
