@@ -92,6 +92,14 @@ export default function App() {
     lastLoadedModeRef.current = null;
     hasLoadedForCurrentAuthRef.current = false;
 
+    // Load pending changes count from IndexedDB
+    void OfflineStore.getPendingCount().then(count => {
+      if (count > 0) {
+        console.log(`📦 Found ${count} pending changes in offline queue`);
+        setPendingChanges(count);
+      }
+    });
+
     return () => {
       console.log('🛑 App component unmounting, cleaning up...');
       isMountedRef.current = false;
@@ -553,6 +561,7 @@ export default function App() {
       } else {
         // Offline: queue and update local stock/cache immediately
         await syncService.queueOfflineDispense(record);
+        setPendingChanges(prev => prev + 1);
         setMedications((prev: Medication[]) =>
           prev.map((med: Medication) =>
             med.id === record.medicationId
@@ -721,7 +730,11 @@ export default function App() {
 
   const handleSync = async () => {
     try {
-      // Simple sync: just reload data
+      // Flush offline queue first
+      const result = await syncService.flushQueue();
+      console.log(`✅ Synced ${result.processed} items, ${result.failed} failed`);
+      
+      // Then reload data from server
       await loadInitialData(isAuthenticated, true);
       setPendingChanges(0);
     } catch (err) {

@@ -109,30 +109,31 @@ export function OfflineSync({ pendingChanges, onSync }: OfflineSyncProps) {
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0">
-            {isOnline && pendingChanges > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSync}
-                disabled={isSyncing}
-                className="text-xs sm:text-sm"
-              >
-                {isSyncing ? (
-                  <RefreshCw className="size-3 sm:size-4 mr-1 sm:mr-2 animate-spin" />
-                ) : (
-                  <RefreshCw className="size-3 sm:size-4 mr-1 sm:mr-2" />
+            {isOnline && (
+              <>
+                <Button
+                  variant={pendingChanges > 0 ? "default" : "outline"}
+                  size="sm"
+                  onClick={handleSync}
+                  disabled={isSyncing}
+                  className="text-xs sm:text-sm"
+                >
+                  {isSyncing ? (
+                    <RefreshCw className="size-3 sm:size-4 mr-1 sm:mr-2 animate-spin" />
+                  ) : (
+                    <RefreshCw className="size-3 sm:size-4 mr-1 sm:mr-2" />
+                  )}
+                  <span className="hidden sm:inline">Sync Now</span>
+                  <span className="sm:hidden">Sync</span>
+                </Button>
+                {pendingChanges === 0 && (
+                  <div className="flex items-center text-green-600 text-xs sm:text-sm">
+                    <Check className="size-3 sm:size-4 mr-1" />
+                    <span className="hidden sm:inline">Up to date</span>
+                    <span className="sm:hidden">✓</span>
+                  </div>
                 )}
-                <span className="hidden sm:inline">Sync Now</span>
-                <span className="sm:hidden">Sync</span>
-              </Button>
-            )}
-
-            {isOnline && pendingChanges === 0 && (
-              <div className="flex items-center text-green-600 text-xs sm:text-sm">
-                <Check className="size-3 sm:size-4 mr-1" />
-                <span className="hidden sm:inline">Up to date</span>
-                <span className="sm:hidden">✓</span>
-              </div>
+              </>
             )}
           </div>
         </div>
