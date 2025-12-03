@@ -262,7 +262,11 @@ export default function App() {
       setMedications(medicationsData);
       setDispensingRecords(authenticated ? dispensingData : []);
       setInventory(inventoryData);
-      setPendingChanges(0);
+      // Don't reset pendingChanges here - let the caller handle it
+      // This prevents race conditions during sync
+      if (!force) {
+        setPendingChanges(0);
+      }
       setLastLoadedMode(mode);
       lastLoadedModeRef.current = mode;
 
@@ -734,11 +738,21 @@ export default function App() {
       const result = await syncService.flushQueue();
       console.log(`✅ Synced ${result.processed} items, ${result.failed} failed`);
       
+      if (result.failed > 0) {
+        showErrorToast(`Sync completed with ${result.failed} failures`);
+      } else if (result.processed > 0) {
+        showSuccessToast(`Successfully synced ${result.processed} items`);
+      }
+      
+      // Wait a moment for database to propagate
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       // Then reload data from server
       await loadInitialData(isAuthenticated, true);
       setPendingChanges(0);
     } catch (err) {
       console.error('Sync failed:', err);
+      showErrorToast('Sync failed. Please try again.');
     }
   };
 
