@@ -24,12 +24,12 @@ export function ForgotPasswordForm({ onBackToLogin }: ForgotPasswordFormProps) {
     register,
     handleSubmit,
     formState: { errors },
-    getValues
+    getValues,
   } = useForm<ResetPasswordFormData>({
     resolver: zodResolver(resetPasswordSchema),
     defaultValues: {
-      email: ''
-    }
+      email: '',
+    },
   });
 
   const onSubmit = async (data: ResetPasswordFormData) => {
@@ -37,13 +37,14 @@ export function ForgotPasswordForm({ onBackToLogin }: ForgotPasswordFormProps) {
       setIsLoading(true);
       setError('');
       setSuccess(false);
-      
+
       await resetPassword(data.email);
-      
+
       setSuccess(true);
       logger.info('Password reset email sent', { email: data.email });
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to send reset email. Please try again.';
+      const errorMessage =
+        err instanceof Error ? err.message : 'Failed to send reset email. Please try again.';
       setError(errorMessage);
       logger.error('Password reset failed', err instanceof Error ? err : new Error(String(err)));
     } finally {
@@ -64,18 +65,16 @@ export function ForgotPasswordForm({ onBackToLogin }: ForgotPasswordFormProps) {
             </CardHeader>
             <CardContent className="text-center space-y-4">
               <div className="space-y-3">
-                <p className="text-green-700">
-                  We've sent a password reset link to:
-                </p>
+                <p className="text-green-700">We've sent a password reset link to:</p>
                 <div className="bg-muted p-3 rounded-md">
                   <p className="font-medium">{getValues('email')}</p>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Check your email and follow the instructions to reset your password.
-                  The link will expire in 1 hour.
+                  Check your email and follow the instructions to reset your password. The link will
+                  expire in 1 hour.
                 </p>
               </div>
-              
+
               <div className="pt-4 space-y-3">
                 <Button onClick={onBackToLogin} className="w-full">
                   Back to Sign In
@@ -143,9 +142,7 @@ export function ForgotPasswordForm({ onBackToLogin }: ForgotPasswordFormProps) {
                     autoFocus
                   />
                 </div>
-                {errors.email && (
-                  <p className="text-sm text-destructive">{errors.email.message}</p>
-                )}
+                {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
               </div>
 
               {/* Error Message */}
@@ -174,8 +171,8 @@ export function ForgotPasswordForm({ onBackToLogin }: ForgotPasswordFormProps) {
 
             {/* Back to Login */}
             <div className="mt-6 text-center">
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 size="sm"
                 onClick={onBackToLogin}
                 disabled={isLoading}

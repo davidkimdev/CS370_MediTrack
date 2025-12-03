@@ -83,11 +83,7 @@ export function LoginForm({ onSwitchToRegister, onSwitchToReset }: LoginFormProp
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form 
-              onSubmit={handleSubmit}
-              noValidate
-              className="space-y-4"
-            >
+            <form onSubmit={handleSubmit} noValidate className="space-y-4">
               {error && (
                 <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
                   <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
@@ -121,7 +117,7 @@ export function LoginForm({ onSwitchToRegister, onSwitchToReset }: LoginFormProp
                 <div className="relative">
                   <Input
                     id="password"
-                    type={showPassword ? "text" : "password"}
+                    type={showPassword ? 'text' : 'password'}
                     placeholder="Enter your password"
                     value={password}
                     onChange={(e) => {
@@ -142,19 +138,15 @@ export function LoginForm({ onSwitchToRegister, onSwitchToReset }: LoginFormProp
                     onClick={() => setShowPassword(!showPassword)}
                     disabled={isSubmitting}
                   >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </Button>
                 </div>
               </div>
 
               {/* Sign In Button */}
-              <Button 
+              <Button
                 type="submit"
-                className="w-full" 
+                className="w-full"
                 disabled={isSubmitting || !email || !password}
               >
                 {isSubmitting ? 'Signing in...' : 'Sign in'}
@@ -175,7 +167,7 @@ export function LoginForm({ onSwitchToRegister, onSwitchToReset }: LoginFormProp
             </form>
 
             <Separator className="my-6" />
-            
+
             {/* Register Link */}
             <div className="text-center text-sm">
               Don't have an account?{' '}

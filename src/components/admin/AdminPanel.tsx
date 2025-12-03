@@ -44,7 +44,10 @@ export function AdminPanel() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load users';
       setError(errorMessage);
-      logger.error('Failed to load users in admin panel', err instanceof Error ? err : new Error(String(err)));
+      logger.error(
+        'Failed to load users in admin panel',
+        err instanceof Error ? err : new Error(String(err)),
+      );
     } finally {
       setIsLoading(false);
     }
@@ -74,8 +77,8 @@ export function AdminPanel() {
     }
   };
 
-  const pendingUsers = users.filter(u => !u.isApproved);
-  const approvedUsers = users.filter(u => u.isApproved);
+  const pendingUsers = users.filter((u) => !u.isApproved);
+  const approvedUsers = users.filter((u) => u.isApproved);
 
   if (isLoading) {
     return (
@@ -161,20 +164,23 @@ export function AdminPanel() {
               <Clock className="size-5 text-orange-600" />
               Pending Approval ({pendingUsers.length})
             </CardTitle>
-            <CardDescription>
-              New user registrations waiting for approval
-            </CardDescription>
+            <CardDescription>New user registrations waiting for approval</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               {pendingUsers.map((user) => (
-                <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg">
+                <div
+                  key={user.id}
+                  className="flex items-center justify-between p-4 border rounded-lg"
+                >
                   <div className="flex items-center gap-3">
                     <div className="size-10 bg-muted rounded-full flex items-center justify-center">
                       <User className="size-5 text-muted-foreground" />
                     </div>
                     <div>
-                      <p className="font-medium">{user.firstName} {user.lastName}</p>
+                      <p className="font-medium">
+                        {user.firstName} {user.lastName}
+                      </p>
                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Mail className="size-3" />
@@ -220,9 +226,7 @@ export function AdminPanel() {
             <Users className="size-5" />
             All Users
           </CardTitle>
-          <CardDescription>
-            Complete list of all registered users
-          </CardDescription>
+          <CardDescription>Complete list of all registered users</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="rounded-md border">
@@ -279,7 +283,9 @@ export function AdminPanel() {
                           <div className="mt-6 space-y-4">
                             <div className="space-y-2">
                               <label className="text-sm font-medium">Name</label>
-                              <p className="text-sm">{user.firstName} {user.lastName}</p>
+                              <p className="text-sm">
+                                {user.firstName} {user.lastName}
+                              </p>
                             </div>
                             <div className="space-y-2">
                               <label className="text-sm font-medium">Email</label>
@@ -287,7 +293,9 @@ export function AdminPanel() {
                             </div>
                             <div className="space-y-2">
                               <label className="text-sm font-medium">Role</label>
-                              <p className="text-sm">{user.role === 'admin' ? 'Administrator' : 'Staff'}</p>
+                              <p className="text-sm">
+                                {user.role === 'admin' ? 'Administrator' : 'Staff'}
+                              </p>
                             </div>
                             <div className="space-y-2">
                               <label className="text-sm font-medium">Status</label>
@@ -305,11 +313,13 @@ export function AdminPanel() {
                                 <p className="text-sm">
                                   {new Date(user.approvedAt).toLocaleString()}
                                   <br />
-                                  <span className="text-muted-foreground">by {user.approvedBy}</span>
+                                  <span className="text-muted-foreground">
+                                    by {user.approvedBy}
+                                  </span>
                                 </p>
                               </div>
                             )}
-                            
+
                             {!user.isApproved && (
                               <div className="pt-4 space-y-2">
                                 <Button

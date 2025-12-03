@@ -152,7 +152,14 @@ export function AddLotDialog({
           return;
         }
         const { MedicationService } = await import('../services/medicationService');
-        const parsedCats = Array.from(new Set(newMedCategoriesText.split(',').map(s => s.trim()).filter(Boolean)));
+        const parsedCats = Array.from(
+          new Set(
+            newMedCategoriesText
+              .split(',')
+              .map((s) => s.trim())
+              .filter(Boolean),
+          ),
+        );
         const created = await MedicationService.createMedication({
           name: newMedName.trim(),
           strength: newMedStrength.trim(),
@@ -315,7 +322,10 @@ export function AddLotDialog({
                           className="focus:outline-none"
                           title={`Toggle ${cat}`}
                         >
-                          <Badge variant={currentCats.includes(cat) ? 'default' : 'outline'} className="text-xs">
+                          <Badge
+                            variant={currentCats.includes(cat) ? 'default' : 'outline'}
+                            className="text-xs"
+                          >
                             {cat}
                           </Badge>
                         </button>

@@ -23,7 +23,7 @@ export async function parseFormularyFile(file: File): Promise<ImportedMedication
 async function parseExcelFile(file: File): Promise<ImportedMedicationRow[]> {
   // Dynamically import XLSX only when needed
   const XLSX = await import('xlsx');
-  
+
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 

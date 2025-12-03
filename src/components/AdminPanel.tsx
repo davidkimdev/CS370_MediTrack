@@ -57,49 +57,52 @@ export function AdminPanel() {
       });
   }, [allUsers]);
 
-  const loadAdminData = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
-    if (!currentUserId || !isAdmin) {
-      if (!silent) {
-        setRefreshing(false);
+  const loadAdminData = useCallback(
+    async ({ silent = false }: { silent?: boolean } = {}) => {
+      if (!currentUserId || !isAdmin) {
+        if (!silent) {
+          setRefreshing(false);
+        }
+        if (!hasLoaded) {
+          setIsLoading(false);
+        }
+        return;
       }
-      if (!hasLoaded) {
-        setIsLoading(false);
-      }
-      return;
-    }
 
-    const isInitialLoad = !hasLoaded;
-    if (isInitialLoad && !silent) {
-      setIsLoading(true);
-    } else if (!silent) {
-      setRefreshing(true);
-    }
-
-    try {
-      const [pending, users, codes] = await Promise.all([
-        AuthService.getPendingUsers(),
-        AuthService.getAllUsers(),
-        AuthService.getInvitationCodes(),
-      ]);
-      setPendingUsers(pending);
-      setAllUsers(users);
-      setInvitationCodes(codes);
-      setHasLoaded(true);
-    } catch (error) {
-      console.error('Failed to load admin data', error);
-      showErrorToast(
-        'Failed to load account information',
-        error instanceof Error ? error.message : 'Please try again later.',
-      );
-    } finally {
+      const isInitialLoad = !hasLoaded;
       if (isInitialLoad && !silent) {
-        setIsLoading(false);
+        setIsLoading(true);
+      } else if (!silent) {
+        setRefreshing(true);
       }
-      if (!silent) {
-        setRefreshing(false);
+
+      try {
+        const [pending, users, codes] = await Promise.all([
+          AuthService.getPendingUsers(),
+          AuthService.getAllUsers(),
+          AuthService.getInvitationCodes(),
+        ]);
+        setPendingUsers(pending);
+        setAllUsers(users);
+        setInvitationCodes(codes);
+        setHasLoaded(true);
+      } catch (error) {
+        console.error('Failed to load admin data', error);
+        showErrorToast(
+          'Failed to load account information',
+          error instanceof Error ? error.message : 'Please try again later.',
+        );
+      } finally {
+        if (isInitialLoad && !silent) {
+          setIsLoading(false);
+        }
+        if (!silent) {
+          setRefreshing(false);
+        }
       }
-    }
-  }, [currentUserId, isAdmin, hasLoaded]);
+    },
+    [currentUserId, isAdmin, hasLoaded],
+  );
 
   useEffect(() => {
     if (isAdmin) {
@@ -114,10 +117,7 @@ export function AdminPanel() {
       await loadAdminData({ silent: true });
     } catch (error) {
       console.error('Admin user action failed', error);
-      showErrorToast(
-        'Action failed',
-        error instanceof Error ? error.message : 'Please retry.',
-      );
+      showErrorToast('Action failed', error instanceof Error ? error.message : 'Please retry.');
     } finally {
       setUserActionLoading((prev) => ({ ...prev, [userId]: false }));
     }
@@ -238,7 +238,11 @@ export function AdminPanel() {
 
   const getInvitationStatus = (code: InvitationCode) => {
     if (code.usedAt) {
-      return { label: 'Used', className: 'bg-emerald-100 text-emerald-700', variant: 'outline' as const };
+      return {
+        label: 'Used',
+        className: 'bg-emerald-100 text-emerald-700',
+        variant: 'outline' as const,
+      };
     }
     if (!code.isActive) {
       return { label: 'Disabled', className: 'text-muted-foreground', variant: 'outline' as const };
@@ -246,7 +250,11 @@ export function AdminPanel() {
     if (code.expiresAt.getTime() < Date.now()) {
       return { label: 'Expired', className: '', variant: 'destructive' as const };
     }
-    return { label: 'Active', className: 'bg-emerald-100 text-emerald-700', variant: 'outline' as const };
+    return {
+      label: 'Active',
+      className: 'bg-emerald-100 text-emerald-700',
+      variant: 'outline' as const,
+    };
   };
 
   const { activeCodes, archivedCodes } = useMemo(() => {
@@ -263,7 +271,9 @@ export function AdminPanel() {
   }
 
   // KPI Metrics (memoized for performance)
-  const [medStats, setMedStats] = useState<{ total: number; low: number; out: number } | null>(null);
+  const [medStats, setMedStats] = useState<{ total: number; low: number; out: number } | null>(
+    null,
+  );
   const [showManageAccounts, setShowManageAccounts] = useState(false);
 
   useEffect(() => {
@@ -273,7 +283,9 @@ export function AdminPanel() {
         const meds = await MedicationService.getAllMedications();
         if (cancelled) return;
         const total = meds.length;
-        const low = meds.filter((m) => typeof m.minStock === 'number' && m.currentStock <= (m.minStock || 0)).length;
+        const low = meds.filter(
+          (m) => typeof m.minStock === 'number' && m.currentStock <= (m.minStock || 0),
+        ).length;
         const out = meds.filter((m) => (m.currentStock || 0) <= 0).length;
         setMedStats({ total, low, out });
       } catch (e) {
@@ -333,14 +345,27 @@ export function AdminPanel() {
             >
               Manage accounts
             </Button>
-            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing || isLoading}>
-              {refreshing ? <Loader2 className="mr-2 size-4 animate-spin" /> : <RefreshCw className="mr-2 size-4" />}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={refreshing || isLoading}
+            >
+              {refreshing ? (
+                <Loader2 className="mr-2 size-4 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-2 size-4" />
+              )}
               Refresh
             </Button>
           </div>
         </div>
         {/* KPI Header */}
-        <AdminKpiHeader loading={isLoading && !hasLoaded} metrics={kpiMetrics} title="Admin overview" />
+        <AdminKpiHeader
+          loading={isLoading && !hasLoaded}
+          metrics={kpiMetrics}
+          title="Admin overview"
+        />
       </div>
       {/* Additional admin widgets can be added below as needed */}
     </div>

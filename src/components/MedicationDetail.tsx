@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
- 
+
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -29,8 +29,6 @@ import { Medication, DispensingRecord, InventoryItem, User } from '../types/medi
 import { useFieldHistory } from '../hooks/useFieldHistory';
 import { showErrorToast } from '../utils/toastUtils';
 
- 
-
 interface MedicationDetailProps {
   medication: Medication;
   alternatives: Medication[];
@@ -54,7 +52,6 @@ interface LotSelection {
   quantity: number;
   expirationDate?: Date;
 }
-
 
 export function MedicationDetail({
   medication,
@@ -131,7 +128,7 @@ export function MedicationDetail({
     setOpenStudent(false);
     setOpenClinic(false);
   };
- 
+
   useEffect(() => {
     if (!isDispenseDialogOpen) {
       closeAllSuggestions();
@@ -232,12 +229,12 @@ export function MedicationDetail({
       onDispense(record);
     });
 
-  patientIdHistory.recordValue(patientId);
-  patientInitialsHistory.recordValue(patientInitials);
-  doseHistory.recordValue(dose);
-  physicianHistory.recordValue(physicianName);
-  studentHistory.recordValue(studentName);
-  clinicSiteHistory.recordValue(clinicSite);
+    patientIdHistory.recordValue(patientId);
+    patientInitialsHistory.recordValue(patientInitials);
+    doseHistory.recordValue(dose);
+    physicianHistory.recordValue(physicianName);
+    studentHistory.recordValue(studentName);
+    clinicSiteHistory.recordValue(clinicSite);
 
     console.log(`Medication dispensed successfully from ${validLots.length} lot(s)`);
     setIsDispenseDialogOpen(false);
@@ -251,12 +248,12 @@ export function MedicationDetail({
     setStudentName('');
     setClinicSite('');
     setNotes('');
-  patientIdHistory.updateQuery('');
-  patientInitialsHistory.updateQuery('');
-  doseHistory.updateQuery('');
-  physicianHistory.updateQuery('');
-  studentHistory.updateQuery('');
-  clinicSiteHistory.updateQuery('');
+    patientIdHistory.updateQuery('');
+    patientInitialsHistory.updateQuery('');
+    doseHistory.updateQuery('');
+    physicianHistory.updateQuery('');
+    studentHistory.updateQuery('');
+    clinicSiteHistory.updateQuery('');
   };
 
   // Multi-lot helpers for dispensing
@@ -323,7 +320,7 @@ export function MedicationDetail({
 
     const expirationDate = new Date(`${lotExpiration}-01T00:00:00Z`);
 
-// Move to *last day* of the month in UTC
+    // Move to *last day* of the month in UTC
     expirationDate.setUTCMonth(expirationDate.getUTCMonth() + 1);
     expirationDate.setUTCDate(0);
 
@@ -376,896 +373,948 @@ export function MedicationDetail({
           )}
         </div>
 
-      {/* Stock Status Card */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <StatusIcon className="size-5" />
-              <div>
-                <p className="font-medium">{stockStatus.status}</p>
-                <p className="text-sm text-muted-foreground">
-                  {medication.currentStock} units available
-                </p>
+        {/* Stock Status Card */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <StatusIcon className="size-5" />
+                <div>
+                  <p className="font-medium">{stockStatus.status}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {medication.currentStock} units available
+                  </p>
+                </div>
               </div>
-            </div>
 
-            {medication.isAvailable && (
-              readOnly ? (
-                <Button variant="outline" onClick={() => onRequireAuth?.()}>
-                  Log in to dispense
-                </Button>
-              ) : (
-                <Dialog open={isDispenseDialogOpen} onOpenChange={setIsDispenseDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="size-4 mr-2" />
-                      Dispense
-                    </Button> 
-                  </DialogTrigger>
-                  <DialogContent
-                    className="max-h-[calc(100vh-5rem)] sm:max-h-[calc(100vh-10rem)] w-[90vw] max-w-[700px] p-0 flex flex-col gap-0 overflow-hidden"
-                    style={
-                      isMobile
-                        ? {
-                            top: '22.5rem',
-                            height: 'calc(100vh - 10rem)',
-                            transform: 'none',
-                          }
-                        : {
-                          height: 'calc(100vh - 10rem)',
-                        }
-                    }
-                    onOpenAutoFocus={(event) => event.preventDefault()}
-                  >
+              {medication.isAvailable &&
+                (readOnly ? (
+                  <Button variant="outline" onClick={() => onRequireAuth?.()}>
+                    Log in to dispense
+                  </Button>
+                ) : (
+                  <Dialog open={isDispenseDialogOpen} onOpenChange={setIsDispenseDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <Plus className="size-4 mr-2" />
+                        Dispense
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent
+                      className="max-h-[calc(100vh-5rem)] sm:max-h-[calc(100vh-10rem)] w-[90vw] max-w-[700px] p-0 flex flex-col gap-0 overflow-hidden"
+                      style={
+                        isMobile
+                          ? {
+                              top: '22.5rem',
+                              height: 'calc(100vh - 10rem)',
+                              transform: 'none',
+                            }
+                          : {
+                              height: 'calc(100vh - 10rem)',
+                            }
+                      }
+                      onOpenAutoFocus={(event) => event.preventDefault()}
+                    >
                       <DialogHeader className="flex-shrink-0 px-4 sm:px-6 pt-3 pb-2 border-b">
-                        <DialogTitle className="text-base sm:text-lg">Dispense {medication.name}</DialogTitle>
+                        <DialogTitle className="text-base sm:text-lg">
+                          Dispense {medication.name}
+                        </DialogTitle>
                         <DialogDescription className="text-xs sm:text-sm">
                           Record medication dispensing for patient
                         </DialogDescription>
                       </DialogHeader>
                       <div className="flex-1 overflow-y-auto px-4 sm:px-6">
-                    <form
-                      autoComplete="off"
-                      className="space-y-2 sm:space-y-3 py-2 sm:py-3"
-                      onSubmit={(event) => {
-                        event.preventDefault();
-                        handleDispense();
-                      }}
-                    >
-                      {/* Patient Information */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <div className="space-y-1.5">
-                          <Label htmlFor="patientId" className="text-sm sm:text-base">Patient ID *</Label>
-                          <div className="space-y-1">
-                            <div className="relative">
-                              <div className="history-suggestion-container">
-                                <Input
-                                  id="patientId"
-                                  placeholder="e.g., 2025-196"
-                                  autoComplete="off"
-                                  ref={patientIdInputRef}
-                                  value={patientId}
-                                  className="h-8 sm:h-9 text-sm sm:text-base"
-                                  onFocus={() => {
-                                    setOpenPatientId(true);
-                                    patientIdHistory.updateQuery(patientId);
-                                  }}
-                                  onMouseDown={(event) => {
-                                    if (
-                                      document.activeElement === event.currentTarget &&
-                                      event.currentTarget.value.trim() === ''
-                                    ) {
-                                      event.preventDefault();
-                                      setOpenPatientId((prev) => {
-                                        const next = !prev;
-                                        if (next) {
-                                          patientIdHistory.updateQuery(event.currentTarget.value);
+                        <form
+                          autoComplete="off"
+                          className="space-y-2 sm:space-y-3 py-2 sm:py-3"
+                          onSubmit={(event) => {
+                            event.preventDefault();
+                            handleDispense();
+                          }}
+                        >
+                          {/* Patient Information */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div className="space-y-1.5">
+                              <Label htmlFor="patientId" className="text-sm sm:text-base">
+                                Patient ID *
+                              </Label>
+                              <div className="space-y-1">
+                                <div className="relative">
+                                  <div className="history-suggestion-container">
+                                    <Input
+                                      id="patientId"
+                                      placeholder="e.g., 2025-196"
+                                      autoComplete="off"
+                                      ref={patientIdInputRef}
+                                      value={patientId}
+                                      className="h-8 sm:h-9 text-sm sm:text-base"
+                                      onFocus={() => {
+                                        setOpenPatientId(true);
+                                        patientIdHistory.updateQuery(patientId);
+                                      }}
+                                      onMouseDown={(event) => {
+                                        if (
+                                          document.activeElement === event.currentTarget &&
+                                          event.currentTarget.value.trim() === ''
+                                        ) {
+                                          event.preventDefault();
+                                          setOpenPatientId((prev) => {
+                                            const next = !prev;
+                                            if (next) {
+                                              patientIdHistory.updateQuery(
+                                                event.currentTarget.value,
+                                              );
+                                            }
+                                            return next;
+                                          });
                                         }
-                                        return next;
-                                      });
-                                    }
-                                  }}
-                                  onChange={(e) => {
-                                    const value = e.target.value;
-                                    setPatientId(value);
-                                    patientIdHistory.updateQuery(value);
-                                    if (!openPatientId) setOpenPatientId(true);
-                                  }}
-                                />
-                                {openPatientId && patientIdHistory.suggestions.length > 0 && (
-                                  <ul className="absolute z-50 mt-1 w-full max-h-48 overflow-auto rounded-md border bg-popover text-sm shadow" role="listbox">
-                                    {patientIdHistory.suggestions.map((s) => (
-                                      <li key={s.value}>
-                                        <button
-                                          type="button"
-                                          className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-muted"
-                                          onClick={() => {
-                                            setPatientId(s.value);
-                                            patientIdHistory.recordValue(s.value);
-                                            patientIdHistory.updateQuery(s.value);
-                                            setOpenPatientId(false);
-                                          }}
-                                        >
-                                          <span>{s.value}</span>
-                                          <span
-                                            className="text-xs text-muted-foreground hover:text-destructive"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              patientIdHistory.clearEntry(s.value);
+                                      }}
+                                      onChange={(e) => {
+                                        const value = e.target.value;
+                                        setPatientId(value);
+                                        patientIdHistory.updateQuery(value);
+                                        if (!openPatientId) setOpenPatientId(true);
+                                      }}
+                                    />
+                                    {openPatientId && patientIdHistory.suggestions.length > 0 && (
+                                      <ul
+                                        className="absolute z-50 mt-1 w-full max-h-48 overflow-auto rounded-md border bg-popover text-sm shadow"
+                                        role="listbox"
+                                      >
+                                        {patientIdHistory.suggestions.map((s) => (
+                                          <li key={s.value}>
+                                            <button
+                                              type="button"
+                                              className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-muted"
+                                              onClick={() => {
+                                                setPatientId(s.value);
+                                                patientIdHistory.recordValue(s.value);
+                                                patientIdHistory.updateQuery(s.value);
+                                                setOpenPatientId(false);
+                                              }}
+                                            >
+                                              <span>{s.value}</span>
+                                              <span
+                                                className="text-xs text-muted-foreground hover:text-destructive"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  patientIdHistory.clearEntry(s.value);
+                                                  patientIdHistory.updateQuery(patientId);
+                                                }}
+                                              >
+                                                Clear
+                                              </span>
+                                            </button>
+                                          </li>
+                                        ))}
+                                        <li className="border-t">
+                                          <button
+                                            type="button"
+                                            className="w-full px-3 py-1.5 text-left text-xs text-muted-foreground hover:text-destructive hover:bg-muted"
+                                            onClick={() => {
+                                              patientIdHistory.clearAll();
                                               patientIdHistory.updateQuery(patientId);
                                             }}
                                           >
-                                            Clear
-                                          </span>
+                                            Clear all
+                                          </button>
+                                        </li>
+                                      </ul>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="initials">Patient Initials *</Label>
+                              <div className="history-suggestion-container">
+                                <Input
+                                  id="initials"
+                                  placeholder="e.g., J.D."
+                                  autoComplete="off"
+                                  maxLength={6}
+                                  ref={patientInitialsInputRef}
+                                  value={patientInitials}
+                                  className="h-8 sm:h-9 text-sm sm:text-base uppercase"
+                                  onFocus={() => {
+                                    setOpenPatientInitials(true);
+                                    patientInitialsHistory.updateQuery(patientInitials);
+                                  }}
+                                  onMouseDown={(event) => {
+                                    if (
+                                      document.activeElement === event.currentTarget &&
+                                      event.currentTarget.value.trim() === ''
+                                    ) {
+                                      event.preventDefault();
+                                      setOpenPatientInitials((prev) => {
+                                        const next = !prev;
+                                        if (next) {
+                                          patientInitialsHistory.updateQuery(
+                                            event.currentTarget.value,
+                                          );
+                                        }
+                                        return next;
+                                      });
+                                    }
+                                  }}
+                                  onChange={(e) => {
+                                    const value = e.target.value
+                                      .toUpperCase()
+                                      .replace(/[^A-Z.]/g, '');
+                                    setPatientInitials(value);
+                                    patientInitialsHistory.updateQuery(value);
+                                    if (!openPatientInitials) setOpenPatientInitials(true);
+                                  }}
+                                />
+                                {openPatientInitials &&
+                                  patientInitialsHistory.suggestions.length > 0 && (
+                                    <ul
+                                      className="absolute z-50 mt-1 w-full max-h-48 overflow-auto rounded-md border bg-popover text-sm shadow"
+                                      role="listbox"
+                                    >
+                                      {patientInitialsHistory.suggestions.map((s) => (
+                                        <li key={s.value}>
+                                          <button
+                                            type="button"
+                                            className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-muted"
+                                            onClick={() => {
+                                              setPatientInitials(s.value);
+                                              patientInitialsHistory.recordValue(s.value);
+                                              patientInitialsHistory.updateQuery(s.value);
+                                              setOpenPatientInitials(false);
+                                            }}
+                                          >
+                                            <span>{s.value}</span>
+                                            <span
+                                              className="text-xs text-muted-foreground hover:text-destructive"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                patientInitialsHistory.clearEntry(s.value);
+                                                patientInitialsHistory.updateQuery(patientInitials);
+                                              }}
+                                            >
+                                              Clear
+                                            </span>
+                                          </button>
+                                        </li>
+                                      ))}
+                                      <li className="border-t">
+                                        <button
+                                          type="button"
+                                          className="w-full px-3 py-1.5 text-left text-xs text-muted-foreground hover:text-destructive hover:bg-muted"
+                                          onClick={() => {
+                                            patientInitialsHistory.clearAll();
+                                            patientInitialsHistory.updateQuery(patientInitials);
+                                          }}
+                                        >
+                                          Clear all
                                         </button>
                                       </li>
-                                    ))}
-                                    <li className="border-t">
-                                      <button
-                                        type="button"
-                                        className="w-full px-3 py-1.5 text-left text-xs text-muted-foreground hover:text-destructive hover:bg-muted"
-                                        onClick={() => {
-                                          patientIdHistory.clearAll();
-                                          patientIdHistory.updateQuery(patientId);
-                                        }}
-                                      >
-                                        Clear all
-                                      </button>
-                                    </li>
-                                  </ul>
-                                )}
+                                    </ul>
+                                  )}
                               </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="initials">Patient Initials *</Label>
-                          <div className="history-suggestion-container">
-                            <Input
-                              id="initials"
-                              placeholder="e.g., J.D."
-                              autoComplete="off"
-                              maxLength={6}
-                              ref={patientInitialsInputRef}
-                              value={patientInitials}
-                              className="h-8 sm:h-9 text-sm sm:text-base uppercase"
-                              onFocus={() => {
-                                setOpenPatientInitials(true);
-                                patientInitialsHistory.updateQuery(patientInitials);
-                              }}
-                              onMouseDown={(event) => {
-                                if (
-                                  document.activeElement === event.currentTarget &&
-                                  event.currentTarget.value.trim() === ''
-                                ) {
-                                  event.preventDefault();
-                                  setOpenPatientInitials((prev) => {
-                                    const next = !prev;
-                                    if (next) {
-                                      patientInitialsHistory.updateQuery(event.currentTarget.value);
-                                    }
-                                    return next;
-                                  });
-                                }
-                              }}
-                              onChange={(e) => {
-                                const value = e.target.value.toUpperCase().replace(/[^A-Z.]/g, '');
-                                setPatientInitials(value);
-                                patientInitialsHistory.updateQuery(value);
-                                if (!openPatientInitials) setOpenPatientInitials(true);
-                              }}
-                            />
-                            {openPatientInitials && patientInitialsHistory.suggestions.length > 0 && (
-                              <ul className="absolute z-50 mt-1 w-full max-h-48 overflow-auto rounded-md border bg-popover text-sm shadow" role="listbox">
-                                {patientInitialsHistory.suggestions.map((s) => (
-                                  <li key={s.value}>
-                                    <button
-                                      type="button"
-                                      className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-muted"
-                                      onClick={() => {
-                                        setPatientInitials(s.value);
-                                        patientInitialsHistory.recordValue(s.value);
-                                        patientInitialsHistory.updateQuery(s.value);
-                                        setOpenPatientInitials(false);
-                                      }}
-                                    >
-                                      <span>{s.value}</span>
-                                      <span
-                                        className="text-xs text-muted-foreground hover:text-destructive"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          patientInitialsHistory.clearEntry(s.value);
-                                          patientInitialsHistory.updateQuery(patientInitials);
-                                        }}
-                                      >
-                                        Clear
-                                      </span>
-                                    </button>
-                                  </li>
-                                ))}
-                                <li className="border-t">
-                                  <button
-                                    type="button"
-                                    className="w-full px-3 py-1.5 text-left text-xs text-muted-foreground hover:text-destructive hover:bg-muted"
-                                    onClick={() => {
-                                      patientInitialsHistory.clearAll();
-                                      patientInitialsHistory.updateQuery(patientInitials);
-                                    }}
-                                  >
-                                    Clear all
-                                  </button>
-                                </li>
-                              </ul>
-                            )}
-                          </div>
-                        </div>
-                      </div>
 
-                      {/* Dose */}
-                      <div className="space-y-1.5">
-                        <Label htmlFor="dose" className="text-sm sm:text-base">Dose Instructions *</Label>
-                        <div className="space-y-1">
-                          <div className="relative">
-                            <div className="history-suggestion-container">
-                              <Input
-                                id="dose"
-                                placeholder="e.g., 1 tab, PRN, 1 gtt"
-                                autoComplete="off"
-                                ref={doseInputRef}
-                                value={dose}
-                                className="h-8 sm:h-9 text-sm sm:text-base"
-                                onFocus={() => {
-                                  setOpenDose(true);
-                                  doseHistory.updateQuery(dose);
-                                }}
-                                onMouseDown={(event) => {
-                                  if (
-                                    document.activeElement === event.currentTarget &&
-                                    event.currentTarget.value.trim() === ''
-                                  ) {
-                                    event.preventDefault();
-                                    setOpenDose((prev) => {
-                                      const next = !prev;
-                                      if (next) {
-                                        doseHistory.updateQuery(event.currentTarget.value);
+                          {/* Dose */}
+                          <div className="space-y-1.5">
+                            <Label htmlFor="dose" className="text-sm sm:text-base">
+                              Dose Instructions *
+                            </Label>
+                            <div className="space-y-1">
+                              <div className="relative">
+                                <div className="history-suggestion-container">
+                                  <Input
+                                    id="dose"
+                                    placeholder="e.g., 1 tab, PRN, 1 gtt"
+                                    autoComplete="off"
+                                    ref={doseInputRef}
+                                    value={dose}
+                                    className="h-8 sm:h-9 text-sm sm:text-base"
+                                    onFocus={() => {
+                                      setOpenDose(true);
+                                      doseHistory.updateQuery(dose);
+                                    }}
+                                    onMouseDown={(event) => {
+                                      if (
+                                        document.activeElement === event.currentTarget &&
+                                        event.currentTarget.value.trim() === ''
+                                      ) {
+                                        event.preventDefault();
+                                        setOpenDose((prev) => {
+                                          const next = !prev;
+                                          if (next) {
+                                            doseHistory.updateQuery(event.currentTarget.value);
+                                          }
+                                          return next;
+                                        });
                                       }
-                                      return next;
-                                    });
-                                  }
-                                }}
-                                onChange={(e) => {
-                                  const value = e.target.value;
-                                  setDose(value);
-                                  doseHistory.updateQuery(value);
-                                  if (!openDose) setOpenDose(true);
-                                }}
-                              />
-                              {openDose && doseHistory.suggestions.length > 0 && (
-                                <ul className="absolute z-50 mt-1 w-full max-h-48 overflow-auto rounded-md border bg-popover text-sm shadow" role="listbox">
-                                  {doseHistory.suggestions.map((s) => (
-                                    <li key={s.value}>
-                                      <button
-                                        type="button"
-                                        className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-muted"
-                                        onClick={() => {
-                                          setDose(s.value);
-                                          doseHistory.recordValue(s.value);
-                                          doseHistory.updateQuery(s.value);
-                                          setOpenDose(false);
-                                        }}
-                                      >
-                                        <span>{s.value}</span>
-                                        <span
-                                          className="text-xs text-muted-foreground hover:text-destructive"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            doseHistory.clearEntry(s.value);
+                                    }}
+                                    onChange={(e) => {
+                                      const value = e.target.value;
+                                      setDose(value);
+                                      doseHistory.updateQuery(value);
+                                      if (!openDose) setOpenDose(true);
+                                    }}
+                                  />
+                                  {openDose && doseHistory.suggestions.length > 0 && (
+                                    <ul
+                                      className="absolute z-50 mt-1 w-full max-h-48 overflow-auto rounded-md border bg-popover text-sm shadow"
+                                      role="listbox"
+                                    >
+                                      {doseHistory.suggestions.map((s) => (
+                                        <li key={s.value}>
+                                          <button
+                                            type="button"
+                                            className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-muted"
+                                            onClick={() => {
+                                              setDose(s.value);
+                                              doseHistory.recordValue(s.value);
+                                              doseHistory.updateQuery(s.value);
+                                              setOpenDose(false);
+                                            }}
+                                          >
+                                            <span>{s.value}</span>
+                                            <span
+                                              className="text-xs text-muted-foreground hover:text-destructive"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                doseHistory.clearEntry(s.value);
+                                                doseHistory.updateQuery(dose);
+                                              }}
+                                            >
+                                              Clear
+                                            </span>
+                                          </button>
+                                        </li>
+                                      ))}
+                                      <li className="border-t">
+                                        <button
+                                          type="button"
+                                          className="w-full px-3 py-1.5 text-left text-xs text-muted-foreground hover:text-destructive hover:bg-muted"
+                                          onClick={() => {
+                                            doseHistory.clearAll();
                                             doseHistory.updateQuery(dose);
                                           }}
                                         >
-                                          Clear
-                                        </span>
-                                      </button>
-                                    </li>
-                                  ))}
-                                  <li className="border-t">
-                                    <button
-                                      type="button"
-                                      className="w-full px-3 py-1.5 text-left text-xs text-muted-foreground hover:text-destructive hover:bg-muted"
-                                      onClick={() => {
-                                        doseHistory.clearAll();
-                                        doseHistory.updateQuery(dose);
-                                      }}
-                                    >
-                                      Clear all
-                                    </button>
-                                  </li>
-                                </ul>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Multi-Lot Selection */}
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <Label>Lots to Dispense *</Label>
-                          <p className="text-sm text-muted-foreground">
-                            Total: {medication.currentStock} units
-                          </p>
-                        </div>
-
-                        {selectedLots.map((lot, index) => {
-                          const inventoryLot = availableLots.find(
-                            (l) => l.lotNumber === lot.lotNumber,
-                          );
-                          const lotSelectId = `lot-select-${index}`;
-                          const lotQuantityId = `lot-quantity-${index}`;
-                          return (
-                            <div
-                              key={index}
-                              className="flex flex-col sm:flex-row gap-2 items-start p-3 border rounded-md bg-muted/30"
-                            >
-                              <div className="flex-1 w-full space-y-2">
-                                <div className="space-y-1">
-                                  <Label htmlFor={lotSelectId} className="text-xs sm:text-sm">
-                                    Lot Number
-                                  </Label>
-                                  <Select
-                                    value={lot.lotNumber}
-                                    onValueChange={(value: string) =>
-                                      updateLotSelection(index, 'lotNumber', value)
-                                    }
-                                  >
-                                    <SelectTrigger id={lotSelectId} className="h-8 sm:h-9 w-full">
-                                      <SelectValue placeholder="Select lot" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {availableLots.map((availLot) => (
-                                        <SelectItem
-                                          key={availLot.lotNumber}
-                                          value={availLot.lotNumber}
-                                        >
-                                          <span className="text-xs sm:text-sm">
-                                            {availLot.lotNumber} - Exp:{' '}
-                                            {availLot.expirationDate.toLocaleDateString()} - Qty:{' '}
-                                            {availLot.quantity}
-                                          </span>
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                                <div className="grid grid-cols-2 gap-2">
-                                  <div className="space-y-1">
-                                    <Label htmlFor={lotQuantityId} className="text-xs sm:text-sm">
-                                      Quantity
-                                    </Label>
-                                    <Input
-                                      id={lotQuantityId}
-                                      type="number"
-                                      min="0"
-                                      max={inventoryLot?.quantity || 9999}
-                                      value={lot.quantity || ''}
-                                      onChange={(e) =>
-                                        updateLotSelection(index, 'quantity', e.target.value)
-                                      }
-                                      placeholder="0"
-                                      className="h-8 sm:h-9"
-                                    />
-                                  </div>
-                                  <div className="space-y-1">
-                                    <Label className="text-xs sm:text-sm">Available</Label>
-                                    <p className="text-sm font-medium py-2">
-                                      {inventoryLot ? `${inventoryLot.quantity} units` : '-'}
-                                    </p>
-                                  </div>
+                                          Clear all
+                                        </button>
+                                      </li>
+                                    </ul>
+                                  )}
                                 </div>
                               </div>
-                              {selectedLots.length > 1 && (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => removeLotSelection(index)}
-                                  className="h-9 px-2 text-destructive hover:text-destructive sm:mt-5"
-                                >
-                                  <Trash2 className="size-4" />
-                                </Button>
-                              )}
                             </div>
-                          );
-                        })}
+                          </div>
 
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={addLotSelection}
-                          className="w-full"
-                        >
-                          <Plus className="size-4 mr-2" />
-                          Add Another Lot
-                        </Button>
-                      </div>
+                          {/* Multi-Lot Selection */}
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <Label>Lots to Dispense *</Label>
+                              <p className="text-sm text-muted-foreground">
+                                Total: {medication.currentStock} units
+                              </p>
+                            </div>
 
-                      {/* Provider Information */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <div className="space-y-1.5">
-                          <Label htmlFor="physician" className="text-sm sm:text-base">Physician Name *</Label>
-                          <div className="space-y-1">
-                            <div className="relative">
-                              <div className="history-suggestion-container">
-                                <Input
-                                  id="physician"
-                                  name="physician-name"
-                                  placeholder="e.g., Dr. Smith"
-                                  autoComplete="off"
-                                  autoCapitalize="words"
-                                  ref={physicianInputRef}
-                                  value={physicianName}
-                                  className="h-8 sm:h-9 text-sm sm:text-base"
-                                  onFocus={() => {
-                                    setOpenPhysician(true);
-                                    physicianHistory.updateQuery(physicianName);
-                                  }}
-                                  onMouseDown={(event) => {
-                                    if (
-                                      document.activeElement === event.currentTarget &&
-                                      event.currentTarget.value.trim() === ''
-                                    ) {
-                                      event.preventDefault();
-                                      setOpenPhysician((prev) => {
-                                        const next = !prev;
-                                        if (next) {
-                                          physicianHistory.updateQuery(event.currentTarget.value);
+                            {selectedLots.map((lot, index) => {
+                              const inventoryLot = availableLots.find(
+                                (l) => l.lotNumber === lot.lotNumber,
+                              );
+                              const lotSelectId = `lot-select-${index}`;
+                              const lotQuantityId = `lot-quantity-${index}`;
+                              return (
+                                <div
+                                  key={index}
+                                  className="flex flex-col sm:flex-row gap-2 items-start p-3 border rounded-md bg-muted/30"
+                                >
+                                  <div className="flex-1 w-full space-y-2">
+                                    <div className="space-y-1">
+                                      <Label htmlFor={lotSelectId} className="text-xs sm:text-sm">
+                                        Lot Number
+                                      </Label>
+                                      <Select
+                                        value={lot.lotNumber}
+                                        onValueChange={(value: string) =>
+                                          updateLotSelection(index, 'lotNumber', value)
                                         }
-                                        return next;
-                                      });
-                                    }
-                                  }}
-                                  onChange={(e) => {
-                                    const value = e.target.value;
-                                    setPhysicianName(value);
-                                    physicianHistory.updateQuery(value);
-                                    if (!openPhysician) setOpenPhysician(true);
-                                  }}
-                                />
-                                {openPhysician && physicianHistory.suggestions.length > 0 && (
-                                  <ul className="absolute z-50 mt-1 w-full max-h-48 overflow-auto rounded-md border bg-popover text-sm shadow" role="listbox">
-                                    {physicianHistory.suggestions.map((s) => (
-                                      <li key={s.value}>
-                                        <button
-                                          type="button"
-                                          className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-muted"
-                                          onClick={() => {
-                                            setPhysicianName(s.value);
-                                            physicianHistory.recordValue(s.value);
-                                            physicianHistory.updateQuery(s.value);
-                                            setOpenPhysician(false);
-                                          }}
+                                      >
+                                        <SelectTrigger
+                                          id={lotSelectId}
+                                          className="h-8 sm:h-9 w-full"
                                         >
-                                          <span>{s.value}</span>
-                                          <span
-                                            className="text-xs text-muted-foreground hover:text-destructive"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              physicianHistory.clearEntry(s.value);
+                                          <SelectValue placeholder="Select lot" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {availableLots.map((availLot) => (
+                                            <SelectItem
+                                              key={availLot.lotNumber}
+                                              value={availLot.lotNumber}
+                                            >
+                                              <span className="text-xs sm:text-sm">
+                                                {availLot.lotNumber} - Exp:{' '}
+                                                {availLot.expirationDate.toLocaleDateString()} -
+                                                Qty: {availLot.quantity}
+                                              </span>
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <div className="space-y-1">
+                                        <Label
+                                          htmlFor={lotQuantityId}
+                                          className="text-xs sm:text-sm"
+                                        >
+                                          Quantity
+                                        </Label>
+                                        <Input
+                                          id={lotQuantityId}
+                                          type="number"
+                                          min="0"
+                                          max={inventoryLot?.quantity || 9999}
+                                          value={lot.quantity || ''}
+                                          onChange={(e) =>
+                                            updateLotSelection(index, 'quantity', e.target.value)
+                                          }
+                                          placeholder="0"
+                                          className="h-8 sm:h-9"
+                                        />
+                                      </div>
+                                      <div className="space-y-1">
+                                        <Label className="text-xs sm:text-sm">Available</Label>
+                                        <p className="text-sm font-medium py-2">
+                                          {inventoryLot ? `${inventoryLot.quantity} units` : '-'}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  {selectedLots.length > 1 && (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => removeLotSelection(index)}
+                                      className="h-9 px-2 text-destructive hover:text-destructive sm:mt-5"
+                                    >
+                                      <Trash2 className="size-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                              );
+                            })}
+
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={addLotSelection}
+                              className="w-full"
+                            >
+                              <Plus className="size-4 mr-2" />
+                              Add Another Lot
+                            </Button>
+                          </div>
+
+                          {/* Provider Information */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div className="space-y-1.5">
+                              <Label htmlFor="physician" className="text-sm sm:text-base">
+                                Physician Name *
+                              </Label>
+                              <div className="space-y-1">
+                                <div className="relative">
+                                  <div className="history-suggestion-container">
+                                    <Input
+                                      id="physician"
+                                      name="physician-name"
+                                      placeholder="e.g., Dr. Smith"
+                                      autoComplete="off"
+                                      autoCapitalize="words"
+                                      ref={physicianInputRef}
+                                      value={physicianName}
+                                      className="h-8 sm:h-9 text-sm sm:text-base"
+                                      onFocus={() => {
+                                        setOpenPhysician(true);
+                                        physicianHistory.updateQuery(physicianName);
+                                      }}
+                                      onMouseDown={(event) => {
+                                        if (
+                                          document.activeElement === event.currentTarget &&
+                                          event.currentTarget.value.trim() === ''
+                                        ) {
+                                          event.preventDefault();
+                                          setOpenPhysician((prev) => {
+                                            const next = !prev;
+                                            if (next) {
+                                              physicianHistory.updateQuery(
+                                                event.currentTarget.value,
+                                              );
+                                            }
+                                            return next;
+                                          });
+                                        }
+                                      }}
+                                      onChange={(e) => {
+                                        const value = e.target.value;
+                                        setPhysicianName(value);
+                                        physicianHistory.updateQuery(value);
+                                        if (!openPhysician) setOpenPhysician(true);
+                                      }}
+                                    />
+                                    {openPhysician && physicianHistory.suggestions.length > 0 && (
+                                      <ul
+                                        className="absolute z-50 mt-1 w-full max-h-48 overflow-auto rounded-md border bg-popover text-sm shadow"
+                                        role="listbox"
+                                      >
+                                        {physicianHistory.suggestions.map((s) => (
+                                          <li key={s.value}>
+                                            <button
+                                              type="button"
+                                              className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-muted"
+                                              onClick={() => {
+                                                setPhysicianName(s.value);
+                                                physicianHistory.recordValue(s.value);
+                                                physicianHistory.updateQuery(s.value);
+                                                setOpenPhysician(false);
+                                              }}
+                                            >
+                                              <span>{s.value}</span>
+                                              <span
+                                                className="text-xs text-muted-foreground hover:text-destructive"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  physicianHistory.clearEntry(s.value);
+                                                  physicianHistory.updateQuery(physicianName);
+                                                }}
+                                              >
+                                                Clear
+                                              </span>
+                                            </button>
+                                          </li>
+                                        ))}
+                                        <li className="border-t">
+                                          <button
+                                            type="button"
+                                            className="w-full px-3 py-1.5 text-left text-xs text-muted-foreground hover:text-destructive hover:bg-muted"
+                                            onClick={() => {
+                                              physicianHistory.clearAll();
                                               physicianHistory.updateQuery(physicianName);
                                             }}
                                           >
-                                            Clear
-                                          </span>
-                                        </button>
-                                      </li>
-                                    ))}
-                                    <li className="border-t">
-                                      <button
-                                        type="button"
-                                        className="w-full px-3 py-1.5 text-left text-xs text-muted-foreground hover:text-destructive hover:bg-muted"
-                                        onClick={() => {
-                                          physicianHistory.clearAll();
-                                          physicianHistory.updateQuery(physicianName);
-                                        }}
-                                      >
-                                        Clear all
-                                      </button>
-                                    </li>
-                                  </ul>
-                                )}
+                                            Clear all
+                                          </button>
+                                        </li>
+                                      </ul>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label htmlFor="student" className="text-sm sm:text-base">Student Name</Label>
-                          <div className="space-y-1">
-                            <div className="relative">
-                              <div className="history-suggestion-container">
-                                <Input
-                                  id="student"
-                                  placeholder="e.g., Jane Doe (optional)"
-                                  autoComplete="off"
-                                  ref={studentInputRef}
-                                  value={studentName}
-                                  className="h-8 sm:h-9 text-sm sm:text-base"
-                                  onFocus={() => {
-                                    setOpenStudent(true);
-                                    studentHistory.updateQuery(studentName);
-                                  }}
-                                  onMouseDown={(event) => {
-                                    if (
-                                      document.activeElement === event.currentTarget &&
-                                      event.currentTarget.value.trim() === ''
-                                    ) {
-                                      event.preventDefault();
-                                      setOpenStudent((prev) => {
-                                        const next = !prev;
-                                        if (next) {
-                                          studentHistory.updateQuery(event.currentTarget.value);
+                            <div className="space-y-1.5">
+                              <Label htmlFor="student" className="text-sm sm:text-base">
+                                Student Name
+                              </Label>
+                              <div className="space-y-1">
+                                <div className="relative">
+                                  <div className="history-suggestion-container">
+                                    <Input
+                                      id="student"
+                                      placeholder="e.g., Jane Doe (optional)"
+                                      autoComplete="off"
+                                      ref={studentInputRef}
+                                      value={studentName}
+                                      className="h-8 sm:h-9 text-sm sm:text-base"
+                                      onFocus={() => {
+                                        setOpenStudent(true);
+                                        studentHistory.updateQuery(studentName);
+                                      }}
+                                      onMouseDown={(event) => {
+                                        if (
+                                          document.activeElement === event.currentTarget &&
+                                          event.currentTarget.value.trim() === ''
+                                        ) {
+                                          event.preventDefault();
+                                          setOpenStudent((prev) => {
+                                            const next = !prev;
+                                            if (next) {
+                                              studentHistory.updateQuery(event.currentTarget.value);
+                                            }
+                                            return next;
+                                          });
                                         }
-                                        return next;
-                                      });
-                                    }
-                                  }}
-                                  onChange={(e) => {
-                                    const value = e.target.value;
-                                    setStudentName(value);
-                                    studentHistory.updateQuery(value);
-                                    if (!openStudent) setOpenStudent(true);
-                                  }}
-                                />
-                                {openStudent && studentHistory.suggestions.length > 0 && (
-                                  <ul className="absolute z-50 mt-1 w-full max-h-48 overflow-auto rounded-md border bg-popover text-sm shadow" role="listbox">
-                                    {studentHistory.suggestions.map((s) => (
-                                      <li key={s.value}>
-                                        <button
-                                          type="button"
-                                          className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-muted"
-                                          onClick={() => {
-                                            setStudentName(s.value);
-                                            studentHistory.recordValue(s.value);
-                                            studentHistory.updateQuery(s.value);
-                                            setOpenStudent(false);
-                                          }}
-                                        >
-                                          <span>{s.value}</span>
-                                          <span
-                                            className="text-xs text-muted-foreground hover:text-destructive"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              studentHistory.clearEntry(s.value);
+                                      }}
+                                      onChange={(e) => {
+                                        const value = e.target.value;
+                                        setStudentName(value);
+                                        studentHistory.updateQuery(value);
+                                        if (!openStudent) setOpenStudent(true);
+                                      }}
+                                    />
+                                    {openStudent && studentHistory.suggestions.length > 0 && (
+                                      <ul
+                                        className="absolute z-50 mt-1 w-full max-h-48 overflow-auto rounded-md border bg-popover text-sm shadow"
+                                        role="listbox"
+                                      >
+                                        {studentHistory.suggestions.map((s) => (
+                                          <li key={s.value}>
+                                            <button
+                                              type="button"
+                                              className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-muted"
+                                              onClick={() => {
+                                                setStudentName(s.value);
+                                                studentHistory.recordValue(s.value);
+                                                studentHistory.updateQuery(s.value);
+                                                setOpenStudent(false);
+                                              }}
+                                            >
+                                              <span>{s.value}</span>
+                                              <span
+                                                className="text-xs text-muted-foreground hover:text-destructive"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  studentHistory.clearEntry(s.value);
+                                                  studentHistory.updateQuery(studentName);
+                                                }}
+                                              >
+                                                Clear
+                                              </span>
+                                            </button>
+                                          </li>
+                                        ))}
+                                        <li className="border-t">
+                                          <button
+                                            type="button"
+                                            className="w-full px-3 py-1.5 text-left text-xs text-muted-foreground hover:text-destructive hover:bg-muted"
+                                            onClick={() => {
+                                              studentHistory.clearAll();
                                               studentHistory.updateQuery(studentName);
                                             }}
                                           >
-                                            Clear
-                                          </span>
-                                        </button>
-                                      </li>
-                                    ))}
-                                    <li className="border-t">
-                                      <button
-                                        type="button"
-                                        className="w-full px-3 py-1.5 text-left text-xs text-muted-foreground hover:text-destructive hover:bg-muted"
-                                        onClick={() => {
-                                          studentHistory.clearAll();
-                                          studentHistory.updateQuery(studentName);
-                                        }}
-                                      >
-                                        Clear all
-                                      </button>
-                                    </li>
-                                  </ul>
-                                )}
+                                            Clear all
+                                          </button>
+                                        </li>
+                                      </ul>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           </div>
-                        </div>
-                      </div>
 
-                      {/* Clinic Site */}
-                      <div className="space-y-1.5">
-                        <Label htmlFor="clinic-site">Clinic Site</Label>
-                        <div className="space-y-1">
-                          <div className="relative">
-                            <div className="history-suggestion-container">
-                              <Input
-                                id="clinic-site"
-                                placeholder="e.g., Bainbridge, Moultrie, etc."
-                                autoComplete="off"
-                                ref={clinicInputRef}
-                                value={clinicSite}
-                                onFocus={() => {
-                                  setOpenClinic(true);
-                                  clinicSiteHistory.updateQuery(clinicSite);
-                                }}
-                                onMouseDown={(event) => {
-                                  if (
-                                    document.activeElement === event.currentTarget &&
-                                    event.currentTarget.value.trim() === ''
-                                  ) {
-                                    event.preventDefault();
-                                    setOpenClinic((prev) => {
-                                      const next = !prev;
-                                      if (next) {
-                                        clinicSiteHistory.updateQuery(event.currentTarget.value);
+                          {/* Clinic Site */}
+                          <div className="space-y-1.5">
+                            <Label htmlFor="clinic-site">Clinic Site</Label>
+                            <div className="space-y-1">
+                              <div className="relative">
+                                <div className="history-suggestion-container">
+                                  <Input
+                                    id="clinic-site"
+                                    placeholder="e.g., Bainbridge, Moultrie, etc."
+                                    autoComplete="off"
+                                    ref={clinicInputRef}
+                                    value={clinicSite}
+                                    onFocus={() => {
+                                      setOpenClinic(true);
+                                      clinicSiteHistory.updateQuery(clinicSite);
+                                    }}
+                                    onMouseDown={(event) => {
+                                      if (
+                                        document.activeElement === event.currentTarget &&
+                                        event.currentTarget.value.trim() === ''
+                                      ) {
+                                        event.preventDefault();
+                                        setOpenClinic((prev) => {
+                                          const next = !prev;
+                                          if (next) {
+                                            clinicSiteHistory.updateQuery(
+                                              event.currentTarget.value,
+                                            );
+                                          }
+                                          return next;
+                                        });
                                       }
-                                      return next;
-                                    });
-                                  }
-                                }}
-                                onChange={(e) => {
-                                  const value = e.target.value;
-                                  setClinicSite(value);
-                                  clinicSiteHistory.updateQuery(value);
-                                  if (!openClinic) setOpenClinic(true);
-                                }}
-                              />
-                              {openClinic && clinicSiteHistory.suggestions.length > 0 && (
-                                <ul className="absolute z-50 mt-1 w-full max-h-48 overflow-auto rounded-md border bg-popover text-sm shadow" role="listbox">
-                                  {clinicSiteHistory.suggestions.map((s) => (
-                                    <li key={s.value}>
-                                      <button
-                                        type="button"
-                                        className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-muted"
-                                        onClick={() => {
-                                          setClinicSite(s.value);
-                                          clinicSiteHistory.recordValue(s.value);
-                                          clinicSiteHistory.updateQuery(s.value);
-                                          setOpenClinic(false);
-                                        }}
-                                      >
-                                        <span>{s.value}</span>
-                                        <span
-                                          className="text-xs text-muted-foreground hover:text-destructive"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            clinicSiteHistory.clearEntry(s.value);
+                                    }}
+                                    onChange={(e) => {
+                                      const value = e.target.value;
+                                      setClinicSite(value);
+                                      clinicSiteHistory.updateQuery(value);
+                                      if (!openClinic) setOpenClinic(true);
+                                    }}
+                                  />
+                                  {openClinic && clinicSiteHistory.suggestions.length > 0 && (
+                                    <ul
+                                      className="absolute z-50 mt-1 w-full max-h-48 overflow-auto rounded-md border bg-popover text-sm shadow"
+                                      role="listbox"
+                                    >
+                                      {clinicSiteHistory.suggestions.map((s) => (
+                                        <li key={s.value}>
+                                          <button
+                                            type="button"
+                                            className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-muted"
+                                            onClick={() => {
+                                              setClinicSite(s.value);
+                                              clinicSiteHistory.recordValue(s.value);
+                                              clinicSiteHistory.updateQuery(s.value);
+                                              setOpenClinic(false);
+                                            }}
+                                          >
+                                            <span>{s.value}</span>
+                                            <span
+                                              className="text-xs text-muted-foreground hover:text-destructive"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                clinicSiteHistory.clearEntry(s.value);
+                                                clinicSiteHistory.updateQuery(clinicSite);
+                                              }}
+                                            >
+                                              Clear
+                                            </span>
+                                          </button>
+                                        </li>
+                                      ))}
+                                      <li className="border-t">
+                                        <button
+                                          type="button"
+                                          className="w-full px-3 py-1.5 text-left text-xs text-muted-foreground hover:text-destructive hover:bg-muted"
+                                          onClick={() => {
+                                            clinicSiteHistory.clearAll();
                                             clinicSiteHistory.updateQuery(clinicSite);
                                           }}
                                         >
-                                          Clear
-                                        </span>
-                                      </button>
-                                    </li>
-                                  ))}
-                                  <li className="border-t">
-                                    <button
-                                      type="button"
-                                      className="w-full px-3 py-1.5 text-left text-xs text-muted-foreground hover:text-destructive hover:bg-muted"
-                                      onClick={() => {
-                                        clinicSiteHistory.clearAll();
-                                        clinicSiteHistory.updateQuery(clinicSite);
-                                      }}
-                                    >
-                                      Clear all
-                                    </button>
-                                  </li>
-                                </ul>
-                              )}
+                                          Clear all
+                                        </button>
+                                      </li>
+                                    </ul>
+                                  )}
+                                </div>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </div>
 
-                      {/* Notes */}
-                      <div className="space-y-1.5">
-                        <Label htmlFor="notes">Notes</Label>
-                        <Textarea
-                          id="notes"
-                          placeholder="Optional notes..."
-                          value={notes}
-                          onChange={(e) => setNotes(e.target.value)}
-                          rows={2}
-                        />
-                      </div>
-                    </form>
+                          {/* Notes */}
+                          <div className="space-y-1.5">
+                            <Label htmlFor="notes">Notes</Label>
+                            <Textarea
+                              id="notes"
+                              placeholder="Optional notes..."
+                              value={notes}
+                              onChange={(e) => setNotes(e.target.value)}
+                              rows={2}
+                            />
+                          </div>
+                        </form>
                       </div>
                       <div className="flex gap-2 py-4 border-t px-4 sm:px-6 flex-shrink-0 bg-background">
-                        <Button type="button" onClick={handleDispense} className="w-full h-9 sm:h-10 text-sm sm:text-base">
-                          
+                        <Button
+                          type="button"
+                          onClick={handleDispense}
+                          className="w-full h-9 sm:h-10 text-sm sm:text-base"
+                        >
                           Confirm Dispensing
                         </Button>
                       </div>
-                  </DialogContent>
-                </Dialog>
-              )
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Details */}
-      <div className="grid md:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Medication Information</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div>
-              <Label className="text-sm font-medium">Strength</Label>
-              <p className="text-sm">{medication.strength}</p>
-            </div>
-            <div>
-              <Label className="text-sm font-medium">Dosage Form</Label>
-              <p className="text-sm">{medication.dosageForm}</p>
-            </div>
-            <div>
-              <Label className="text-sm font-medium">Category</Label>
-              <div className="flex flex-wrap gap-1 mt-1">
-                {(Array.isArray(medication.category)
-                  ? medication.category
-                  : medication.category
-                  ? [medication.category as unknown as string]
-                  : []
-                ).map((cat) => (
-                  <Badge key={cat} variant="outline" className="text-xs">
-                    {cat}
-                  </Badge>
+                    </DialogContent>
+                  </Dialog>
                 ))}
-              </div>
-            </div>
-            <div>
-              <Label className="text-sm font-medium">Last Updated</Label>
-              <p className="text-sm text-muted-foreground">
-                {medication.lastUpdated.toLocaleString()}
-              </p>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Package className="size-4" />
-                Inventory Details
-              </CardTitle>
-              {canEditLots && (
-                <Button variant="outline" size="sm" onClick={handleAddLot}>
-                  <Plus className="size-4 mr-1" />
-                  Add Lot
-                </Button>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent>
-            {medicationInventory.length > 0 ? (
-              <div className="space-y-2">
-                {medicationInventory.map((inv) => (
-                  <div key={inv.id} className="flex items-center justify-between p-3 border rounded">
-                    <div className="flex-1">
-                      <p className="font-medium">Lot: {inv.lotNumber}</p>
-                      <p className="text-sm text-muted-foreground">Quantity: {inv.quantity} units</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="text-right">
-                        <div className="flex items-center gap-1">
-                          <Clock className="size-3" />
-                          <span className="text-sm">
-                            Exp: {inv.expirationDate.toLocaleDateString()}
-                          </span>
+        {/* Details */}
+        <div className="grid md:grid-cols-2 gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Medication Information</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <Label className="text-sm font-medium">Strength</Label>
+                <p className="text-sm">{medication.strength}</p>
+              </div>
+              <div>
+                <Label className="text-sm font-medium">Dosage Form</Label>
+                <p className="text-sm">{medication.dosageForm}</p>
+              </div>
+              <div>
+                <Label className="text-sm font-medium">Category</Label>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {(Array.isArray(medication.category)
+                    ? medication.category
+                    : medication.category
+                      ? [medication.category as unknown as string]
+                      : []
+                  ).map((cat) => (
+                    <Badge key={cat} variant="outline" className="text-xs">
+                      {cat}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <Label className="text-sm font-medium">Last Updated</Label>
+                <p className="text-sm text-muted-foreground">
+                  {medication.lastUpdated.toLocaleString()}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Package className="size-4" />
+                  Inventory Details
+                </CardTitle>
+                {canEditLots && (
+                  <Button variant="outline" size="sm" onClick={handleAddLot}>
+                    <Plus className="size-4 mr-1" />
+                    Add Lot
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {medicationInventory.length > 0 ? (
+                <div className="space-y-2">
+                  {medicationInventory.map((inv) => (
+                    <div
+                      key={inv.id}
+                      className="flex items-center justify-between p-3 border rounded"
+                    >
+                      <div className="flex-1">
+                        <p className="font-medium">Lot: {inv.lotNumber}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Quantity: {inv.quantity} units
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <div className="flex items-center gap-1">
+                            <Clock className="size-3" />
+                            <span className="text-sm">
+                              Exp: {inv.expirationDate.toLocaleDateString()}
+                            </span>
+                          </div>
+                          {inv.isExpired && (
+                            <Badge variant="destructive" className="text-xs mt-1">
+                              Expired
+                            </Badge>
+                          )}
                         </div>
-                        {inv.isExpired && (
-                          <Badge variant="destructive" className="text-xs mt-1">
-                            Expired
-                          </Badge>
+                        {canEditLots && (
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditLot(inv)}
+                              className="h-8 w-8 p-0"
+                            >
+                              <Edit2 className="size-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteLot(inv.id)}
+                              className="h-8 w-8 p-0 text-red-600 hover:text-red-600 hover:bg-red-50"
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </div>
                         )}
                       </div>
-                      {canEditLots && (
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditLot(inv)}
-                            className="h-8 w-8 p-0"
-                          >
-                            <Edit2 className="size-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteLot(inv.id)}
-                            className="h-8 w-8 p-0 text-red-600 hover:text-red-600 hover:bg-red-50"
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </div>
-                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6 text-muted-foreground">
+                  <Package className="size-12 mx-auto mb-2 opacity-30" />
+                  <p>No lot numbers recorded</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Alternatives */}
+        {alternatives.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Alternative Medications</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {alternatives.map((alt) => (
+                  <div
+                    key={alt.id}
+                    className="flex items-center justify-between p-3 border rounded cursor-pointer hover:bg-muted/50"
+                    onClick={() => handleAlternativeSelect(alt)}
+                  >
+                    <div>
+                      <p className="font-medium">
+                        {alt.name} {alt.strength}
+                      </p>
+                      <p className="text-sm text-muted-foreground">{alt.genericName}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium text-green-600">{alt.currentStock} available</p>
+                      <p className="text-xs text-muted-foreground">Click to view</p>
                     </div>
                   </div>
                 ))}
               </div>
-            ) : (
-              <div className="text-center py-6 text-muted-foreground">
-                <Package className="size-12 mx-auto mb-2 opacity-30" />
-                <p>No lot numbers recorded</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        )}
 
-      {/* Alternatives */}
-      {alternatives.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Alternative Medications</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {alternatives.map((alt) => (
-                <div
-                  key={alt.id}
-                  className="flex items-center justify-between p-3 border rounded cursor-pointer hover:bg-muted/50"
-                  onClick={() => handleAlternativeSelect(alt)}
-                >
-                  <div>
-                    <p className="font-medium">
-                      {alt.name} {alt.strength}
-                    </p>
-                    <p className="text-sm text-muted-foreground">{alt.genericName}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-medium text-green-600">{alt.currentStock} available</p>
-                    <p className="text-xs text-muted-foreground">Click to view</p>
-                  </div>
+        {/* Lot Edit/Add Dialog */}
+        {canEditLots && (
+          <Dialog open={isLotDialogOpen} onOpenChange={setIsLotDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{editingLot ? 'Edit Lot Number' : 'Add Lot Number'}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="lot-number">Lot Number *</Label>
+                  <Input
+                    id="lot-number"
+                    value={lotNumber}
+                    onChange={(e) => setLotNumber(e.target.value)}
+                    placeholder="e.g., EW0646, 11953A"
+                  />
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Lot Edit/Add Dialog */}
-      {canEditLots && (
-        <Dialog open={isLotDialogOpen} onOpenChange={setIsLotDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingLot ? 'Edit Lot Number' : 'Add Lot Number'}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="lot-number">Lot Number *</Label>
-                <Input
-                  id="lot-number"
-                  value={lotNumber}
-                  onChange={(e) => setLotNumber(e.target.value)}
-                  placeholder="e.g., EW0646, 11953A"
-                />
+                <div className="space-y-2">
+                  <Label htmlFor="lot-quantity">Quantity *</Label>
+                  <Input
+                    id="lot-quantity"
+                    type="number"
+                    value={lotQuantity}
+                    onChange={(e) => setLotQuantity(e.target.value)}
+                    min="0"
+                    placeholder="e.g., 100"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lot-expiration">Expiration Date *</Label>
+                  <Input
+                    id="lot-expiration"
+                    type="month"
+                    value={lotExpiration}
+                    onChange={(e) => setLotExpiration(e.target.value)}
+                  />
+                </div>
+                <div className="flex justify-end gap-3 mt-6">
+                  <Button variant="outline" onClick={() => setIsLotDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleSaveLot}>{editingLot ? 'Update' : 'Add'} Lot</Button>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="lot-quantity">Quantity *</Label>
-                <Input
-                  id="lot-quantity"
-                  type="number"
-                  value={lotQuantity}
-                  onChange={(e) => setLotQuantity(e.target.value)}
-                  min="0"
-                  placeholder="e.g., 100"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="lot-expiration">Expiration Date *</Label>
-                <Input
-                  id="lot-expiration"
-                  type="month"
-                  value={lotExpiration}
-                  onChange={(e) => setLotExpiration(e.target.value)}
-                />
-              </div>
-              <div className="flex justify-end gap-3 mt-6">
-                <Button variant="outline" onClick={() => setIsLotDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleSaveLot}>{editingLot ? 'Update' : 'Add'} Lot</Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
     </div>
   );

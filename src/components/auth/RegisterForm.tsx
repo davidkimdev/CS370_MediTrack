@@ -19,7 +19,7 @@ export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
   const [success, setSuccess] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  
+
   // Form state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -38,7 +38,7 @@ export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
     if (!/[A-Z]/.test(password)) return 'Password must contain at least one uppercase letter';
     if (!/[a-z]/.test(password)) return 'Password must contain at least one lowercase letter';
     if (!/[0-9]/.test(password)) return 'Password must contain at least one number';
-    if (password !== confirmPassword) return 'Passwords don\'t match';
+    if (password !== confirmPassword) return "Passwords don't match";
     if (!firstName) return 'First name is required';
     if (firstName.length < 2) return 'First name must be at least 2 characters';
     if (!lastName) return 'Last name is required';
@@ -48,39 +48,40 @@ export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const validationError = validateForm();
     if (validationError) {
       setError(validationError);
       return;
     }
 
-    console.log('🟢 Register form submitted!', { 
-      email, 
+    console.log('🟢 Register form submitted!', {
+      email,
       firstName,
       lastName,
       hasInvitationCode: Boolean(invitationCode),
-      passwordLength: password.length 
+      passwordLength: password.length,
     });
-    
+
     try {
       setIsLoading(true);
       setError('');
       setSuccess(false);
-      
+
       console.log('🟢 Attempting to register user...', { email });
       await signUp({
         email: email.toLowerCase().trim(),
         password,
         firstName: firstName.trim(),
         lastName: lastName.trim(),
-        invitationCode: invitationCode.trim() || undefined
+        invitationCode: invitationCode.trim() || undefined,
       });
-      
+
       console.log('✅ User registered successfully!', { email });
       setSuccess(true);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Registration failed. Please try again.';
+      const errorMessage =
+        err instanceof Error ? err.message : 'Registration failed. Please try again.';
       console.error('❌ Registration failed:', errorMessage);
       setError(errorMessage);
     } finally {
@@ -104,7 +105,8 @@ export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
               {hasInvitationCode ? (
                 <div className="space-y-3">
                   <p className="text-green-700">
-                    Your account has been created and approved automatically using your invitation code.
+                    Your account has been created and approved automatically using your invitation
+                    code.
                   </p>
                   <p className="text-sm text-muted-foreground">
                     You can now sign in and access all features.
@@ -112,19 +114,17 @@ export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <p className="text-green-700">
-                    Your account has been created successfully!
-                  </p>
+                  <p className="text-green-700">Your account has been created successfully!</p>
                   <Alert>
                     <Info className="h-4 w-4" />
                     <AlertDescription>
-                      Your account is pending approval from an administrator. 
-                      You'll receive an email notification once approved.
+                      Your account is pending approval from an administrator. You'll receive an
+                      email notification once approved.
                     </AlertDescription>
                   </Alert>
                 </div>
               )}
-              
+
               <div className="pt-4">
                 <Button onClick={onSwitchToLogin} className="w-full">
                   Go to Sign In
@@ -164,7 +164,7 @@ export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
               {/* Invitation Code Field */}
               <div className="space-y-2">
                 <Label htmlFor="invitationCode">
-                  Invitation Code 
+                  Invitation Code
                   <span className="text-muted-foreground text-sm font-normal">(Optional)</span>
                 </Label>
                 <Input
@@ -255,11 +255,7 @@ export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
                     onClick={() => setShowPassword(!showPassword)}
                     disabled={isLoading}
                   >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -306,11 +302,7 @@ export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
               )}
 
               {/* Submit Button */}
-              <Button 
-                type="submit" 
-                className="w-full" 
-                disabled={isLoading}
-              >
+              <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? (
                   <div className="flex items-center justify-center gap-2">
                     <div className="size-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -324,9 +316,9 @@ export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
 
             {/* Login Link */}
             <div className="mt-6">
-              <Button 
-                variant="outline" 
-                className="w-full" 
+              <Button
+                variant="outline"
+                className="w-full"
                 onClick={onSwitchToLogin}
                 disabled={isLoading}
               >

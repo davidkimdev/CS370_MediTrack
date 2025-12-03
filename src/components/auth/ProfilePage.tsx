@@ -5,7 +5,14 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { ShieldCheck, KeyRound, MailPlus, Trash2, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -205,7 +212,12 @@ export function ProfilePage() {
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0">
-          <Button type="button" variant="outline" onClick={closeEmailModal} disabled={isProcessingEmail}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={closeEmailModal}
+            disabled={isProcessingEmail}
+          >
             Cancel
           </Button>
           <Button type="button" onClick={handleEmailSubmit} disabled={isProcessingEmail}>
@@ -217,9 +229,7 @@ export function ProfilePage() {
   );
 
   if (isLoading) {
-    return (
-      <div className="py-12 text-center text-muted-foreground">Loading profile…</div>
-    );
+    return <div className="py-12 text-center text-muted-foreground">Loading profile…</div>;
   }
 
   if (!user) {
@@ -235,7 +245,9 @@ export function ProfilePage() {
       <Card>
         <CardHeader>
           <CardTitle>Account Profile</CardTitle>
-          <CardDescription>Update how your name appears throughout the application.</CardDescription>
+          <CardDescription>
+            Update how your name appears throughout the application.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -271,9 +283,7 @@ export function ProfilePage() {
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <Badge variant="outline">Role: {profile?.role ?? 'staff'}</Badge>
             {profile?.createdAt && (
-              <span>
-                Member since {profile.createdAt.toLocaleDateString()}
-              </span>
+              <span>Member since {profile.createdAt.toLocaleDateString()}</span>
             )}
           </div>
 

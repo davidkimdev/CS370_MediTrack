@@ -11,7 +11,10 @@ export class AuthService {
     return `${supabaseUrl}/functions/v1/server/make-server-be81afe8`;
   }
 
-  private static async callAdminFunction<T>(endpoint: string, body: Record<string, unknown>): Promise<T> {
+  private static async callAdminFunction<T>(
+    endpoint: string,
+    body: Record<string, unknown>,
+  ): Promise<T> {
     const session = await this.getSession();
     const accessToken = session?.access_token;
 
@@ -37,7 +40,10 @@ export class AuthService {
       try {
         payload = JSON.parse(text);
       } catch (parseError) {
-        logger.warn('Failed to parse admin function response', parseError instanceof Error ? parseError : new Error(String(parseError)));
+        logger.warn(
+          'Failed to parse admin function response',
+          parseError instanceof Error ? parseError : new Error(String(parseError)),
+        );
       }
     }
 
@@ -56,7 +62,7 @@ export class AuthService {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.toLowerCase().trim(),
-        password
+        password,
       });
 
       if (error) {
@@ -72,7 +78,7 @@ export class AuthService {
       return {
         id: data.user.id,
         email: data.user.email!,
-        profile: undefined // Don't fetch profile during sign-in for performance
+        profile: undefined, // Don't fetch profile during sign-in for performance
       };
     } catch (error) {
       logger.error('Sign in error', error instanceof Error ? error : new Error(String(error)));
@@ -93,12 +99,12 @@ export class AuthService {
         if (!invitation) {
           throw new Error('Invalid or expired invitation code');
         }
-        
+
         // If invitation is specific to an email, verify it matches
         if (invitation.email && invitation.email.toLowerCase() !== data.email.toLowerCase()) {
           throw new Error('This invitation is for a different email address');
         }
-        
+
         isAutoApproved = true;
       }
 
@@ -109,9 +115,9 @@ export class AuthService {
         options: {
           data: {
             first_name: data.firstName,
-            last_name: data.lastName
-          }
-        }
+            last_name: data.lastName,
+          },
+        },
       });
 
       if (authError) {
@@ -124,17 +130,15 @@ export class AuthService {
       }
 
       // Create user profile
-      const { error: profileError } = await supabase
-        .from('user_profiles')
-        .insert({
-          id: authData.user.id,
-          email: data.email.toLowerCase().trim(),
-          first_name: data.firstName,
-          last_name: data.lastName,
-          role: 'staff',
-          is_approved: isAutoApproved,
-          approved_at: isAutoApproved ? new Date().toISOString() : null
-        });
+      const { error: profileError } = await supabase.from('user_profiles').insert({
+        id: authData.user.id,
+        email: data.email.toLowerCase().trim(),
+        first_name: data.firstName,
+        last_name: data.lastName,
+        role: 'staff',
+        is_approved: isAutoApproved,
+        approved_at: isAutoApproved ? new Date().toISOString() : null,
+      });
 
       if (profileError) {
         logger.error('Profile creation failed', profileError);
@@ -148,12 +152,11 @@ export class AuthService {
         await this.markInvitationAsUsed(data.invitationCode, authData.user.id);
       }
 
-      logger.info('User registered successfully', { 
-        userId: authData.user.id, 
+      logger.info('User registered successfully', {
+        userId: authData.user.id,
         email: data.email,
-        autoApproved: isAutoApproved 
+        autoApproved: isAutoApproved,
       });
-
     } catch (error) {
       logger.error('Sign up error', error instanceof Error ? error : new Error(String(error)));
       throw error;
@@ -183,7 +186,7 @@ export class AuthService {
   static async resetPassword(email: string): Promise<void> {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email.toLowerCase().trim(), {
-        redirectTo: `${window.location.origin}/auth/reset-password`
+        redirectTo: `${window.location.origin}/auth/reset-password`,
       });
 
       if (error) {
@@ -193,7 +196,10 @@ export class AuthService {
 
       logger.info('Password reset email sent', { email });
     } catch (error) {
-      logger.error('Reset password error', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Reset password error',
+        error instanceof Error ? error : new Error(String(error)),
+      );
       throw error;
     }
   }
@@ -203,7 +209,10 @@ export class AuthService {
    */
   static async getSession() {
     try {
-      const { data: { session }, error } = await supabase.auth.getSession();
+      const {
+        data: { session },
+        error,
+      } = await supabase.auth.getSession();
       if (error) {
         logger.error('Get session failed', error);
         return null;
@@ -231,24 +240,17 @@ export class AuthService {
 
       // Increase timeout to 30 seconds to handle slow/stale connections
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Profile query timeout after 30 seconds')), 30000)
+        setTimeout(() => reject(new Error('Profile query timeout after 30 seconds')), 30000),
       );
 
-      const queryPromise = supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
+      const queryPromise = supabase.from('user_profiles').select('*').eq('id', userId).single();
 
       console.log('⏳ Waiting for profile query...');
 
-      const { data, error } = await Promise.race([
-        queryPromise,
-        timeoutPromise
-      ]).catch(err => {
+      const { data, error } = (await Promise.race([queryPromise, timeoutPromise]).catch((err) => {
         console.error('❌ PROFILE TIMEOUT ERROR:', err.message);
         throw err;
-      }) as any;
+      })) as any;
 
       console.log('🔍 AuthService: Profile query result:', { data, error });
 
@@ -277,11 +279,14 @@ export class AuthService {
         isApproved: data.is_approved,
         approvedBy: data.approved_by,
         approvedAt: data.approved_at ? new Date(data.approved_at) : undefined,
-        createdAt: new Date(data.created_at)
+        createdAt: new Date(data.created_at),
       };
     } catch (error) {
       console.error('❌ getUserProfile error:', error);
-      logger.error('Get user profile error', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Get user profile error',
+        error instanceof Error ? error : new Error(String(error)),
+      );
       throw error; // Re-throw so retry logic can catch it
     }
   }
@@ -297,7 +302,7 @@ export class AuthService {
           ...(updates.firstName && { first_name: updates.firstName }),
           ...(updates.lastName && { last_name: updates.lastName }),
           ...(updates.role && { role: updates.role }),
-          ...(updates.isApproved !== undefined && { is_approved: updates.isApproved })
+          ...(updates.isApproved !== undefined && { is_approved: updates.isApproved }),
         })
         .eq('id', userId)
         .select()
@@ -317,10 +322,13 @@ export class AuthService {
         isApproved: data.is_approved,
         approvedBy: data.approved_by,
         approvedAt: data.approved_at ? new Date(data.approved_at) : undefined,
-        createdAt: new Date(data.created_at)
+        createdAt: new Date(data.created_at),
       };
     } catch (error) {
-      logger.error('Update profile error', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Update profile error',
+        error instanceof Error ? error : new Error(String(error)),
+      );
       throw error;
     }
   }
@@ -352,10 +360,13 @@ export class AuthService {
         expiresAt: new Date(data.expires_at),
         usedBy: data.used_by,
         usedAt: data.used_at ? new Date(data.used_at) : undefined,
-        isActive: data.is_active
+        isActive: data.is_active,
       };
     } catch (error) {
-      logger.error('Validate invitation code error', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Validate invitation code error',
+        error instanceof Error ? error : new Error(String(error)),
+      );
       return null;
     }
   }
@@ -370,7 +381,7 @@ export class AuthService {
         .update({
           used_by: userId,
           used_at: new Date().toISOString(),
-          is_active: false
+          is_active: false,
         })
         .eq('code', code);
 
@@ -378,28 +389,33 @@ export class AuthService {
         logger.error('Failed to mark invitation as used', error);
       }
     } catch (error) {
-      logger.error('Mark invitation used error', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Mark invitation used error',
+        error instanceof Error ? error : new Error(String(error)),
+      );
     }
   }
 
   /**
    * Admin: Create invitation code
    */
-  static async createInvitationCode(createdBy: string, email?: string, expiresInDays = 7): Promise<string> {
+  static async createInvitationCode(
+    createdBy: string,
+    email?: string,
+    expiresInDays = 7,
+  ): Promise<string> {
     try {
       const code = this.generateInvitationCode();
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + expiresInDays);
 
-      const { error } = await supabase
-        .from('invitation_codes')
-        .insert({
-          code,
-          email: email?.toLowerCase().trim(),
-          created_by: createdBy,
-          expires_at: expiresAt.toISOString(),
-          is_active: true
-        });
+      const { error } = await supabase.from('invitation_codes').insert({
+        code,
+        email: email?.toLowerCase().trim(),
+        created_by: createdBy,
+        expires_at: expiresAt.toISOString(),
+        is_active: true,
+      });
 
       if (error) {
         logger.error('Failed to create invitation code', error);
@@ -409,7 +425,10 @@ export class AuthService {
       logger.info('Invitation code created', { code, email, createdBy });
       return code;
     } catch (error) {
-      logger.error('Create invitation code error', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Create invitation code error',
+        error instanceof Error ? error : new Error(String(error)),
+      );
       throw error;
     }
   }
@@ -440,7 +459,10 @@ export class AuthService {
         isActive: code.is_active,
       }));
     } catch (error) {
-      logger.error('Get invitation codes error', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Get invitation codes error',
+        error instanceof Error ? error : new Error(String(error)),
+      );
       throw error;
     }
   }
@@ -461,7 +483,10 @@ export class AuthService {
 
       logger.info('Invitation code deactivated', { codeId });
     } catch (error) {
-      logger.error('Deactivate invitation code error', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Deactivate invitation code error',
+        error instanceof Error ? error : new Error(String(error)),
+      );
       throw error;
     }
   }
@@ -494,7 +519,7 @@ export class AuthService {
         throw new Error(error.message);
       }
 
-      return data.map(user => ({
+      return data.map((user) => ({
         id: user.id,
         email: user.email,
         firstName: user.first_name,
@@ -503,10 +528,13 @@ export class AuthService {
         isApproved: user.is_approved,
         approvedBy: user.approved_by,
         approvedAt: user.approved_at ? new Date(user.approved_at) : undefined,
-        createdAt: new Date(user.created_at)
+        createdAt: new Date(user.created_at),
       }));
     } catch (error) {
-      logger.error('Get pending users error', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Get pending users error',
+        error instanceof Error ? error : new Error(String(error)),
+      );
       throw error;
     }
   }
@@ -521,7 +549,7 @@ export class AuthService {
         .update({
           is_approved: true,
           approved_by: approvedBy,
-          approved_at: new Date().toISOString()
+          approved_at: new Date().toISOString(),
         })
         .eq('id', userId);
 
@@ -551,7 +579,7 @@ export class AuthService {
         throw new Error(`Failed to get users: ${error.message}`);
       }
 
-      return (data || []).map(user => ({
+      return (data || []).map((user) => ({
         id: user.id,
         email: user.email,
         firstName: user.first_name,
@@ -560,10 +588,13 @@ export class AuthService {
         isApproved: user.is_approved,
         approvedBy: user.approved_by,
         approvedAt: user.approved_at ? new Date(user.approved_at) : undefined,
-        createdAt: new Date(user.created_at)
+        createdAt: new Date(user.created_at),
       }));
     } catch (error) {
-      logger.error('Get all users error', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Get all users error',
+        error instanceof Error ? error : new Error(String(error)),
+      );
       throw error;
     }
   }
@@ -635,7 +666,10 @@ export class AuthService {
         createdAt: new Date(updated.createdAt),
       };
     } catch (error) {
-      logger.error('Admin update user error', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Admin update user error',
+        error instanceof Error ? error : new Error(String(error)),
+      );
       throw error;
     }
   }

@@ -24,23 +24,26 @@ export function InvitationManagerPanel() {
 
     try {
       setIsGenerating(true);
-      
+
       const options = {
         email: email.trim() || undefined,
         expiresInDays: parseInt(expiresInDays),
-        customCode: customCode.trim() || undefined
+        customCode: customCode.trim() || undefined,
       };
 
       const code = await InvitationUtils.createInvitation(user.id, options);
-      setGeneratedCodes(prev => [code, ...prev]);
-      
+      setGeneratedCodes((prev) => [code, ...prev]);
+
       // Clear form
       setEmail('');
       setCustomCode('');
-      
+
       logger.info('Invitation code generated successfully', { code });
     } catch (error) {
-      logger.error('Failed to generate invitation code', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Failed to generate invitation code',
+        error instanceof Error ? error : new Error(String(error)),
+      );
     } finally {
       setIsGenerating(false);
     }
@@ -52,15 +55,18 @@ export function InvitationManagerPanel() {
     try {
       setIsGenerating(true);
       const presetConfig = InvitationUtils.PRESETS[preset as keyof typeof InvitationUtils.PRESETS];
-      
+
       const code = await InvitationUtils.createInvitation(user.id, {
-        expiresInDays: presetConfig.expiresInDays
+        expiresInDays: presetConfig.expiresInDays,
       });
-      
-      setGeneratedCodes(prev => [code, ...prev]);
+
+      setGeneratedCodes((prev) => [code, ...prev]);
       logger.info('Preset invitation code generated', { preset, code });
     } catch (error) {
-      logger.error('Failed to generate preset code', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Failed to generate preset code',
+        error instanceof Error ? error : new Error(String(error)),
+      );
     } finally {
       setIsGenerating(false);
     }
@@ -71,7 +77,10 @@ export function InvitationManagerPanel() {
       await navigator.clipboard.writeText(code);
       logger.info('Invitation code copied to clipboard', { code });
     } catch (error) {
-      logger.error('Failed to copy code', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Failed to copy code',
+        error instanceof Error ? error : new Error(String(error)),
+      );
     }
   };
 
@@ -84,9 +93,7 @@ export function InvitationManagerPanel() {
             <Plus className="size-5" />
             Quick Generate
           </CardTitle>
-          <CardDescription>
-            Generate invitation codes with common presets
-          </CardDescription>
+          <CardDescription>Generate invitation codes with common presets</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-end gap-4">
@@ -104,11 +111,7 @@ export function InvitationManagerPanel() {
                 </SelectContent>
               </Select>
             </div>
-            <Button 
-              onClick={handleGeneratePreset}
-              disabled={isGenerating}
-              className="shrink-0"
-            >
+            <Button onClick={handleGeneratePreset} disabled={isGenerating} className="shrink-0">
               {isGenerating ? (
                 <div className="flex items-center gap-2">
                   <div className="size-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -129,9 +132,7 @@ export function InvitationManagerPanel() {
       <Card>
         <CardHeader>
           <CardTitle>Custom Invitation</CardTitle>
-          <CardDescription>
-            Create a custom invitation with specific settings
-          </CardDescription>
+          <CardDescription>Create a custom invitation with specific settings</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -145,9 +146,7 @@ export function InvitationManagerPanel() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Leave empty for general use code
-                </p>
+                <p className="text-xs text-muted-foreground">Leave empty for general use code</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="customCode">Custom Code (Optional)</Label>
@@ -159,12 +158,10 @@ export function InvitationManagerPanel() {
                   onChange={(e) => setCustomCode(e.target.value.toUpperCase())}
                   maxLength={8}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Leave empty for auto-generation
-                </p>
+                <p className="text-xs text-muted-foreground">Leave empty for auto-generation</p>
               </div>
             </div>
-            
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="expires">Expires In (Days)</Label>
@@ -183,11 +180,7 @@ export function InvitationManagerPanel() {
                 </Select>
               </div>
               <div className="flex items-end">
-                <Button 
-                  onClick={handleGenerateCode}
-                  disabled={isGenerating}
-                  className="w-full"
-                >
+                <Button onClick={handleGenerateCode} disabled={isGenerating} className="w-full">
                   {isGenerating ? (
                     <div className="flex items-center gap-2">
                       <div className="size-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -214,14 +207,15 @@ export function InvitationManagerPanel() {
               <User className="size-5" />
               Generated Codes ({generatedCodes.length})
             </CardTitle>
-            <CardDescription>
-              Recently generated invitation codes
-            </CardDescription>
+            <CardDescription>Recently generated invitation codes</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               {generatedCodes.map((code, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                >
                   <div className="flex items-center gap-3">
                     <Badge variant="outline" className="font-mono text-base px-3 py-1">
                       {code}
@@ -233,11 +227,7 @@ export function InvitationManagerPanel() {
                       </div>
                     </div>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => copyToClipboard(code)}
-                  >
+                  <Button size="sm" variant="ghost" onClick={() => copyToClipboard(code)}>
                     <Copy className="size-4" />
                   </Button>
                 </div>

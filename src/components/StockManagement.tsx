@@ -202,8 +202,7 @@ export function StockManagement({
     () => sortedVisibleCategories.slice(INLINE_LIMIT),
     [sortedVisibleCategories],
   );
-  const ensureSelectedChip =
-    activeCategory !== 'All' && !topCategories.includes(activeCategory);
+  const ensureSelectedChip = activeCategory !== 'All' && !topCategories.includes(activeCategory);
 
   useEffect(() => {
     if (activeCategory !== 'All' && !visibleCategories.includes(activeCategory)) {
@@ -433,9 +432,9 @@ export function StockManagement({
             onChange={(e) => setSearchTerm(e.target.value)}
             style={{
               backgroundColor: '#86efac', // Tailwind's green-300 hex
-              borderColor: '#22c55e',     // Tailwind's green-500
-              color: '#064e3b',           // Tailwind's green-900 (text)
-              }}
+              borderColor: '#22c55e', // Tailwind's green-500
+              color: '#064e3b', // Tailwind's green-900 (text)
+            }}
             className="pl-10 border-2 focus:ring-2 focus:ring-green-600 focus:border-green-600"
           />
         </div>
@@ -500,7 +499,9 @@ export function StockManagement({
                   >
                     {activeCategory}
                     {categoryCounts.get(activeCategory) ? (
-                      <span className="ml-1 text-[10px] opacity-70">{categoryCounts.get(activeCategory)}</span>
+                      <span className="ml-1 text-[10px] opacity-70">
+                        {categoryCounts.get(activeCategory)}
+                      </span>
                     ) : null}
                   </Button>
                 )}
@@ -814,12 +815,16 @@ export function StockManagement({
           {medicationToDelete && (
             <div className="space-y-4">
               <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-md">
-                <p className="text-sm font-medium mb-2">Are you sure you want to delete this medication?</p>
+                <p className="text-sm font-medium mb-2">
+                  Are you sure you want to delete this medication?
+                </p>
                 <p className="text-sm font-medium">
-                  {medicationToDelete.name} - {medicationToDelete.strength} ({medicationToDelete.dosageForm})
+                  {medicationToDelete.name} - {medicationToDelete.strength} (
+                  {medicationToDelete.dosageForm})
                 </p>
                 <p className="text-sm text-muted-foreground mt-2">
-                  This will permanently remove the medication and all its inventory lots. This action cannot be undone.
+                  This will permanently remove the medication and all its inventory lots. This
+                  action cannot be undone.
                 </p>
               </div>
 

@@ -14,7 +14,12 @@ interface ProtectedRouteProps {
   onAccessDenied?: () => void;
 }
 
-export function ProtectedRoute({ children, requiredLevel, fallback, onAccessDenied }: ProtectedRouteProps) {
+export function ProtectedRoute({
+  children,
+  requiredLevel,
+  fallback,
+  onAccessDenied,
+}: ProtectedRouteProps) {
   const { user, isLoading } = useAuth();
 
   // Show loading state
@@ -38,24 +43,24 @@ export function ProtectedRoute({ children, requiredLevel, fallback, onAccessDeni
   // No user at all - show access denied
   if (!user) {
     logger.debug('No user found, access denied');
-    
+
     if (onAccessDenied) {
       onAccessDenied();
       return null;
     }
-    
+
     if (fallback) {
       return <>{fallback}</>;
     }
-    
+
     return <AccessDeniedScreen reason="login-required" />;
   }
 
   // Authenticated access - just need to be logged in
   if (requiredLevel === 'authenticated') {
-    logger.debug('User authenticated, allowing access', { 
-      userId: user.id, 
-      isApproved: user.profile?.isApproved 
+    logger.debug('User authenticated, allowing access', {
+      userId: user.id,
+      isApproved: user.profile?.isApproved,
     });
     return <>{children}</>;
   }
@@ -64,14 +69,14 @@ export function ProtectedRoute({ children, requiredLevel, fallback, onAccessDeni
   if (requiredLevel === 'approved') {
     if (!user.profile?.isApproved) {
       logger.debug('User not approved, showing pending approval screen', { userId: user.id });
-      
+
       if (fallback) {
         return <>{fallback}</>;
       }
-      
+
       return <PendingApprovalScreen />;
     }
-    
+
     logger.debug('User approved, allowing access', { userId: user.id });
     return <>{children}</>;
   }
@@ -118,7 +123,8 @@ function PendingApprovalScreen() {
           <CardContent className="text-center space-y-4">
             <div className="space-y-3">
               <p className="text-orange-700">
-                Your account has been created successfully but is waiting for administrator approval.
+                Your account has been created successfully but is waiting for administrator
+                approval.
               </p>
               <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 text-left">
                 <div className="flex items-start gap-3">
@@ -134,10 +140,11 @@ function PendingApprovalScreen() {
                 </div>
               </div>
               <p className="text-sm text-muted-foreground">
-                If you have questions or need urgent access, please contact your system administrator.
+                If you have questions or need urgent access, please contact your system
+                administrator.
               </p>
             </div>
-            
+
             <div className="pt-4 space-y-3">
               <Button onClick={handleSignOut} variant="outline" className="w-full">
                 Sign Out
@@ -178,18 +185,14 @@ function AccessDeniedScreen({ reason }: { reason: 'login-required' | 'unknown-er
           <CardContent className="text-center space-y-4">
             {reason === 'login-required' ? (
               <div className="space-y-3">
-                <p className="text-red-700">
-                  You need to sign in to access this feature.
-                </p>
+                <p className="text-red-700">You need to sign in to access this feature.</p>
                 <p className="text-sm text-muted-foreground">
                   Please sign in with your account to continue.
                 </p>
               </div>
             ) : (
               <div className="space-y-3">
-                <p className="text-red-700">
-                  There was an error checking your access permissions.
-                </p>
+                <p className="text-red-700">There was an error checking your access permissions.</p>
                 <p className="text-sm text-muted-foreground">
                   Please try refreshing the page or contact support.
                 </p>
@@ -207,10 +210,30 @@ export function GuestRoute({ children }: { children: ReactNode }) {
   return <ProtectedRoute requiredLevel="guest">{children}</ProtectedRoute>;
 }
 
-export function AuthenticatedRoute({ children, fallback }: { children: ReactNode; fallback?: ReactNode }) {
-  return <ProtectedRoute requiredLevel="authenticated" fallback={fallback}>{children}</ProtectedRoute>;
+export function AuthenticatedRoute({
+  children,
+  fallback,
+}: {
+  children: ReactNode;
+  fallback?: ReactNode;
+}) {
+  return (
+    <ProtectedRoute requiredLevel="authenticated" fallback={fallback}>
+      {children}
+    </ProtectedRoute>
+  );
 }
 
-export function ApprovedRoute({ children, fallback }: { children: ReactNode; fallback?: ReactNode }) {
-  return <ProtectedRoute requiredLevel="approved" fallback={fallback}>{children}</ProtectedRoute>;
+export function ApprovedRoute({
+  children,
+  fallback,
+}: {
+  children: ReactNode;
+  fallback?: ReactNode;
+}) {
+  return (
+    <ProtectedRoute requiredLevel="approved" fallback={fallback}>
+      {children}
+    </ProtectedRoute>
+  );
 }

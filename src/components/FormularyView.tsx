@@ -48,8 +48,8 @@ export function FormularyView({
       const cats = Array.isArray(med.category)
         ? med.category
         : med.category
-        ? [med.category as unknown as string]
-        : [];
+          ? [med.category as unknown as string]
+          : [];
       for (const c of cats) {
         const v = (c ?? '').trim();
         if (v) set.add(v);
@@ -75,8 +75,8 @@ export function FormularyView({
       const medCats = Array.isArray(med.category)
         ? med.category
         : med.category
-        ? [med.category as unknown as string]
-        : [];
+          ? [med.category as unknown as string]
+          : [];
       const matchesCategory = categoryFilter === 'all' || medCats.includes(categoryFilter);
 
       const matchesAvailability =
@@ -135,8 +135,8 @@ export function FormularyView({
       const cats = Array.isArray(m.category)
         ? m.category
         : m.category
-        ? [m.category as unknown as string]
-        : [];
+          ? [m.category as unknown as string]
+          : [];
       for (const c of cats) {
         const v = (c ?? '').trim();
         if (!v) continue;
@@ -164,8 +164,7 @@ export function FormularyView({
     () => sortedVisibleCategories.slice(INLINE_LIMIT),
     [sortedVisibleCategories],
   );
-  const ensureSelectedChip =
-    categoryFilter !== 'all' && !topCategories.includes(categoryFilter);
+  const ensureSelectedChip = categoryFilter !== 'all' && !topCategories.includes(categoryFilter);
 
   useEffect(() => {
     if (categoryFilter !== 'all' && !visibleCategories.includes(categoryFilter)) {
@@ -275,28 +274,28 @@ export function FormularyView({
       <div className="space-y-3">
         <div className="flex gap-3">
           <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 size-4 text-muted-foreground" />
-          <Input
-            placeholder="Search medications, conditions, or uses..."
-            value={searchTerm}
-            onChange={(e) => onSearchTermChange(e.target.value)}
-            style={{
-              backgroundColor: '#86efac', // Tailwind's green-300 hex
-              borderColor: '#22c55e',     // Tailwind's green-500
-              color: '#064e3b',           // Tailwind's green-900 (text)
-            }}
-            className="pl-10 border-2 focus:ring-2 focus:ring-green-600 focus:border-green-600"
-          />
-          {searchTerm && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute right-1 top-1/2 transform -translate-y-1/2 size-8"
-              onClick={() => onSearchTermChange('')}
-            >
-              <X className="size-4" />
-            </Button>
-          )}
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 size-4 text-muted-foreground" />
+            <Input
+              placeholder="Search medications, conditions, or uses..."
+              value={searchTerm}
+              onChange={(e) => onSearchTermChange(e.target.value)}
+              style={{
+                backgroundColor: '#86efac', // Tailwind's green-300 hex
+                borderColor: '#22c55e', // Tailwind's green-500
+                color: '#064e3b', // Tailwind's green-900 (text)
+              }}
+              className="pl-10 border-2 focus:ring-2 focus:ring-green-600 focus:border-green-600"
+            />
+            {searchTerm && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-1 top-1/2 transform -translate-y-1/2 size-8"
+                onClick={() => onSearchTermChange('')}
+              >
+                <X className="size-4" />
+              </Button>
+            )}
           </div>
 
           <Select value={availabilityFilter} onValueChange={onAvailabilityFilterChange}>
@@ -345,7 +344,9 @@ export function FormularyView({
                     >
                       {cat}
                       {categoryCounts.get(cat) ? (
-                        <span className="ml-1 text-[10px] opacity-70">{categoryCounts.get(cat)}</span>
+                        <span className="ml-1 text-[10px] opacity-70">
+                          {categoryCounts.get(cat)}
+                        </span>
                       ) : null}
                     </Button>
                   ))}
@@ -359,7 +360,9 @@ export function FormularyView({
                     >
                       {categoryFilter}
                       {categoryCounts.get(categoryFilter) ? (
-                        <span className="ml-1 text-[10px] opacity-70">{categoryCounts.get(categoryFilter)}</span>
+                        <span className="ml-1 text-[10px] opacity-70">
+                          {categoryCounts.get(categoryFilter)}
+                        </span>
                       ) : null}
                     </Button>
                   )}
@@ -378,7 +381,9 @@ export function FormularyView({
                     <DropdownMenuItem key={cat} onClick={() => onCategoryFilterChange(cat)}>
                       <span className="mr-2">{cat}</span>
                       {categoryCounts.get(cat) ? (
-                        <span className="ml-auto text-xs opacity-70">{categoryCounts.get(cat)}</span>
+                        <span className="ml-auto text-xs opacity-70">
+                          {categoryCounts.get(cat)}
+                        </span>
                       ) : null}
                     </DropdownMenuItem>
                   ))}
@@ -389,11 +394,16 @@ export function FormularyView({
 
           {/* Status filter + clear */}
           <div className="flex items-center gap-2">
-          {hasActiveFilters && (
-            <Button variant="outline" size="icon" onClick={clearFilters} className="flex-shrink-0">
-              <X className="size-4" />
-            </Button>
-          )}
+            {hasActiveFilters && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={clearFilters}
+                className="flex-shrink-0"
+              >
+                <X className="size-4" />
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -445,8 +455,8 @@ export function FormularyView({
                       {(Array.isArray(medication.category)
                         ? medication.category
                         : medication.category
-                        ? [medication.category as unknown as string]
-                        : []
+                          ? [medication.category as unknown as string]
+                          : []
                       ).map((cat) => (
                         <Badge key={cat} variant="outline" className="text-xs">
                           {cat}
