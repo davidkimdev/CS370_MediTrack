@@ -367,15 +367,7 @@ export function UserGuide({ isOpen, onClose }: UserGuideProps) {
           )}
         </div>
 
-        {/* Footer */}
-        <div className="border-t p-6 bg-gray-50 flex-shrink-0">
-          <p className="text-sm text-gray-600 text-center">
-            Still have questions? Contact your system administrator or{' '}
-            <a href="mailto:support@meditrack.org" className="text-primary hover:underline">
-              support@meditrack.org
-            </a>
-          </p>
-        </div>
+        
       </DialogContent>
     </Dialog>
   );
