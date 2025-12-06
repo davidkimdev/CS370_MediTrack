@@ -17,35 +17,38 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true,
-    flowType: 'pkce'
+    flowType: 'pkce',
   },
   global: {
     headers: {
-      'x-client-info': 'meditrack-v1'
-    }
+      'x-client-info': 'meditrack-v1',
+    },
   },
   db: {
-    schema: 'public'
+    schema: 'public',
   },
   realtime: {
     params: {
-      eventsPerSecond: 10
-    }
-  }
+      eventsPerSecond: 10,
+    },
+  },
 });
 
 // Test connection on load
-supabase.from('medications').select('count', { count: 'exact', head: true }).then(({ error, count }) => {
-  if (error) {
-    console.error('❌ Supabase connection test failed:', error);
-    console.error('   Error code:', error.code);
-    console.error('   Error message:', error.message);
-    console.error('   Error details:', error.details);
-    console.error('   Error hint:', error.hint);
-  } else {
-    console.log('✅ Supabase connection successful!');
-    console.log(`   Medications table accessible (${count ?? 0} records)`);
-  }
-});
+supabase
+  .from('medications')
+  .select('count', { count: 'exact', head: true })
+  .then(({ error, count }) => {
+    if (error) {
+      console.error('❌ Supabase connection test failed:', error);
+      console.error('   Error code:', error.code);
+      console.error('   Error message:', error.message);
+      console.error('   Error details:', error.details);
+      console.error('   Error hint:', error.hint);
+    } else {
+      console.log('✅ Supabase connection successful!');
+      console.log(`   Medications table accessible (${count ?? 0} records)`);
+    }
+  });
 
 export default supabase;

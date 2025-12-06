@@ -12,7 +12,18 @@ import { useAuth } from '../../contexts/AuthContext';
 import { AuthService } from '../../services/authService';
 import { showErrorToast, showSuccessToast } from '../../utils/toastUtils';
 import type { InvitationCode, UserProfile } from '../../types/auth';
-import { ArrowLeft, Ban, Clipboard, ClipboardCheck, KeyRound, Loader2, RefreshCw, ShieldCheck, UserPlus, Users } from 'lucide-react';
+import {
+  ArrowLeft,
+  Ban,
+  Clipboard,
+  ClipboardCheck,
+  KeyRound,
+  Loader2,
+  RefreshCw,
+  ShieldCheck,
+  UserPlus,
+  Users,
+} from 'lucide-react';
 
 interface ManageAccountsProps {
   onBack: () => void;
@@ -48,49 +59,52 @@ export default function ManageAccounts({ onBack }: ManageAccountsProps) {
       });
   }, [allUsers]);
 
-  const loadAdminData = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
-    if (!currentUserId || !isAdmin) {
-      if (!silent) {
-        setRefreshing(false);
+  const loadAdminData = useCallback(
+    async ({ silent = false }: { silent?: boolean } = {}) => {
+      if (!currentUserId || !isAdmin) {
+        if (!silent) {
+          setRefreshing(false);
+        }
+        if (!hasLoaded) {
+          setIsLoading(false);
+        }
+        return;
       }
-      if (!hasLoaded) {
-        setIsLoading(false);
-      }
-      return;
-    }
 
-    const isInitialLoad = !hasLoaded;
-    if (isInitialLoad && !silent) {
-      setIsLoading(true);
-    } else if (!silent) {
-      setRefreshing(true);
-    }
-
-    try {
-      const [pending, users, codes] = await Promise.all([
-        AuthService.getPendingUsers(),
-        AuthService.getAllUsers(),
-        AuthService.getInvitationCodes(),
-      ]);
-      setPendingUsers(pending);
-      setAllUsers(users);
-      setInvitationCodes(codes);
-      setHasLoaded(true);
-    } catch (error) {
-      console.error('Failed to load admin data', error);
-      showErrorToast(
-        'Failed to load account information',
-        error instanceof Error ? error.message : 'Please try again later.',
-      );
-    } finally {
+      const isInitialLoad = !hasLoaded;
       if (isInitialLoad && !silent) {
-        setIsLoading(false);
+        setIsLoading(true);
+      } else if (!silent) {
+        setRefreshing(true);
       }
-      if (!silent) {
-        setRefreshing(false);
+
+      try {
+        const [pending, users, codes] = await Promise.all([
+          AuthService.getPendingUsers(),
+          AuthService.getAllUsers(),
+          AuthService.getInvitationCodes(),
+        ]);
+        setPendingUsers(pending);
+        setAllUsers(users);
+        setInvitationCodes(codes);
+        setHasLoaded(true);
+      } catch (error) {
+        console.error('Failed to load admin data', error);
+        showErrorToast(
+          'Failed to load account information',
+          error instanceof Error ? error.message : 'Please try again later.',
+        );
+      } finally {
+        if (isInitialLoad && !silent) {
+          setIsLoading(false);
+        }
+        if (!silent) {
+          setRefreshing(false);
+        }
       }
-    }
-  }, [currentUserId, isAdmin, hasLoaded]);
+    },
+    [currentUserId, isAdmin, hasLoaded],
+  );
 
   useEffect(() => {
     if (isAdmin) {
@@ -105,10 +119,7 @@ export default function ManageAccounts({ onBack }: ManageAccountsProps) {
       await loadAdminData({ silent: true });
     } catch (error) {
       console.error('Admin user action failed', error);
-      showErrorToast(
-        'Action failed',
-        error instanceof Error ? error.message : 'Please retry.',
-      );
+      showErrorToast('Action failed', error instanceof Error ? error.message : 'Please retry.');
     } finally {
       setUserActionLoading((prev) => ({ ...prev, [userId]: false }));
     }
@@ -229,7 +240,11 @@ export default function ManageAccounts({ onBack }: ManageAccountsProps) {
 
   const getInvitationStatus = (code: InvitationCode) => {
     if (code.usedAt) {
-      return { label: 'Used', className: 'bg-emerald-100 text-emerald-700', variant: 'outline' as const };
+      return {
+        label: 'Used',
+        className: 'bg-emerald-100 text-emerald-700',
+        variant: 'outline' as const,
+      };
     }
     if (!code.isActive) {
       return { label: 'Disabled', className: 'text-muted-foreground', variant: 'outline' as const };
@@ -237,7 +252,11 @@ export default function ManageAccounts({ onBack }: ManageAccountsProps) {
     if (code.expiresAt.getTime() < Date.now()) {
       return { label: 'Expired', className: '', variant: 'destructive' as const };
     }
-    return { label: 'Active', className: 'bg-emerald-100 text-emerald-700', variant: 'outline' as const };
+    return {
+      label: 'Active',
+      className: 'bg-emerald-100 text-emerald-700',
+      variant: 'outline' as const,
+    };
   };
 
   const { activeCodes, archivedCodes } = useMemo(() => {
@@ -266,14 +285,23 @@ export default function ManageAccounts({ onBack }: ManageAccountsProps) {
             Manage Accounts
           </h2>
         </div>
-        <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing || isLoading}>
-          {refreshing ? <Loader2 className="mr-2 size-4 animate-spin" /> : <RefreshCw className="mr-2 size-4" />}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRefresh}
+          disabled={refreshing || isLoading}
+        >
+          {refreshing ? (
+            <Loader2 className="mr-2 size-4 animate-spin" />
+          ) : (
+            <RefreshCw className="mr-2 size-4" />
+          )}
           Refresh
         </Button>
       </div>
 
-  {/* Invitation Codes */}
-  <Card className="mt-4">
+      {/* Invitation Codes */}
+      <Card className="mt-4">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <UserPlus className="size-5" />
@@ -293,7 +321,11 @@ export default function ManageAccounts({ onBack }: ManageAccountsProps) {
               />
             </div>
             <div className="flex items-end">
-              <Button onClick={handleGenerateInvite} disabled={isGeneratingCode} className="w-full sm:w-auto">
+              <Button
+                onClick={handleGenerateInvite}
+                disabled={isGeneratingCode}
+                className="w-full sm:w-auto"
+              >
                 {isGeneratingCode ? (
                   <Loader2 className="mr-2 size-4 animate-spin" />
                 ) : (
@@ -331,7 +363,9 @@ export default function ManageAccounts({ onBack }: ManageAccountsProps) {
                 Active invitation codes
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">Showing {activeCodes.length} active codes</span>
+                <span className="text-xs text-muted-foreground">
+                  Showing {activeCodes.length} active codes
+                </span>
                 {archivedCodes.length > 0 && (
                   <Button variant="ghost" size="sm" onClick={() => setIsHistoryOpen(true)}>
                     View history
@@ -369,8 +403,12 @@ export default function ManageAccounts({ onBack }: ManageAccountsProps) {
                         const disableLoading = codeActionLoading[code.id];
                         return (
                           <TableRow key={code.id}>
-                            <TableCell className="font-mono text-xs sm:text-sm">{code.code}</TableCell>
-                            <TableCell className="text-xs text-muted-foreground">{code.email ?? 'Any email'}</TableCell>
+                            <TableCell className="font-mono text-xs sm:text-sm">
+                              {code.code}
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {code.email ?? 'Any email'}
+                            </TableCell>
                             <TableCell>
                               <Badge variant={status.variant} className={status.className}>
                                 {status.label}
@@ -383,7 +421,11 @@ export default function ManageAccounts({ onBack }: ManageAccountsProps) {
                               {code.expiresAt.toLocaleDateString()}
                             </TableCell>
                             <TableCell className="flex flex-wrap gap-2">
-                              <Button size="sm" variant="outline" onClick={() => handleCopyCode(code.code)}>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleCopyCode(code.code)}
+                              >
                                 {copiedCode === code.code ? (
                                   <ClipboardCheck className="mr-2 size-4" />
                                 ) : (
@@ -447,8 +489,12 @@ export default function ManageAccounts({ onBack }: ManageAccountsProps) {
                         const status = getInvitationStatus(code);
                         return (
                           <TableRow key={code.id}>
-                            <TableCell className="font-mono text-xs sm:text-sm">{code.code}</TableCell>
-                            <TableCell className="text-xs text-muted-foreground">{code.email ?? 'Any email'}</TableCell>
+                            <TableCell className="font-mono text-xs sm:text-sm">
+                              {code.code}
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {code.email ?? 'Any email'}
+                            </TableCell>
                             <TableCell>
                               <Badge variant={status.variant} className={status.className}>
                                 {status.label}
@@ -489,7 +535,9 @@ export default function ManageAccounts({ onBack }: ManageAccountsProps) {
                 Loading pending requests…
               </div>
             ) : pendingUsers.length === 0 ? (
-              <div className="py-6 text-center text-muted-foreground">No pending account requests.</div>
+              <div className="py-6 text-center text-muted-foreground">
+                No pending account requests.
+              </div>
             ) : (
               <Table>
                 <TableHeader>
@@ -506,7 +554,9 @@ export default function ManageAccounts({ onBack }: ManageAccountsProps) {
                     return (
                       <TableRow key={pending.id}>
                         <TableCell>{`${pending.firstName} ${pending.lastName}`}</TableCell>
-                        <TableCell className="font-mono text-xs sm:text-sm">{pending.email}</TableCell>
+                        <TableCell className="font-mono text-xs sm:text-sm">
+                          {pending.email}
+                        </TableCell>
                         <TableCell className="text-xs text-muted-foreground">
                           {pending.createdAt.toLocaleDateString()}
                         </TableCell>
@@ -567,7 +617,9 @@ export default function ManageAccounts({ onBack }: ManageAccountsProps) {
                     return (
                       <TableRow key={account.id}>
                         <TableCell>{`${account.firstName} ${account.lastName}`}</TableCell>
-                        <TableCell className="font-mono text-xs sm:text-sm">{account.email}</TableCell>
+                        <TableCell className="font-mono text-xs sm:text-sm">
+                          {account.email}
+                        </TableCell>
                         <TableCell>
                           <Select
                             value={account.role}
@@ -617,7 +669,8 @@ export default function ManageAccounts({ onBack }: ManageAccountsProps) {
             )}
             <Separator />
             <p className="text-xs text-muted-foreground">
-              * Admins can approve accounts, generate invitations, and adjust roles. Staff accounts have operational access only.
+              * Admins can approve accounts, generate invitations, and adjust roles. Staff accounts
+              have operational access only.
             </p>
           </CardContent>
         </Card>

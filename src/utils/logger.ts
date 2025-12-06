@@ -98,7 +98,7 @@ class Logger {
    */
   getHistory(level?: LogLevel): LogEntry[] {
     if (level) {
-      return this.logHistory.filter(entry => entry.level === level);
+      return this.logHistory.filter((entry) => entry.level === level);
     }
     return [...this.logHistory];
   }

@@ -3,7 +3,10 @@ import { Medication, InventoryItem, DispensingRecord, User } from '../types/medi
 import { toESTDateString, logDateToUTCNoon } from '../utils/timezone';
 import { logger } from '../utils/logger';
 
-const derivePatientInitials = (stored?: string | null, patientId?: string | null): string | undefined => {
+const derivePatientInitials = (
+  stored?: string | null,
+  patientId?: string | null,
+): string | undefined => {
   const normalizedStored = stored?.trim();
   if (normalizedStored && normalizedStored.length > 0) {
     return normalizedStored.toUpperCase();
@@ -32,7 +35,10 @@ export class MedicationService {
 
     // Add timeout wrapper
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Query timeout after 10 seconds - possible RLS issue')), 10000)
+      setTimeout(
+        () => reject(new Error('Query timeout after 10 seconds - possible RLS issue')),
+        10000,
+      ),
     );
 
     // First get all medications with timeout
@@ -43,15 +49,15 @@ export class MedicationService {
       .order('name');
 
     console.log('⏳ Waiting for medications query...');
-    const { data: medications, error: medError } = await Promise.race([
+    const { data: medications, error: medError } = (await Promise.race([
       queryPromise,
-      timeoutPromise
-    ]).catch(err => {
+      timeoutPromise,
+    ]).catch((err) => {
       console.error('❌ TIMEOUT ERROR:', err.message);
       console.error('💡 This usually means RLS policies are blocking the query.');
       console.error('💡 Check Supabase dashboard → Database → Policies');
       throw err;
-    }) as any;
+    })) as any;
 
     if (medError) {
       console.error('❌ MEDICATIONS ERROR:', medError);
@@ -199,8 +205,8 @@ export class MedicationService {
       category: Array.isArray(data.category)
         ? (data.category as string[]).map((c) => (c ?? '').trim()).filter(Boolean)
         : data.category
-        ? [String(data.category).trim()]
-        : ['General'],
+          ? [String(data.category).trim()]
+          : ['General'],
       currentStock: data.current_stock,
       minStock: data.min_stock,
       maxStock: data.max_stock,
@@ -280,18 +286,15 @@ export class MedicationService {
 
   static async getAllInventory(): Promise<InventoryItem[]> {
     console.log('🔍 MedicationService: Starting to fetch all inventory...');
-    
+
     // Remove timeout temporarily to debug
-    const { data, error } = await supabase
-      .from('inventory')
-      .select('*')
-      .order('expiration_date');
+    const { data, error } = await supabase.from('inventory').select('*').order('expiration_date');
 
     if (error) {
       logger.error('Error fetching all inventory', error);
       throw new Error('Failed to fetch inventory');
     }
-    
+
     console.log(`✅ Fetched ${data?.length || 0} total inventory items`);
 
     return (
@@ -408,7 +411,7 @@ export class MedicationService {
   // Dispensing Records
   static async getAllDispensingRecords(): Promise<DispensingRecord[]> {
     console.log('🔍 MedicationService: Starting to fetch dispensing records...');
-    
+
     // Remove timeout temporarily to debug
     const { data, error } = await supabase
       .from('dispensing_logs')
@@ -419,7 +422,7 @@ export class MedicationService {
       logger.error('Error fetching dispensing records', error);
       throw new Error('Failed to fetch dispensing records');
     }
-    
+
     console.log(`✅ Fetched ${data?.length || 0} dispensing records`);
 
     return (
@@ -435,8 +438,6 @@ export class MedicationService {
           medicationName: record.medication_name,
           patientId: record.patient_id || '',
           patientInitials: derivePatientInitials(record.patient_initials, record.patient_id),
-          
-    
 
           quantity: (() => {
             const raw = record.amount_dispensed;
@@ -467,12 +468,11 @@ export class MedicationService {
     id: string,
     updates: Partial<Omit<DispensingRecord, 'id'>>,
   ): Promise<DispensingRecord> {
-       const { data: oldData } = await supabase
-     .from('dispensing_logs')
-     .select('amount_dispensed, lot_number, medication_id')
-     .eq('id', id)
-     .single();
-
+    const { data: oldData } = await supabase
+      .from('dispensing_logs')
+      .select('amount_dispensed, lot_number, medication_id')
+      .eq('id', id)
+      .single();
 
    let oldQty = 0;
    if (oldData?.amount_dispensed) {
@@ -497,7 +497,7 @@ export class MedicationService {
       updateData.expiration_date = updates.expirationDate.toISOString().split('T')[0];
     if (updates.physicianName !== undefined) updateData.physician_name = updates.physicianName;
     if (updates.studentName !== undefined) updateData.student_name = updates.studentName;
-  if (updates.clinicSite !== undefined) updateData.clinic_site = updates.clinicSite ?? null;
+    if (updates.clinicSite !== undefined) updateData.clinic_site = updates.clinicSite ?? null;
     if (updates.indication !== undefined) updateData.dose_instructions = updates.indication;
     if (updates.notes !== undefined) updateData.notes = updates.notes;
 
@@ -597,7 +597,7 @@ export class MedicationService {
       medicationId: data.medication_id || data.medication_name,
       medicationName: data.medication_name,
       patientId: data.patient_id,
-        patientInitials: derivePatientInitials(data.patient_initials, data.patient_id),
+      patientInitials: derivePatientInitials(data.patient_initials, data.patient_id),
       quantity: (() => {
         const raw = data.amount_dispensed;
         const s = raw === null || raw === undefined ? '' : String(raw);
@@ -672,7 +672,8 @@ export class MedicationService {
       medicationId: record.medicationId,
       medicationName: data.medication_name,
       patientId: data.patient_id,
-      patientInitials: record.patientInitials || derivePatientInitials(data.patient_initials, data.patient_id),
+      patientInitials:
+        record.patientInitials || derivePatientInitials(data.patient_initials, data.patient_id),
       quantity: record.quantity,
       dose: data.dose_instructions,
       lotNumber: record.lotNumber || '',
@@ -737,7 +738,8 @@ export class MedicationService {
       medicationId: record.medicationId,
       medicationName: data.medication_name,
       patientId: data.patient_id,
-      patientInitials: record.patientInitials || derivePatientInitials(data.patient_initials, data.patient_id),
+      patientInitials:
+        record.patientInitials || derivePatientInitials(data.patient_initials, data.patient_id),
       quantity: record.quantity,
       dose: data.dose_instructions,
       lotNumber: record.lotNumber || '',
@@ -757,10 +759,7 @@ export class MedicationService {
   }
 
   static async deleteDispensingRecord(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('dispensing_logs')
-      .delete()
-      .eq('id', id);
+    const { error } = await supabase.from('dispensing_logs').delete().eq('id', id);
 
     if (error) {
       logger.error('Error deleting dispensing record', error);

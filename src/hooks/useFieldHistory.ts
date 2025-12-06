@@ -66,10 +66,7 @@ function normalizeEntries(entries: FieldHistoryEntry[], ttlMs: number): FieldHis
     .sort((a, b) => b.lastUsed - a.lastUsed);
 }
 
-export function useFieldHistory(
-  fieldKey: string,
-  options?: FieldHistoryOptions,
-) {
+export function useFieldHistory(fieldKey: string, options?: FieldHistoryOptions) {
   const maxEntries = options?.maxEntries ?? DEFAULT_MAX_ENTRIES;
   const ttlMs = options?.ttlMs ?? DEFAULT_TTL_MS;
   const minLength = options?.minLength ?? 1;
@@ -93,49 +90,60 @@ export function useFieldHistory(
     setHistory(loadEntries());
   }, [loadEntries]);
 
-  const persistEntries = useCallback((entries: FieldHistoryEntry[]) => {
-    const store = readStorage();
-    store[fieldKey] = entries;
-    writeStorage(store);
-    setHistory(entries);
-  }, [fieldKey]);
+  const persistEntries = useCallback(
+    (entries: FieldHistoryEntry[]) => {
+      const store = readStorage();
+      store[fieldKey] = entries;
+      writeStorage(store);
+      setHistory(entries);
+    },
+    [fieldKey],
+  );
 
-  const recordValue = useCallback((rawValue: string) => {
-    if (!rawValue) {
-      return;
-    }
+  const recordValue = useCallback(
+    (rawValue: string) => {
+      if (!rawValue) {
+        return;
+      }
 
-    const value = rawValue.trim();
-    if (!value || value.length < minLength) {
-      return;
-    }
+      const value = rawValue.trim();
+      if (!value || value.length < minLength) {
+        return;
+      }
 
-    const store = readStorage();
-    const existing = normalizeEntries(store[fieldKey] ?? [], ttlMs);
+      const store = readStorage();
+      const existing = normalizeEntries(store[fieldKey] ?? [], ttlMs);
 
-    const lowerValue = value.toLowerCase();
-    const filtered = existing.filter((entry) => entry.value.toLowerCase() !== lowerValue);
-    const nextEntries: FieldHistoryEntry[] = [
-      { value, lastUsed: Date.now() },
-      ...filtered,
-    ].slice(0, maxEntries);
+      const lowerValue = value.toLowerCase();
+      const filtered = existing.filter((entry) => entry.value.toLowerCase() !== lowerValue);
+      const nextEntries: FieldHistoryEntry[] = [{ value, lastUsed: Date.now() }, ...filtered].slice(
+        0,
+        maxEntries,
+      );
 
-    store[fieldKey] = nextEntries;
-    writeStorage(store);
-    setHistory(nextEntries);
-  }, [fieldKey, maxEntries, minLength, ttlMs]);
+      store[fieldKey] = nextEntries;
+      writeStorage(store);
+      setHistory(nextEntries);
+    },
+    [fieldKey, maxEntries, minLength, ttlMs],
+  );
 
-  const clearEntry = useCallback((rawValue: string) => {
-    const value = rawValue?.trim();
-    if (!value) {
-      return;
-    }
+  const clearEntry = useCallback(
+    (rawValue: string) => {
+      const value = rawValue?.trim();
+      if (!value) {
+        return;
+      }
 
-    const store = readStorage();
-    const existing = normalizeEntries(store[fieldKey] ?? [], ttlMs);
-    const nextEntries = existing.filter((entry) => entry.value.toLowerCase() !== value.toLowerCase());
-    persistEntries(nextEntries);
-  }, [fieldKey, ttlMs, persistEntries]);
+      const store = readStorage();
+      const existing = normalizeEntries(store[fieldKey] ?? [], ttlMs);
+      const nextEntries = existing.filter(
+        (entry) => entry.value.toLowerCase() !== value.toLowerCase(),
+      );
+      persistEntries(nextEntries);
+    },
+    [fieldKey, ttlMs, persistEntries],
+  );
 
   const clearAll = useCallback(() => {
     persistEntries([]);

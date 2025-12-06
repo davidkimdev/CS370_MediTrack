@@ -11,11 +11,27 @@ import { ProfilePage } from './components/auth/ProfilePage';
 import { AdminPanel } from './components/AdminPanel';
 import { Button } from './components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from './components/ui/tabs';
-import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './components/ui/sheet';
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from './components/ui/sheet';
 import { UserGuide } from './components/UserGuide';
 import { cn } from './components/ui/utils';
 import type { LucideIcon } from 'lucide-react';
-import { Pill, ClipboardList, Package, Menu, LogOut, User, ShieldCheck, HelpCircle } from 'lucide-react';
+import {
+  Pill,
+  ClipboardList,
+  Package,
+  Menu,
+  LogOut,
+  User,
+  ShieldCheck,
+  HelpCircle,
+} from 'lucide-react';
 import { Medication, DispensingRecord, InventoryItem, User as UserType } from './types/medication';
 import { MedicationService } from './services/medicationService';
 import { syncService } from './services/syncService';
@@ -49,10 +65,15 @@ export default function App() {
   const [isHelpGuideOpen, setIsHelpGuideOpen] = useState(false);
 
   // State for withdrawal functionality
-  const undoDispenseMapRef = useRef<Record<string, {
-    record: DispensingRecord;
-    inventoryChange: { oldQuantity: number; inventoryId: string };
-  }>>({});
+  const undoDispenseMapRef = useRef<
+    Record<
+      string,
+      {
+        record: DispensingRecord;
+        inventoryChange: { oldQuantity: number; inventoryId: string };
+      }
+    >
+  >({});
   const isLoadingDataRef = useRef(false);
   const lastLoadedModeRef = useRef<'authenticated' | 'public' | null>(null);
   const isMountedRef = useRef(true);
@@ -71,6 +92,14 @@ export default function App() {
     lastLoadedModeRef.current = null;
     hasLoadedForCurrentAuthRef.current = false;
 
+    // Load pending changes count from IndexedDB
+    void OfflineStore.getPendingCount().then(count => {
+      if (count > 0) {
+        console.log(`📦 Found ${count} pending changes in offline queue`);
+        setPendingChanges(count);
+      }
+    });
+
     return () => {
       console.log('🛑 App component unmounting, cleaning up...');
       isMountedRef.current = false;
@@ -83,13 +112,15 @@ export default function App() {
     if (profile) {
       const firstInitial = profile.firstName?.charAt(0)?.toUpperCase() ?? '';
       const lastInitial = profile.lastName?.charAt(0)?.toUpperCase() ?? '';
-      const displayName = `${profile.firstName ?? ''} ${profile.lastName ?? ''}`.trim() || user?.email || 'User';
+      const displayName =
+        `${profile.firstName ?? ''} ${profile.lastName ?? ''}`.trim() || user?.email || 'User';
 
       const formattedUser: UserType = {
         id: profile.id,
         name: displayName,
         role: 'pharmacy_staff',
-        initials: `${firstInitial}${lastInitial}` || (user?.email?.substring(0, 2).toUpperCase() ?? 'US'),
+        initials:
+          `${firstInitial}${lastInitial}` || (user?.email?.substring(0, 2).toUpperCase() ?? 'US'),
       };
       setCurrentUser(formattedUser);
     } else if (user && !profile) {
@@ -103,7 +134,7 @@ export default function App() {
     } else if (!user && currentUser) {
       setCurrentUser(null);
     }
-  }, [user, profile]);
+  }, [user, profile, currentUser]);
 
   useEffect(() => {
     if (user) {
@@ -160,31 +191,31 @@ export default function App() {
           try {
             console.log('📡 Fetching authenticated data from server...');
             console.time('Data fetch duration');
-            
+
             try {
               medicationsData = await MedicationService.getAllMedications();
             } catch (medErr) {
               console.error('❌ Failed to fetch medications:', medErr);
               throw medErr;
             }
-            
+
             try {
               dispensingData = await MedicationService.getAllDispensingRecords();
             } catch (dispErr) {
               console.error('❌ Failed to fetch dispensing records:', dispErr);
               throw dispErr;
             }
-            
+
             try {
               inventoryData = await MedicationService.getAllInventory();
             } catch (invErr) {
               console.error('❌ Failed to fetch inventory:', invErr);
               throw invErr;
             }
-            
+
             console.timeEnd('Data fetch duration');
             console.log('✅ Authenticated data fetched successfully');
-            
+
             // Only start realtime if not already started
             syncService.stopRealtime(); // Stop any existing subscription first
             syncService.startMedicationsRealtime();
@@ -201,10 +232,10 @@ export default function App() {
           try {
             console.log('📡 Fetching public data from server...');
             console.time('Public data fetch duration');
-            
+
             medicationsData = await MedicationService.getAllMedications();
             inventoryData = await MedicationService.getAllInventory();
-            
+
             console.timeEnd('Public data fetch duration');
             console.log('✅ Public data fetched successfully');
           } catch (err) {
@@ -231,7 +262,11 @@ export default function App() {
       setMedications(medicationsData);
       setDispensingRecords(authenticated ? dispensingData : []);
       setInventory(inventoryData);
-      setPendingChanges(0);
+      // Don't reset pendingChanges here - let the caller handle it
+      // This prevents race conditions during sync
+      if (!force) {
+        setPendingChanges(0);
+      }
       setLastLoadedMode(mode);
       lastLoadedModeRef.current = mode;
 
@@ -248,7 +283,10 @@ export default function App() {
       }
       const errorMessage = err instanceof Error ? err.message : 'Failed to load data';
       setError(errorMessage);
-      logger.error('Failed to load initial data', err instanceof Error ? err : new Error(String(err)));
+      logger.error(
+        'Failed to load initial data',
+        err instanceof Error ? err : new Error(String(err)),
+      );
     } finally {
       if (isMountedRef.current) {
         setIsLoadingData(false);
@@ -263,7 +301,9 @@ export default function App() {
       const currentMode = isAuthenticated ? 'authenticated' : 'public';
       // If auth mode changed, reset the flag so we reload
       if (lastLoadedModeRef.current !== null && lastLoadedModeRef.current !== currentMode) {
-        console.log(`🔄 Auth mode changed from ${lastLoadedModeRef.current} to ${currentMode}, resetting load flag`);
+        console.log(
+          `🔄 Auth mode changed from ${lastLoadedModeRef.current} to ${currentMode}, resetting load flag`,
+        );
         hasLoadedForCurrentAuthRef.current = false;
       }
       // Also reset if we're in authenticated mode but profile isn't loaded yet
@@ -330,7 +370,11 @@ export default function App() {
   const getAlternatives = (medication: Medication): Medication[] => {
     return medications.filter((m) => {
       if (medication.alternatives.includes(m.id)) return true;
-      const a = new Set((Array.isArray(medication.category) ? medication.category : []).map((c) => (c ?? '').trim()));
+      const a = new Set(
+        (Array.isArray(medication.category) ? medication.category : []).map((c) =>
+          (c ?? '').trim(),
+        ),
+      );
       const b = (Array.isArray(m.category) ? m.category : []).map((c) => (c ?? '').trim());
       const intersects = b.some((c) => a.has(c));
       return intersects && m.id !== medication.id;
@@ -345,7 +389,7 @@ export default function App() {
       const undoEntry = undoDispenseMapRef.current[key];
       const recentRecord = undoEntry?.record;
       const recentChange = undoEntry?.inventoryChange;
-      
+
       if (!recentRecord || !recentChange) {
         console.error('Cannot undo: record or inventory change not found', {
           recentRecord,
@@ -358,15 +402,15 @@ export default function App() {
 
       // Delete the dispensing record from database
       await MedicationService.deleteDispensingRecord(recordId);
-      
+
       // Restore inventory quantity
-      await MedicationService.updateInventoryItem(recentChange.inventoryId, { 
-        quantity: recentChange.oldQuantity 
+      await MedicationService.updateInventoryItem(recentChange.inventoryId, {
+        quantity: recentChange.oldQuantity,
       });
 
       // Update local state
-  setDispensingRecords((prev) => prev.filter((rec) => String(rec.id) !== key));
-      
+      setDispensingRecords((prev) => prev.filter((rec) => String(rec.id) !== key));
+
       // Restore medication stock
       setMedications((prev) =>
         prev.map((med) =>
@@ -380,7 +424,7 @@ export default function App() {
             : med,
         ),
       );
-      
+
       // Restore inventory
       setInventory((prev) =>
         prev.map((inv) =>
@@ -401,7 +445,7 @@ export default function App() {
     }
   };
 
-  const handleDispense = async (record: Omit<DispensingRecord, "id">) => {
+  const handleDispense = async (record: Omit<DispensingRecord, 'id'>) => {
     console.log('🎯 handleDispense called with:', record);
     // We'll store progress reference to fail gracefully
     let progress: ReturnType<typeof showProgressToast> | null = null;
@@ -417,10 +461,7 @@ export default function App() {
         let newRecord: DispensingRecord | null = null;
         // Attempt fast path first; fall back if it errors (e.g., foreign key constraint)
         try {
-          newRecord = await MedicationService.createDispensingRecordFast(
-            record,
-            currentUser?.id,
-          );
+          newRecord = await MedicationService.createDispensingRecordFast(record, currentUser?.id);
         } catch (fastErr) {
           console.warn('⚠️ Fast path failed, falling back to standard create:', fastErr);
           try {
@@ -431,7 +472,7 @@ export default function App() {
         }
 
         if (!newRecord) throw new Error('Record creation returned null');
-  progress && progress.update(40);
+        progress && progress.update(40);
         console.log('🧾 New dispensing record created with id:', newRecord.id);
         setDispensingRecords((prev: DispensingRecord[]) => [newRecord!, ...prev]);
 
@@ -444,7 +485,7 @@ export default function App() {
           const newQuantity = Math.max(0, inventoryLot.quantity - record.quantity);
           await MedicationService.updateInventoryItem(inventoryLot.id, { quantity: newQuantity });
           progress && progress.update(62);
-          
+
           // Track for withdrawal functionality
           const recordKey = String(newRecord.id);
           undoDispenseMapRef.current = {
@@ -454,7 +495,12 @@ export default function App() {
               inventoryChange: { oldQuantity, inventoryId: inventoryLot.id },
             },
           };
-          console.log('💾 Stored undo data for', recordKey, 'current keys:', Object.keys(undoDispenseMapRef.current));
+          console.log(
+            '💾 Stored undo data for',
+            recordKey,
+            'current keys:',
+            Object.keys(undoDispenseMapRef.current),
+          );
 
           // Auto-cleanup after 10 seconds
           setTimeout(() => {
@@ -488,12 +534,12 @@ export default function App() {
               : inv,
           ),
         );
-        
+
         // Show success toast with withdrawal option (with slight delay)
-        const medication = medications.find(m => m.id === record.medicationId);
+        const medication = medications.find((m) => m.id === record.medicationId);
         // Show success toast with withdrawal option and navigate back to formulary
         setTimeout(() => {
-          const medication = medications.find(m => m.id === record.medicationId);
+          const medication = medications.find((m) => m.id === record.medicationId);
           const recordKey = String(newRecord.id);
           progress && progress.update(88);
           // Dismiss progress to avoid duplicate success toast.
@@ -508,10 +554,10 @@ export default function App() {
                 console.log('🖱️ Withdraw button clicked! Record ID:', recordKey);
                 handleUndoDispensing(recordKey);
               },
-            }
+            },
           );
           console.log('🎉 Success toast with withdrawal displayed');
-          
+
           // Navigate back to formulary after successful dispensing
           setCurrentView('formulary');
           setSelectedMedication(null);
@@ -519,6 +565,7 @@ export default function App() {
       } else {
         // Offline: queue and update local stock/cache immediately
         await syncService.queueOfflineDispense(record);
+        setPendingChanges(prev => prev + 1);
         setMedications((prev: Medication[]) =>
           prev.map((med: Medication) =>
             med.id === record.medicationId
@@ -537,13 +584,13 @@ export default function App() {
           id: `temp-${Date.now()}`, // Temporary ID for offline records
         };
         setDispensingRecords((prev: DispensingRecord[]) => [tempRecord, ...prev]);
-        
+
         // Show success toast for offline dispensing and navigate back
-        const medication = medications.find(m => m.id === record.medicationId);
+        const medication = medications.find((m) => m.id === record.medicationId);
         showSuccessToast(
-          `${medication?.name || 'Medication'} dispensed (offline - will sync when online)`
+          `${medication?.name || 'Medication'} dispensed (offline - will sync when online)`,
         );
-        
+
         // Navigate back to formulary after successful offline dispensing
         setTimeout(() => {
           setCurrentView('formulary');
@@ -555,7 +602,10 @@ export default function App() {
       if (progress) {
         progress.fail(error instanceof Error ? error.message : 'Unknown error');
       } else {
-        showErrorToast('Failed to dispense medication. Please try again.', error instanceof Error ? error.message : undefined);
+        showErrorToast(
+          'Failed to dispense medication. Please try again.',
+          error instanceof Error ? error.message : undefined,
+        );
       }
     }
   };
@@ -582,31 +632,31 @@ export default function App() {
     try {
       if (navigator.onLine) {
         await MedicationService.updateInventoryItem(lotId, { quantity: newQuantity });
-        setInventory(prev => prev.map(item => 
-          item.id === lotId 
-            ? { ...item, quantity: newQuantity }
-            : item
-        ));
-        
+        setInventory((prev) =>
+          prev.map((item) => (item.id === lotId ? { ...item, quantity: newQuantity } : item)),
+        );
+
         // Update medication stock total
-        const lot = inventory.find(inv => inv.id === lotId);
+        const lot = inventory.find((inv) => inv.id === lotId);
         if (lot) {
-          const medication = medications.find(m => m.id === lot.medicationId);
+          const medication = medications.find((m) => m.id === lot.medicationId);
           if (medication) {
             const totalStock = inventory
-              .filter(inv => inv.medicationId === lot.medicationId)
+              .filter((inv) => inv.medicationId === lot.medicationId)
               .reduce((sum, inv) => sum + (inv.id === lotId ? newQuantity : inv.quantity), 0);
-            
-            setMedications(prev => prev.map(med => 
-              med.id === lot.medicationId 
-                ? { ...med, currentStock: totalStock, isAvailable: totalStock > 0 }
-                : med
-            ));
+
+            setMedications((prev) =>
+              prev.map((med) =>
+                med.id === lot.medicationId
+                  ? { ...med, currentStock: totalStock, isAvailable: totalStock > 0 }
+                  : med,
+              ),
+            );
           }
         }
       } else {
         // Handle offline
-        setPendingChanges(prev => prev + 1);
+        setPendingChanges((prev) => prev + 1);
       }
     } catch (err) {
       console.error('Error updating lot:', err);
@@ -615,7 +665,10 @@ export default function App() {
   };
 
   // Handler for MedicationDetail component (with updates object)
-  const handleUpdateLot = (id: string, updates: Partial<Pick<InventoryItem, 'quantity' | 'lotNumber' | 'expirationDate'>>) => {
+  const handleUpdateLot = (
+    id: string,
+    updates: Partial<Pick<InventoryItem, 'quantity' | 'lotNumber' | 'expirationDate'>>,
+  ) => {
     // For now, just handle quantity updates
     if (updates.quantity !== undefined) {
       handleUpdateLotWithReason(id, updates.quantity, 'Updated from detail view');
@@ -626,22 +679,24 @@ export default function App() {
     try {
       if (navigator.onLine) {
         const newLot = await MedicationService.createInventoryItem(lot);
-        setInventory(prev => [...prev, newLot]);
-        
+        setInventory((prev) => [...prev, newLot]);
+
         // Update medication stock
-        const medication = medications.find(m => m.id === lot.medicationId);
+        const medication = medications.find((m) => m.id === lot.medicationId);
         if (medication) {
           const newStock = medication.currentStock + lot.quantity;
-          setMedications(prev => prev.map(med => 
-            med.id === lot.medicationId 
-              ? { ...med, currentStock: newStock, isAvailable: newStock > 0 }
-              : med
-          ));
+          setMedications((prev) =>
+            prev.map((med) =>
+              med.id === lot.medicationId
+                ? { ...med, currentStock: newStock, isAvailable: newStock > 0 }
+                : med,
+            ),
+          );
         }
       } else {
         // Handle offline
         await syncService.queueOfflineLot(lot);
-        setPendingChanges(prev => prev + 1);
+        setPendingChanges((prev) => prev + 1);
       }
     } catch (err) {
       console.error('Error adding lot:', err);
@@ -653,23 +708,25 @@ export default function App() {
     try {
       if (navigator.onLine) {
         await MedicationService.deleteInventoryItem(id);
-        const lot = inventory.find(inv => inv.id === id);
-        setInventory(prev => prev.filter(item => item.id !== id));
+        const lot = inventory.find((inv) => inv.id === id);
+        setInventory((prev) => prev.filter((item) => item.id !== id));
 
         // Update medication stock
         if (lot) {
-          const medication = medications.find(m => m.id === lot.medicationId);
+          const medication = medications.find((m) => m.id === lot.medicationId);
           if (medication) {
             const newStock = Math.max(0, medication.currentStock - lot.quantity);
-            setMedications(prev => prev.map(med =>
-              med.id === lot.medicationId
-                ? { ...med, currentStock: newStock, isAvailable: newStock > 0 }
-                : med
-            ));
+            setMedications((prev) =>
+              prev.map((med) =>
+                med.id === lot.medicationId
+                  ? { ...med, currentStock: newStock, isAvailable: newStock > 0 }
+                  : med,
+              ),
+            );
           }
         }
       } else {
-        setPendingChanges(prev => prev + 1);
+        setPendingChanges((prev) => prev + 1);
       }
     } catch (err) {
       console.error('Error deleting lot:', err);
@@ -679,20 +736,36 @@ export default function App() {
 
   const handleSync = async () => {
     try {
-      // Simple sync: just reload data
+      // Flush offline queue first
+      const result = await syncService.flushQueue();
+      console.log(`✅ Synced ${result.processed} items, ${result.failed} failed`);
+      
+      if (result.failed > 0) {
+        showErrorToast(`Sync completed with ${result.failed} failures`);
+      } else if (result.processed > 0) {
+        showSuccessToast(`Successfully synced ${result.processed} items`);
+      }
+      
+      // Wait a moment for database to propagate
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Then reload data from server
       await loadInitialData(isAuthenticated, true);
       setPendingChanges(0);
     } catch (err) {
       console.error('Sync failed:', err);
+      showErrorToast('Sync failed. Please try again.');
     }
   };
 
-  const navigationSections = useMemo<Array<{
-    key: Exclude<AppSection, 'profile' | 'admin'>;
-    label: string;
-    icon: LucideIcon;
-    requiresAuth?: boolean;
-  }>>(() => {
+  const navigationSections = useMemo<
+    Array<{
+      key: Exclude<AppSection, 'profile' | 'admin'>;
+      label: string;
+      icon: LucideIcon;
+      requiresAuth?: boolean;
+    }>
+  >(() => {
     const baseSections: Array<{
       key: Exclude<AppSection, 'profile' | 'admin'>;
       label: string;
@@ -780,9 +853,7 @@ export default function App() {
           <Button onClick={() => loadInitialData(isAuthenticated, true)} variant="outline">
             Try Again
           </Button>
-          {!isAuthenticated && (
-            <Button onClick={() => setShowAuthModal(true)}>Log In</Button>
-          )}
+          {!isAuthenticated && <Button onClick={() => setShowAuthModal(true)}>Log In</Button>}
         </div>
       </div>
     );
@@ -790,8 +861,15 @@ export default function App() {
 
   // Show detail view if medication is selected
   if (currentView === 'detail' && selectedMedication) {
-    console.log('🔐 Authentication status when rendering MedicationDetail:', { isAuthenticated, user: !!user, profile: !!profile });
-    console.log('📋 onDispense prop will be:', isAuthenticated ? 'handleDispense function' : 'undefined');
+    console.log('🔐 Authentication status when rendering MedicationDetail:', {
+      isAuthenticated,
+      user: !!user,
+      profile: !!profile,
+    });
+    console.log(
+      '📋 onDispense prop will be:',
+      isAuthenticated ? 'handleDispense function' : 'undefined',
+    );
     return (
       <MedicationDetail
         medication={selectedMedication}
@@ -812,7 +890,10 @@ export default function App() {
 
   // Show main app layout
   return (
-    <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #e8f0f7 100%)' }}>
+    <div
+      className="min-h-screen"
+      style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #e8f0f7 100%)' }}
+    >
       {/* Header */}
       <header className="border-b border-slate-200/60 bg-white/80 backdrop-blur-md sticky top-0 z-50 shadow-sm">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
@@ -822,10 +903,10 @@ export default function App() {
               <Pill className="size-6 text-white pill-icon-spin" style={{ strokeWidth: 2.5 }} />
             </div>
             <div>
-              <h1 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-teal-500 bg-clip-text text-transparent">EFWP Formulary</h1>
-              {!isAuthenticated && (
-                <p className="text-xs text-slate-500">Viewing limited access</p>
-              )}
+              <h1 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-teal-500 bg-clip-text text-transparent">
+                EFWP Formulary
+              </h1>
+              {!isAuthenticated && <p className="text-xs text-slate-500">Viewing limited access</p>}
             </div>
           </div>
 
@@ -854,7 +935,7 @@ export default function App() {
                       'rounded-none px-3 h-9 gap-2 text-sm first:rounded-l-lg transition-colors',
                       activeSection === 'admin'
                         ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-muted-foreground hover:bg-muted/60'
+                        : 'text-muted-foreground hover:bg-muted/60',
                     )}
                     onClick={() => handleSectionChange('admin')}
                   >
@@ -871,7 +952,7 @@ export default function App() {
                     isAdmin ? '' : 'first:rounded-l-lg',
                     activeSection === 'profile'
                       ? 'bg-primary text-primary-foreground shadow-sm'
-                      : 'text-muted-foreground hover:bg-muted/60'
+                      : 'text-muted-foreground hover:bg-muted/60',
                   )}
                   onClick={() => handleSectionChange('profile')}
                 >
@@ -883,9 +964,7 @@ export default function App() {
 
             {user ? (
               <>
-                <span className="text-sm text-muted-foreground hidden lg:block">
-                  {user.email}
-                </span>
+                <span className="text-sm text-muted-foreground hidden lg:block">{user.email}</span>
 
                 {/* Mobile Menu */}
                 <Sheet>
@@ -913,19 +992,19 @@ export default function App() {
 
                             return (
                               <SheetClose asChild key={key}>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                data-mobile-nav-button="true"
-                                data-active={isActive}
-                                className={cn(
-                                  mobileNavButtonBaseClasses,
-                                  isRestricted && 'opacity-70 pointer-events-none',
-                                )}
-                                disabled={isRestricted}
-                                onClick={() => handleSectionChange(key)}
-                                title={isRestricted ? 'Log in to access this area' : undefined}
-                              >
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  data-mobile-nav-button="true"
+                                  data-active={isActive}
+                                  className={cn(
+                                    mobileNavButtonBaseClasses,
+                                    isRestricted && 'opacity-70 pointer-events-none',
+                                  )}
+                                  disabled={isRestricted}
+                                  onClick={() => handleSectionChange(key)}
+                                  title={isRestricted ? 'Log in to access this area' : undefined}
+                                >
                                   <Icon className="size-4" />
                                   {label}
                                 </Button>
@@ -1068,8 +1147,9 @@ export default function App() {
               />
             )}
 
-            {activeSection === 'inventory' && isAuthenticated && (
-              currentUser ? (
+            {activeSection === 'inventory' &&
+              isAuthenticated &&
+              (currentUser ? (
                 <StockManagement
                   medications={medications}
                   inventory={inventory}
@@ -1081,8 +1161,7 @@ export default function App() {
                 <div className="text-center py-8">
                   <div className="animate-pulse">Loading user data...</div>
                 </div>
-              )
-            )}
+              ))}
 
             {activeSection === 'profile' && isAuthenticated && <ProfilePage />}
 
@@ -1108,10 +1187,7 @@ export default function App() {
       )}
 
       {/* Help Guide & FAQ */}
-      <UserGuide
-        isOpen={isHelpGuideOpen}
-        onClose={() => setIsHelpGuideOpen(false)}
-      />
+      <UserGuide isOpen={isHelpGuideOpen} onClose={() => setIsHelpGuideOpen(false)} />
     </div>
   );
 }

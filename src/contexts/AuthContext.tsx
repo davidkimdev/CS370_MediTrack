@@ -49,15 +49,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
               // Try to update profile in background (don't wait)
               AuthService.getUserProfile(supabaseUser.id)
-                .then(freshProfile => {
+                .then((freshProfile) => {
                   if (freshProfile) {
                     console.log('✅ Updated profile in background');
                     setProfile(freshProfile);
-                    setUser(prev => prev ? { ...prev, profile: freshProfile } : null);
+                    setUser((prev) => (prev ? { ...prev, profile: freshProfile } : null));
                     localStorage.setItem('cached_profile', JSON.stringify(freshProfile));
                   }
                 })
-                .catch(err => console.warn('Background profile update failed:', err));
+                .catch((err) => console.warn('Background profile update failed:', err));
 
               return; // Exit early with cached profile
             }
@@ -68,7 +68,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       // Check if token needs refresh before loading profile
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (session) {
         const expiresAt = session.expires_at;
         const now = Math.floor(Date.now() / 1000);
@@ -77,7 +79,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
         // If token expires in less than 5 minutes, refresh it proactively
         if (timeUntilExpiry < 300) {
           console.log('🔄 Token expiring soon, refreshing before profile load...');
-          const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+          const {
+            data: { session: refreshedSession },
+            error: refreshError,
+          } = await supabase.auth.refreshSession();
 
           if (refreshError) {
             console.error('❌ Token refresh failed:', refreshError);
@@ -102,7 +107,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
       } catch (profileError) {
         // If profile load fails, try cache before retrying
-        const profileErr = profileError instanceof Error ? profileError.message : String(profileError);
+        const profileErr =
+          profileError instanceof Error ? profileError.message : String(profileError);
         console.warn('⚠️ Profile load failed, trying cache:', profileErr);
 
         try {
@@ -116,15 +122,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
               // Try to refresh in background
               setTimeout(() => {
                 AuthService.getUserProfile(supabaseUser.id)
-                  .then(fresh => {
+                  .then((fresh) => {
                     if (fresh) {
                       console.log('✅ Background profile refresh succeeded');
                       setProfile(fresh);
-                      setUser(prev => prev ? { ...prev, profile: fresh } : null);
+                      setUser((prev) => (prev ? { ...prev, profile: fresh } : null));
                       localStorage.setItem('cached_profile', JSON.stringify(fresh));
                     }
                   })
-                  .catch(err => console.warn('Background refresh failed:', err));
+                  .catch((err) => console.warn('Background refresh failed:', err));
               }, 2000);
             }
           }
@@ -152,38 +158,46 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       // Try to recover from cache if offline or network error
       if (!navigator.onLine || errorMsg.includes('fetch') || errorMsg.includes('network')) {
-          console.log('📴 Offline/Network error detected - attempting to load cached profile');
-          try {
-              const cachedStr = localStorage.getItem('cached_profile');
-              if (cachedStr) {
-                  const cachedProfile = JSON.parse(cachedStr);
-                  if (cachedProfile && cachedProfile.id === supabaseUser.id) {
-                      console.log('✅ Loaded profile from cache');
-                      setProfile(cachedProfile);
-                      setUser({
-                        id: supabaseUser.id,
-                        email: supabaseUser.email ?? '',
-                        secondaryEmails: Array.isArray(supabaseUser.user_metadata?.secondary_emails) 
-                            ? (supabaseUser.user_metadata.secondary_emails as string[]) 
-                            : [],
-                        profile: cachedProfile,
-                      });
-                      return;
-                  }
-              }
-          } catch (cacheErr) {
-              console.error('❌ Failed to parse cached profile:', cacheErr);
+        console.log('📴 Offline/Network error detected - attempting to load cached profile');
+        try {
+          const cachedStr = localStorage.getItem('cached_profile');
+          if (cachedStr) {
+            const cachedProfile = JSON.parse(cachedStr);
+            if (cachedProfile && cachedProfile.id === supabaseUser.id) {
+              console.log('✅ Loaded profile from cache');
+              setProfile(cachedProfile);
+              setUser({
+                id: supabaseUser.id,
+                email: supabaseUser.email ?? '',
+                secondaryEmails: Array.isArray(supabaseUser.user_metadata?.secondary_emails)
+                  ? (supabaseUser.user_metadata.secondary_emails as string[])
+                  : [],
+                profile: cachedProfile,
+              });
+              return;
+            }
           }
+        } catch (cacheErr) {
+          console.error('❌ Failed to parse cached profile:', cacheErr);
+        }
       }
 
       // If it's a timeout or auth error and we haven't retried too many times, retry
-      if (retryCount < 2 && (errorMsg.includes('timeout') || errorMsg.includes('JWT') || errorMsg.includes('auth') || errorMsg.includes('session'))) {
+      if (
+        retryCount < 2 &&
+        (errorMsg.includes('timeout') ||
+          errorMsg.includes('JWT') ||
+          errorMsg.includes('auth') ||
+          errorMsg.includes('session'))
+      ) {
         console.log(`🔄 Retrying in ${(retryCount + 1) * 1000}ms...`);
         // Wait a bit for token refresh to complete, then retry
-        await new Promise(resolve => setTimeout(resolve, (retryCount + 1) * 1000));
+        await new Promise((resolve) => setTimeout(resolve, (retryCount + 1) * 1000));
 
         // Get fresh session and refresh token before retrying
-        const { data: { session } } = await supabase.auth.refreshSession();
+        const {
+          data: { session },
+        } = await supabase.auth.refreshSession();
         if (session?.user) {
           return loadUserState(session.user, retryCount + 1);
         }
@@ -227,37 +241,44 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
         // If no session found but we have a user, they might have been signed out remotely or session expired completely
         if (!session) {
-            if (!navigator.onLine) {
-                 console.log('📴 No session found but offline - ignoring');
-                 return;
-            }
-            
-            // ATTEMPT RECOVERY: sometimes getSession returns null briefly, but a refresh might still work if we have the token
-            console.log('⚠️ No session found during check - attempting force refresh...');
-            const { data: { session: recoveredSession }, error: recoveryError } = await supabase.auth.refreshSession();
-            
-            if (recoveredSession) {
-                console.log('✅ Session recovered via force refresh!');
-                return;
-            }
-
-            // If we are here, both getSession AND refreshSession failed.
-            // This means the refresh token is truly dead or invalid.
-            console.error('❌ Recovery failed:', recoveryError);
-
-            // DOUBLE CHECK: Are we offline now? Sometimes state changes mid-flight.
-            if (!navigator.onLine) {
-                 console.log('📴 Offline detected after recovery failure - preserving state instead of logout');
-                 return;
-            }
-            
-            console.log('❌ Session unrecoverable - signing out');
-            await signOut();
+          if (!navigator.onLine) {
+            console.log('📴 No session found but offline - ignoring');
             return;
+          }
+
+          // ATTEMPT RECOVERY: sometimes getSession returns null briefly, but a refresh might still work if we have the token
+          console.log('⚠️ No session found during check - attempting force refresh...');
+          const {
+            data: { session: recoveredSession },
+            error: recoveryError,
+          } = await supabase.auth.refreshSession();
+
+          if (recoveredSession) {
+            console.log('✅ Session recovered via force refresh!');
+            return;
+          }
+
+          // If we are here, both getSession AND refreshSession failed.
+          // This means the refresh token is truly dead or invalid.
+          console.error('❌ Recovery failed:', recoveryError);
+
+          // DOUBLE CHECK: Are we offline now? Sometimes state changes mid-flight.
+          if (!navigator.onLine) {
+            console.log(
+              '📴 Offline detected after recovery failure - preserving state instead of logout',
+            );
+            return;
+          }
+
+          console.log('❌ Session unrecoverable - signing out');
+          await signOut();
+          return;
         }
 
         const expiresAt = session.expires_at;
@@ -271,8 +292,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
           if (error) {
             console.error('❌ Periodic refresh failed:', error);
             // Only sign out if it's a serious auth error (not network) AND we are online
-            if (navigator.onLine && (error.message.includes('Refresh Token') || error.message.includes('invalid'))) {
-                await signOut();
+            if (
+              navigator.onLine &&
+              (error.message.includes('Refresh Token') || error.message.includes('invalid'))
+            ) {
+              await signOut();
             }
           } else {
             console.log('✅ Periodic refresh successful');
@@ -288,20 +312,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     // Also check when returning to the tab
     const handleVisibilityChange = () => {
-        if (document.visibilityState === 'visible') {
-            console.log('👁️ Tab became visible - checking session...');
-            checkAndRefreshToken();
-        }
+      if (document.visibilityState === 'visible') {
+        console.log('👁️ Tab became visible - checking session...');
+        checkAndRefreshToken();
+      }
     };
 
     const handleFocus = () => {
-        console.log('👁️ Window focused - checking session...');
-        checkAndRefreshToken();
+      console.log('👁️ Window focused - checking session...');
+      checkAndRefreshToken();
     };
 
     const handleOnline = () => {
-        console.log('📶 Connection restored - verifying session...');
-        checkAndRefreshToken();
+      console.log('📶 Connection restored - verifying session...');
+      checkAndRefreshToken();
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -312,10 +336,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     checkAndRefreshToken();
 
     return () => {
-        clearInterval(interval);
-        document.removeEventListener('visibilitychange', handleVisibilityChange);
-        window.removeEventListener('focus', handleFocus);
-        window.removeEventListener('online', handleOnline);
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('online', handleOnline);
     };
   }, [user]);
 
@@ -331,7 +355,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       try {
         console.log('🔷 Getting current session...');
-        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        const {
+          data: { session: currentSession },
+        } = await supabase.auth.getSession();
 
         if (!currentSession) {
           console.log('🔷 No session found');
@@ -356,28 +382,34 @@ export function AuthProvider({ children }: AuthProviderProps) {
         // If token expires in less than 60 seconds, refresh it now
         if (timeUntilExpiry < 60) {
           console.log('🔷 Token expired or expiring soon, refreshing...');
-          const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+          const {
+            data: { session: refreshedSession },
+            error: refreshError,
+          } = await supabase.auth.refreshSession();
 
           if (refreshError) {
             console.error('🔷 Token refresh failed:', refreshError);
-            
+
             if (!navigator.onLine) {
-                console.log('📴 Refresh failed but offline - preserving session');
+              console.log('📴 Refresh failed but offline - preserving session');
             } else {
-                // Special handling: if refresh token is missing/invalid, we might be able to recover
-                // if we have a valid session stored in localStorage by supabase client
-                if (refreshError.message.includes('Refresh Token') || refreshError.message.includes('invalid')) {
-                     console.log('⚠️ Refresh token invalid - checking if auto-recovery is possible...');
-                     // Wait a moment to see if the client auto-recovers (it sometimes does)
-                }
-                
-                // Sign out and clear session if refresh fails
-                await supabase.auth.signOut();
-                setUser(null);
-                setProfile(null);
-                setIsLoading(false);
-                isInitialized = true;
-                return;
+              // Special handling: if refresh token is missing/invalid, we might be able to recover
+              // if we have a valid session stored in localStorage by supabase client
+              if (
+                refreshError.message.includes('Refresh Token') ||
+                refreshError.message.includes('invalid')
+              ) {
+                console.log('⚠️ Refresh token invalid - checking if auto-recovery is possible...');
+                // Wait a moment to see if the client auto-recovers (it sometimes does)
+              }
+
+              // Sign out and clear session if refresh fails
+              await supabase.auth.signOut();
+              setUser(null);
+              setProfile(null);
+              setIsLoading(false);
+              isInitialized = true;
+              return;
             }
           }
 
@@ -415,35 +447,35 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.log('🔷 Setting up auth state listener...');
 
       // NOW set up the listener (after init is complete)
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(
-        async (event, session) => {
-          if (!mounted || !isInitialized) return;
+      const {
+        data: { subscription },
+      } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (!mounted || !isInitialized) return;
 
-          console.log('🔷 Auth event:', event);
+        console.log('🔷 Auth event:', event);
 
-          if (event === 'SIGNED_IN' && session?.user) {
-            console.log('🔷 SIGNED_IN - Loading user');
-            await loadUserState(session.user);
+        if (event === 'SIGNED_IN' && session?.user) {
+          console.log('🔷 SIGNED_IN - Loading user');
+          await loadUserState(session.user);
+          setIsLoading(false);
+        } else if (event === 'SIGNED_OUT') {
+          // If offline, ignore involuntary sign-outs (e.g. from failed refresh)
+          // Manual sign-out handles state clearing separately
+          if (!navigator.onLine) {
+            console.log('📴 SIGNED_OUT event detected but offline - preserving state');
             setIsLoading(false);
-          } else if (event === 'SIGNED_OUT') {
-            // If offline, ignore involuntary sign-outs (e.g. from failed refresh)
-            // Manual sign-out handles state clearing separately
-            if (!navigator.onLine) {
-                console.log('📴 SIGNED_OUT event detected but offline - preserving state');
-                setIsLoading(false);
-                return;
-            }
-            console.log('🔷 SIGNED_OUT - Clearing user');
-            setUser(null);
-            setProfile(null);
-            setIsLoading(false);
-          } else if (event === 'USER_UPDATED' && session?.user) {
-            console.log('🔷 USER_UPDATED - Refreshing user');
-            await loadUserState(session.user);
+            return;
           }
-          // Ignore TOKEN_REFRESHED and INITIAL_SESSION
+          console.log('🔷 SIGNED_OUT - Clearing user');
+          setUser(null);
+          setProfile(null);
+          setIsLoading(false);
+        } else if (event === 'USER_UPDATED' && session?.user) {
+          console.log('🔷 USER_UPDATED - Refreshing user');
+          await loadUserState(session.user);
         }
-      );
+        // Ignore TOKEN_REFRESHED and INITIAL_SESSION
+      });
 
       return () => {
         subscription.unsubscribe();
@@ -460,7 +492,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       const { error } = await supabase.auth.signInWithPassword({
         email,
-        password
+        password,
       });
 
       if (error) {
@@ -484,7 +516,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       logger.info('User registered successfully', { email: data.email });
     } catch (error) {
       console.error('🟦 AuthContext.signUp failed:', error);
-      logger.error('Registration failed', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Registration failed',
+        error instanceof Error ? error : new Error(String(error)),
+      );
       throw error;
     } finally {
       console.log('🟦 AuthContext.signUp completed');
@@ -510,7 +545,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       await AuthService.resetPassword(email);
       logger.info('Password reset requested', { email });
     } catch (error) {
-      logger.error('Password reset failed', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Password reset failed',
+        error instanceof Error ? error : new Error(String(error)),
+      );
       throw error;
     }
   };
@@ -523,16 +561,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       const updatedProfile = await AuthService.updateProfile(user.id, updates);
       setProfile(updatedProfile);
-      setUser(prev => prev ? { ...prev, profile: updatedProfile } : null);
+      setUser((prev) => (prev ? { ...prev, profile: updatedProfile } : null));
       logger.info('Profile updated successfully', { userId: user.id });
     } catch (error) {
-      logger.error('Profile update failed', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Profile update failed',
+        error instanceof Error ? error : new Error(String(error)),
+      );
       throw error;
     }
   };
 
   const refreshUser = useCallback(async () => {
-    const { data: { user: current } } = await supabase.auth.getUser();
+    const {
+      data: { user: current },
+    } = await supabase.auth.getUser();
     await loadUserState(current ?? null);
   }, [loadUserState]);
 
@@ -548,14 +591,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     signOut,
     resetPassword,
     updateProfile,
-    refreshUser
+    refreshUser,
   };
 
-  return (
-    <AuthContext.Provider value={contextValue}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
@@ -568,7 +607,7 @@ export function useAuth() {
 
 export function useRequireAuth() {
   const auth = useAuth();
-  
+
   useEffect(() => {
     if (!auth.isLoading && !auth.isAuthenticated) {
       logger.warn('Unauthenticated access attempt');

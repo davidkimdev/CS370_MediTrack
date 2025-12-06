@@ -49,7 +49,10 @@ const getAdminContext = async (c, requestId) => {
 
   const { data: authUserData, error: authUserError } = await supabaseAdmin.auth.getUser(token);
   if (authUserError || !authUserData?.user) {
-    console.warn(`[admin-auth] failed to validate admin token`, { requestId, error: authUserError });
+    console.warn(`[admin-auth] failed to validate admin token`, {
+      requestId,
+      error: authUserError,
+    });
     return { error: c.json({ error: 'Unauthorized' }, 401) };
   }
 
@@ -62,7 +65,10 @@ const getAdminContext = async (c, requestId) => {
     .maybeSingle();
 
   if (adminProfileError) {
-    console.error(`[admin-auth] failed to load admin profile`, { requestId, error: adminProfileError });
+    console.error(`[admin-auth] failed to load admin profile`, {
+      requestId,
+      error: adminProfileError,
+    });
     return { error: c.json({ error: 'Unable to validate admin status' }, 500) };
   }
 
@@ -132,7 +138,10 @@ app.post('/make-server-be81afe8/admin/reject-user', async (c) => {
     .maybeSingle();
 
   if (targetProfileError) {
-    console.error(`[reject-user] failed to lookup target profile`, { requestId, error: targetProfileError });
+    console.error(`[reject-user] failed to lookup target profile`, {
+      requestId,
+      error: targetProfileError,
+    });
     return c.json({ error: 'Failed to lookup user' }, 500);
   }
 
@@ -142,13 +151,19 @@ app.post('/make-server-be81afe8/admin/reject-user', async (c) => {
   }
 
   if (targetProfile.role === 'admin') {
-    console.warn(`[reject-user] attempted to delete admin account`, { requestId, userId: body.userId });
+    console.warn(`[reject-user] attempted to delete admin account`, {
+      requestId,
+      userId: body.userId,
+    });
     return c.json({ error: 'Cannot remove administrator accounts' }, 400);
   }
 
   const { error: deleteAuthError } = await supabaseAdmin.auth.admin.deleteUser(body.userId);
   if (deleteAuthError && deleteAuthError.message !== 'User not found') {
-    console.error(`[reject-user] failed to delete auth user`, { requestId, error: deleteAuthError });
+    console.error(`[reject-user] failed to delete auth user`, {
+      requestId,
+      error: deleteAuthError,
+    });
     return c.json({ error: 'Failed to delete auth user' }, 500);
   }
 
@@ -158,7 +173,10 @@ app.post('/make-server-be81afe8/admin/reject-user', async (c) => {
     .eq('id', body.userId);
 
   if (deleteProfileError) {
-    console.error(`[reject-user] failed to delete profile`, { requestId, error: deleteProfileError });
+    console.error(`[reject-user] failed to delete profile`, {
+      requestId,
+      error: deleteProfileError,
+    });
     return c.json({ error: 'Auth user deleted but profile cleanup failed' }, 500);
   }
 
@@ -215,7 +233,10 @@ app.post('/make-server-be81afe8/admin/update-profile', async (c) => {
     .maybeSingle();
 
   if (targetProfileError) {
-    console.error(`[update-profile] failed to lookup target profile`, { requestId, error: targetProfileError });
+    console.error(`[update-profile] failed to lookup target profile`, {
+      requestId,
+      error: targetProfileError,
+    });
     return c.json({ error: 'Failed to lookup user' }, 500);
   }
 
@@ -258,7 +279,11 @@ app.post('/make-server-be81afe8/admin/update-profile', async (c) => {
     return c.json({ error: 'Failed to update profile' }, 500);
   }
 
-  console.log(`[update-profile] update complete`, { requestId, userId: body.userId, changes: Object.keys(updatePayload) });
+  console.log(`[update-profile] update complete`, {
+    requestId,
+    userId: body.userId,
+    changes: Object.keys(updatePayload),
+  });
   return c.json({ success: true, profile: serializeProfile(updatedProfile) });
 });
 

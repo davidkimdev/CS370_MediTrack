@@ -12,9 +12,9 @@ export class InvitationManager {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     const randomPart = Array.from(
       { length: length - prefix.length },
-      () => chars[Math.floor(Math.random() * chars.length)]
+      () => chars[Math.floor(Math.random() * chars.length)],
     ).join('');
-    
+
     return (prefix + randomPart).toUpperCase().slice(0, length);
   }
 
@@ -27,26 +27,29 @@ export class InvitationManager {
       email?: string;
       expiresInDays?: number;
       customCode?: string;
-    } = {}
+    } = {},
   ): Promise<string> {
     try {
       const code = options.customCode || this.generateCode('', 8);
-      
+
       const invitationCode = await AuthService.createInvitationCode(
         createdBy,
         options.email,
-        options.expiresInDays || 7
+        options.expiresInDays || 7,
       );
-      
-      logger.info('Invitation code created', { 
-        code: invitationCode, 
+
+      logger.info('Invitation code created', {
+        code: invitationCode,
         email: options.email,
-        expiresInDays: options.expiresInDays 
+        expiresInDays: options.expiresInDays,
       });
-      
+
       return invitationCode;
     } catch (error) {
-      logger.error('Failed to create invitation code', error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        'Failed to create invitation code',
+        error instanceof Error ? error : new Error(String(error)),
+      );
       throw error;
     }
   }
@@ -60,22 +63,25 @@ export class InvitationManager {
     options: {
       prefix?: string;
       expiresInDays?: number;
-    } = {}
+    } = {},
   ): Promise<string[]> {
     const codes: string[] = [];
-    
+
     for (let i = 0; i < count; i++) {
       try {
         const code = await this.createInvitation(createdBy, {
           customCode: this.generateCode(options.prefix || '', 8),
-          expiresInDays: options.expiresInDays
+          expiresInDays: options.expiresInDays,
         });
         codes.push(code);
       } catch (error) {
-        logger.error(`Failed to create invitation code ${i + 1}/${count}`, error instanceof Error ? error : new Error(String(error)));
+        logger.error(
+          `Failed to create invitation code ${i + 1}/${count}`,
+          error instanceof Error ? error : new Error(String(error)),
+        );
       }
     }
-    
+
     return codes;
   }
 
@@ -85,19 +91,19 @@ export class InvitationManager {
   static readonly PRESETS = {
     STAFF: {
       prefix: 'STAFF',
-      expiresInDays: 30
+      expiresInDays: 30,
     },
     ADMIN: {
       prefix: 'ADMIN',
-      expiresInDays: 7
+      expiresInDays: 7,
     },
     TEMP: {
       prefix: 'TEMP',
-      expiresInDays: 3
+      expiresInDays: 3,
     },
     CLINIC: {
       prefix: 'CLINIC',
-      expiresInDays: 60
-    }
+      expiresInDays: 60,
+    },
   };
 }

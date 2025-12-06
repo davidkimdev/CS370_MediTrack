@@ -7,7 +7,6 @@ import {
   AlertTriangle,
   Info,
   RefreshCw,
-  Clipboard,
 } from 'lucide-react';
 import React from 'react';
 
@@ -56,9 +55,7 @@ export const showSuccessToast = (
         label: (
           <div className="flex items-center gap-1">
             {action.icon ? (
-              <span className="inline-flex items-center justify-center">
-                {action.icon}
-              </span>
+              <span className="inline-flex items-center justify-center">{action.icon}</span>
             ) : (
               <RotateCcw className="h-3 w-3" />
             )}
@@ -133,7 +130,11 @@ export const showActionToast = ({
 }: {
   title: string;
   description?: string | React.ReactNode;
-  actions: Array<{ label: string; variant?: 'primary' | 'secondary' | 'danger'; onClick: () => void }>;
+  actions: Array<{
+    label: string;
+    variant?: 'primary' | 'secondary' | 'danger';
+    onClick: () => void;
+  }>;
   dismissAfter?: number;
 }) => {
   toast.custom(
@@ -156,8 +157,8 @@ export const showActionToast = ({
                   (a.variant === 'danger'
                     ? 'bg-red-600 text-white hover:bg-red-500 focus-visible:ring-red-400'
                     : a.variant === 'secondary'
-                    ? 'bg-slate-200 text-slate-800 hover:bg-slate-300 focus-visible:ring-slate-400'
-                    : 'bg-slate-900 text-white hover:bg-slate-800 focus-visible:ring-slate-500')
+                      ? 'bg-slate-200 text-slate-800 hover:bg-slate-300 focus-visible:ring-slate-400'
+                      : 'bg-slate-900 text-white hover:bg-slate-800 focus-visible:ring-slate-500')
                 }
               >
                 {a.label}
@@ -269,13 +270,22 @@ export const showAggregateToast = ({
         description={
           <div className="space-y-1">
             {successes && successes.length > 0 && (
-              <div className="text-xs text-emerald-600">{successes.slice(0, 3).join(', ')}{successes.length > 3 && '…'}</div>
+              <div className="text-xs text-emerald-600">
+                {successes.slice(0, 3).join(', ')}
+                {successes.length > 3 && '…'}
+              </div>
             )}
             {warnings && warnings.length > 0 && (
-              <div className="text-xs text-amber-600">{warnings.slice(0, 3).join(', ')}{warnings.length > 3 && '…'}</div>
+              <div className="text-xs text-amber-600">
+                {warnings.slice(0, 3).join(', ')}
+                {warnings.length > 3 && '…'}
+              </div>
             )}
             {errors && errors.length > 0 && (
-              <div className="text-xs text-red-600">{errors.slice(0, 3).join(', ')}{errors.length > 3 && '…'}</div>
+              <div className="text-xs text-red-600">
+                {errors.slice(0, 3).join(', ')}
+                {errors.length > 3 && '…'}
+              </div>
             )}
           </div>
         }
@@ -284,4 +294,3 @@ export const showAggregateToast = ({
     { duration: 7000 },
   );
 };
-

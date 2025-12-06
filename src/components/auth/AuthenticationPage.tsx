@@ -11,17 +11,13 @@ export function AuthenticationPage() {
   return (
     <>
       {mode === 'login' && (
-        <LoginForm 
+        <LoginForm
           onSwitchToRegister={() => setMode('register')}
           onSwitchToReset={() => setMode('forgot-password')}
         />
       )}
-      {mode === 'register' && (
-        <RegisterForm onSwitchToLogin={() => setMode('login')} />
-      )}
-      {mode === 'forgot-password' && (
-        <ForgotPasswordForm onBackToLogin={() => setMode('login')} />
-      )}
+      {mode === 'register' && <RegisterForm onSwitchToLogin={() => setMode('login')} />}
+      {mode === 'forgot-password' && <ForgotPasswordForm onBackToLogin={() => setMode('login')} />}
     </>
   );
 }

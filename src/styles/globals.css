@@ -316,13 +316,17 @@ html {
 
   /* Modern card styling with subtle shadow and hover effect */
   [data-slot='card'] {
-    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+    box-shadow:
+      0 1px 3px 0 rgba(0, 0, 0, 0.1),
+      0 1px 2px -1px rgba(0, 0, 0, 0.1);
     transition: all 0.2s ease;
     border: 1px solid rgba(148, 163, 184, 0.15);
   }
 
   [data-slot='card']:hover {
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+    box-shadow:
+      0 4px 6px -1px rgba(0, 0, 0, 0.1),
+      0 2px 4px -2px rgba(0, 0, 0, 0.1);
     transform: translateY(-1px);
   }
 
@@ -382,7 +386,9 @@ html {
     background-color: #ffffff !important;
     color: #1a2332 !important;
     border-color: rgba(148, 163, 184, 0.2) !important;
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1) !important;
+    box-shadow:
+      0 10px 15px -3px rgba(0, 0, 0, 0.1),
+      0 4px 6px -4px rgba(0, 0, 0, 0.1) !important;
   }
 
   /* Specific override for active menu items inside Sheet */
@@ -478,7 +484,7 @@ html {
       max-height: 95vh !important;
       margin: 2.5vh auto;
     }
-    
+
     /* Ensure proper scrolling on mobile */
     [role='dialog'] [data-radix-scroll-area-viewport] {
       -webkit-overflow-scrolling: touch;
@@ -489,7 +495,7 @@ html {
   .overflow-x-clip {
     overflow-x: clip;
   }
-  
+
   /* Better select dropdowns on mobile */
   @media (max-width: 640px) {
     [role='listbox'],
@@ -519,7 +525,8 @@ html {
   }
 
   @keyframes pill-spin-subtle {
-    0%, 100% {
+    0%,
+    100% {
       transform: rotateY(0deg);
     }
     50% {

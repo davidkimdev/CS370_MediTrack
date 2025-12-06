@@ -1,7 +1,16 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Skeleton } from '../ui/skeleton';
-import { Users, UserCheck, UserPlus, KeyRound, CheckCircle2, Pill, AlertTriangle, Ban } from 'lucide-react';
+import {
+  Users,
+  UserCheck,
+  UserPlus,
+  KeyRound,
+  CheckCircle2,
+  Pill,
+  AlertTriangle,
+  Ban,
+} from 'lucide-react';
 import { cn } from '../ui/utils';
 
 interface KpiHeaderProps {
@@ -75,14 +84,18 @@ function KpiCard({ icon, label, value, loading, accent = 'emerald' }: KpiCardPro
     <div className={cn('relative border transition-colors rounded-lg', accentClasses[accent])}>
       <div className="p-4">
         <div className="flex items-center gap-4">
-          <div className={cn(
-            'flex size-12 items-center justify-center rounded-xl text-emerald-600 dark:text-emerald-300',
-            'bg-white/70 dark:bg-white/5 backdrop-blur-sm shadow-sm'
-          )}>
+          <div
+            className={cn(
+              'flex size-12 items-center justify-center rounded-xl text-emerald-600 dark:text-emerald-300',
+              'bg-white/70 dark:bg-white/5 backdrop-blur-sm shadow-sm',
+            )}
+          >
             {icon}
           </div>
           <div className="flex-1">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground/80 font-medium">{label}</p>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground/80 font-medium">
+              {label}
+            </p>
             <p className="mt-1 text-2xl font-semibold tabular-nums">{animated}</p>
           </div>
         </div>
@@ -94,9 +107,12 @@ function KpiCard({ icon, label, value, loading, accent = 'emerald' }: KpiCardPro
 function HighlightCard({ icon, label, value, loading, accent = 'emerald' }: KpiCardProps) {
   const animated = useCountUp(value);
   const gradients: Record<string, string> = {
-    emerald: 'from-emerald-500/10 via-emerald-500/5 to-transparent border-emerald-200/60 dark:border-emerald-900/60',
-    indigo: 'from-indigo-500/10 via-indigo-500/5 to-transparent border-indigo-200/60 dark:border-indigo-900/60',
-    amber: 'from-amber-500/10 via-amber-500/5 to-transparent border-amber-200/60 dark:border-amber-900/60',
+    emerald:
+      'from-emerald-500/10 via-emerald-500/5 to-transparent border-emerald-200/60 dark:border-emerald-900/60',
+    indigo:
+      'from-indigo-500/10 via-indigo-500/5 to-transparent border-indigo-200/60 dark:border-indigo-900/60',
+    amber:
+      'from-amber-500/10 via-amber-500/5 to-transparent border-amber-200/60 dark:border-amber-900/60',
     rose: 'from-rose-500/10 via-rose-500/5 to-transparent border-rose-200/60 dark:border-rose-900/60',
   };
   if (loading) {
@@ -113,7 +129,9 @@ function HighlightCard({ icon, label, value, loading, accent = 'emerald' }: KpiC
     );
   }
   return (
-    <div className={`relative overflow-hidden rounded-xl border bg-gradient-to-br ${gradients[accent]} backdrop-blur-sm group`}> 
+    <div
+      className={`relative overflow-hidden rounded-xl border bg-gradient-to-br ${gradients[accent]} backdrop-blur-sm group`}
+    >
       <div className="p-4 flex items-center gap-4">
         <div className="size-12 rounded-xl bg-white/70 dark:bg-white/5 flex items-center justify-center shadow-sm transition-colors group-hover:bg-white dark:group-hover:bg-white/10">
           {icon}
@@ -135,7 +153,17 @@ function HighlightCard({ icon, label, value, loading, accent = 'emerald' }: KpiC
   );
 }
 
-function StatPill({ icon, label, value, loading }: { icon: React.ReactNode; label: string; value: number; loading: boolean }) {
+function StatPill({
+  icon,
+  label,
+  value,
+  loading,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+  loading: boolean;
+}) {
   if (loading) {
     return <Skeleton className="h-7 w-32 rounded-full" />;
   }
@@ -152,29 +180,77 @@ function StatPill({ icon, label, value, loading }: { icon: React.ReactNode; labe
 
 export function AdminKpiHeader({ loading, metrics, title = 'Overview' }: KpiHeaderProps) {
   // Build medication chunk
-  const medHighlights: Array<{ label: string; value?: number; icon: React.ReactNode; accent: 'indigo' | 'amber' | 'rose' }> = [];
+  const medHighlights: Array<{
+    label: string;
+    value?: number;
+    icon: React.ReactNode;
+    accent: 'indigo' | 'amber' | 'rose';
+  }> = [];
   if (metrics.totalMedications !== undefined) {
-    medHighlights.push({ label: 'Total Medications', value: metrics.totalMedications, icon: <Pill className="size-6" />, accent: 'indigo' });
+    medHighlights.push({
+      label: 'Total Medications',
+      value: metrics.totalMedications,
+      icon: <Pill className="size-6" />,
+      accent: 'indigo',
+    });
   }
   if (metrics.lowStock !== undefined) {
-    medHighlights.push({ label: 'Low Stock', value: metrics.lowStock, icon: <AlertTriangle className="size-6" />, accent: 'amber' });
+    medHighlights.push({
+      label: 'Low Stock',
+      value: metrics.lowStock,
+      icon: <AlertTriangle className="size-6" />,
+      accent: 'amber',
+    });
   }
   if (metrics.outOfStock !== undefined) {
-    medHighlights.push({ label: 'Out of Stock', value: metrics.outOfStock, icon: <Ban className="size-6" />, accent: 'rose' });
+    medHighlights.push({
+      label: 'Out of Stock',
+      value: metrics.outOfStock,
+      icon: <Ban className="size-6" />,
+      accent: 'rose',
+    });
   }
   const medPills: Array<{ label: string; value: number; icon: React.ReactNode }> = [];
   // keep pills empty for meds to reduce clutter
 
   // Build accounts chunk
-  const acctHighlights: Array<{ label: string; value?: number; icon: React.ReactNode; accent: 'emerald' | 'amber' | 'indigo' }> = [
+  const acctHighlights: Array<{
+    label: string;
+    value?: number;
+    icon: React.ReactNode;
+    accent: 'emerald' | 'amber' | 'indigo';
+  }> = [
     // Emphasize action-needed first
-    { label: 'Pending Approvals', value: metrics.pendingApprovals, icon: <UserPlus className="size-6" />, accent: 'amber' },
-    { label: 'Active Users', value: metrics.activeUsers, icon: <Users className="size-6" />, accent: 'emerald' },
-    { label: 'Admins', value: metrics.adminUsers, icon: <UserCheck className="size-6" />, accent: 'indigo' },
+    {
+      label: 'Pending Approvals',
+      value: metrics.pendingApprovals,
+      icon: <UserPlus className="size-6" />,
+      accent: 'amber',
+    },
+    {
+      label: 'Active Users',
+      value: metrics.activeUsers,
+      icon: <Users className="size-6" />,
+      accent: 'emerald',
+    },
+    {
+      label: 'Admins',
+      value: metrics.adminUsers,
+      icon: <UserCheck className="size-6" />,
+      accent: 'indigo',
+    },
   ];
   const acctPills: Array<{ label: string; value: number; icon: React.ReactNode }> = [
-    { label: 'Invites', value: metrics.activeInvitationCodes, icon: <KeyRound className="size-3" /> },
-    { label: 'Redemptions', value: metrics.recentRedemptions, icon: <CheckCircle2 className="size-3" /> },
+    {
+      label: 'Invites',
+      value: metrics.activeInvitationCodes,
+      icon: <KeyRound className="size-3" />,
+    },
+    {
+      label: 'Redemptions',
+      value: metrics.recentRedemptions,
+      icon: <CheckCircle2 className="size-3" />,
+    },
   ];
 
   return (
@@ -188,7 +264,14 @@ export function AdminKpiHeader({ loading, metrics, title = 'Overview' }: KpiHead
           {medHighlights.length > 0 ? (
             <div className="grid gap-3 sm:grid-cols-3">
               {medHighlights.map((h, idx) => (
-                <HighlightCard key={`med-h-${idx}`} icon={h.icon} label={h.label} value={h.value ?? 0} loading={loading} accent={h.accent} />
+                <HighlightCard
+                  key={`med-h-${idx}`}
+                  icon={h.icon}
+                  label={h.label}
+                  value={h.value ?? 0}
+                  loading={loading}
+                  accent={h.accent}
+                />
               ))}
             </div>
           ) : (
@@ -206,12 +289,25 @@ export function AdminKpiHeader({ loading, metrics, title = 'Overview' }: KpiHead
         <CardContent className="space-y-3">
           <div className="grid gap-3 sm:grid-cols-3">
             {acctHighlights.map((h, idx) => (
-              <HighlightCard key={`acct-h-${idx}`} icon={h.icon} label={h.label} value={h.value ?? 0} loading={loading} accent={h.accent} />
+              <HighlightCard
+                key={`acct-h-${idx}`}
+                icon={h.icon}
+                label={h.label}
+                value={h.value ?? 0}
+                loading={loading}
+                accent={h.accent}
+              />
             ))}
           </div>
           <div className="flex flex-wrap gap-2">
             {acctPills.map((p, idx) => (
-              <StatPill key={`acct-p-${idx}`} icon={p.icon} label={p.label} value={p.value} loading={loading} />
+              <StatPill
+                key={`acct-p-${idx}`}
+                icon={p.icon}
+                label={p.label}
+                value={p.value}
+                loading={loading}
+              />
             ))}
           </div>
         </CardContent>
@@ -221,9 +317,14 @@ export function AdminKpiHeader({ loading, metrics, title = 'Overview' }: KpiHead
 }
 
 function UserXIcon() {
-  return <svg viewBox="0 0 24 24" className="size-6" aria-hidden>
-    <path fill="currentColor" d="M15.5 12a4.5 4.5 0 1 0-4.243-5.657A4.5 4.5 0 0 0 15.5 12ZM3 20a7 7 0 0 1 14 0v1H3v-1Zm18-9.5-1.5-1.5-1.5 1.5-1-1L18 8l-1.5-1.5 1-1L19 7l1.5-1.5 1 1L20 8l1.5 1.5-1 1Z" />
-  </svg>;
+  return (
+    <svg viewBox="0 0 24 24" className="size-6" aria-hidden>
+      <path
+        fill="currentColor"
+        d="M15.5 12a4.5 4.5 0 1 0-4.243-5.657A4.5 4.5 0 0 0 15.5 12ZM3 20a7 7 0 0 1 14 0v1H3v-1Zm18-9.5-1.5-1.5-1.5 1.5-1-1L18 8l-1.5-1.5 1-1L19 7l1.5-1.5 1 1L20 8l1.5 1.5-1 1Z"
+      />
+    </svg>
+  );
 }
 
 export default AdminKpiHeader;

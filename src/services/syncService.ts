@@ -38,19 +38,19 @@ export class SyncService {
       console.log('⚠️ Realtime already active, skipping duplicate subscription');
       return;
     }
-    
+
     console.log('📡 Starting realtime subscription for inventory changes...');
-    
+
     // Listen to inventory changes since stock is derived from inventory rows
     const channel = supabase.channel('rt-inventory');
-    
+
     channel.on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'inventory' },
       async (payload: any) => {
         try {
           console.log('📦 Inventory change detected:', payload.eventType);
-          
+
           // Determine affected medication_id from new/old row
           const medId = (payload.new?.medication_id || payload.old?.medication_id) as
             | string
@@ -74,7 +74,7 @@ export class SyncService {
         }
       },
     );
-    
+
     channel.subscribe((status) => {
       if (status === 'SUBSCRIBED') {
         console.log('✅ Realtime subscription active');
@@ -82,7 +82,7 @@ export class SyncService {
         console.error('❌ Realtime subscription error');
       }
     });
-    
+
     this.subscription = channel;
   }
 
@@ -141,7 +141,10 @@ export class SyncService {
         await OfflineStore.removePendingDispense(pending.id);
         processed++;
       } catch (e) {
-        logger.error('Failed to sync pending dispense', e instanceof Error ? e : new Error(String(e)));
+        logger.error(
+          'Failed to sync pending dispense',
+          e instanceof Error ? e : new Error(String(e)),
+        );
         failed++;
       }
     }
