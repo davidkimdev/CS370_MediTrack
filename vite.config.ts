@@ -66,6 +66,7 @@ export default defineConfig({
     },
   },
   server: {
+    host: true, // Expose server to network (0.0.0.0)
     port: 3000,
     strictPort: true, // Fail if port 3000 is not available instead of trying other ports
     open: true,

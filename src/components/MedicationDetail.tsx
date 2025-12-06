@@ -89,7 +89,6 @@ export function MedicationDetail({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
   const [patientId, setPatientId] = useState('');
-  const [patientInitials, setPatientInitials] = useState('');
   const [dose, setDose] = useState('');
   const [selectedLots, setSelectedLots] = useState<LotSelection[]>([
     { lotNumber: '', quantity: 0 },
@@ -100,21 +99,18 @@ export function MedicationDetail({
   const [notes, setNotes] = useState('');
 
   const patientIdInputRef = useRef<HTMLInputElement>(null);
-  const patientInitialsInputRef = useRef<HTMLInputElement>(null);
   const doseInputRef = useRef<HTMLInputElement>(null);
   const physicianInputRef = useRef<HTMLInputElement>(null);
   const studentInputRef = useRef<HTMLInputElement>(null);
   const clinicInputRef = useRef<HTMLInputElement>(null);
 
   const patientIdHistory = useFieldHistory('dispense_patient_id', { minLength: 2 });
-  const patientInitialsHistory = useFieldHistory('dispense_patient_initials', { minLength: 2 });
   const doseHistory = useFieldHistory('dispense_dose', { minLength: 1 });
   const physicianHistory = useFieldHistory('dispense_physician_name', { minLength: 2 });
   const studentHistory = useFieldHistory('dispense_student_name', { minLength: 2 });
   const clinicSiteHistory = useFieldHistory('dispense_clinic_site', { minLength: 2 });
   // Per-field open flags
   const [openPatientId, setOpenPatientId] = useState(false);
-  const [openPatientInitials, setOpenPatientInitials] = useState(false);
   const [openDose, setOpenDose] = useState(false);
   const [openPhysician, setOpenPhysician] = useState(false);
   const [openStudent, setOpenStudent] = useState(false);
@@ -122,7 +118,6 @@ export function MedicationDetail({
 
   const closeAllSuggestions = () => {
     setOpenPatientId(false);
-    setOpenPatientInitials(false);
     setOpenDose(false);
     setOpenPhysician(false);
     setOpenStudent(false);
@@ -176,7 +171,7 @@ export function MedicationDetail({
     }
 
     // Validate required fields
-    if (!patientId.trim() || !patientInitials.trim() || !dose.trim() || !physicianName.trim()) {
+    if (!patientId.trim() || !dose.trim() || !physicianName.trim()) {
       showErrorToast(
         'Missing required fields',
         'Please fill in all required fields (marked with *)',
@@ -211,7 +206,7 @@ export function MedicationDetail({
         medicationId: medication.id,
         medicationName: `${medication.name} ${medication.strength}`,
         patientId: patientId.trim(),
-        patientInitials: patientInitials.trim().toUpperCase(),
+        patientInitials: undefined,
         quantity: selectedLot.quantity,
         dose: dose.trim(),
         lotNumber: selectedLot.lotNumber,
@@ -230,7 +225,6 @@ export function MedicationDetail({
     });
 
     patientIdHistory.recordValue(patientId);
-    patientInitialsHistory.recordValue(patientInitials);
     doseHistory.recordValue(dose);
     physicianHistory.recordValue(physicianName);
     studentHistory.recordValue(studentName);
@@ -241,7 +235,6 @@ export function MedicationDetail({
 
     // Reset form
     setPatientId('');
-    setPatientInitials('');
     setDose('');
     setSelectedLots([{ lotNumber: '', quantity: 0 }]);
     setPhysicianName('');
@@ -249,7 +242,6 @@ export function MedicationDetail({
     setClinicSite('');
     setNotes('');
     patientIdHistory.updateQuery('');
-    patientInitialsHistory.updateQuery('');
     doseHistory.updateQuery('');
     physicianHistory.updateQuery('');
     studentHistory.updateQuery('');
@@ -433,155 +425,63 @@ export function MedicationDetail({
                           }}
                         >
                           {/* Patient Information */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            <div className="space-y-1.5">
-                              <Label htmlFor="patientId" className="text-sm sm:text-base">
-                                Patient ID *
-                              </Label>
-                              <div className="space-y-1">
-                                <div className="relative">
-                                  <div className="history-suggestion-container">
-                                    <Input
-                                      id="patientId"
-                                      placeholder="e.g., 2025-196"
-                                      autoComplete="off"
-                                      ref={patientIdInputRef}
-                                      value={patientId}
-                                      className="h-8 sm:h-9 text-sm sm:text-base"
-                                      onFocus={() => {
-                                        setOpenPatientId(true);
-                                        patientIdHistory.updateQuery(patientId);
-                                      }}
-                                      onMouseDown={(event) => {
-                                        if (
-                                          document.activeElement === event.currentTarget &&
-                                          event.currentTarget.value.trim() === ''
-                                        ) {
-                                          event.preventDefault();
-                                          setOpenPatientId((prev) => {
-                                            const next = !prev;
-                                            if (next) {
-                                              patientIdHistory.updateQuery(
-                                                event.currentTarget.value,
-                                              );
-                                            }
-                                            return next;
-                                          });
-                                        }
-                                      }}
-                                      onChange={(e) => {
-                                        const value = e.target.value;
-                                        setPatientId(value);
-                                        patientIdHistory.updateQuery(value);
-                                        if (!openPatientId) setOpenPatientId(true);
-                                      }}
-                                    />
-                                    {openPatientId && patientIdHistory.suggestions.length > 0 && (
-                                      <ul
-                                        className="absolute z-50 mt-1 w-full max-h-48 overflow-auto rounded-md border bg-popover text-sm shadow"
-                                        role="listbox"
-                                      >
-                                        {patientIdHistory.suggestions.map((s) => (
-                                          <li key={s.value}>
-                                            <button
-                                              type="button"
-                                              className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-muted"
-                                              onClick={() => {
-                                                setPatientId(s.value);
-                                                patientIdHistory.recordValue(s.value);
-                                                patientIdHistory.updateQuery(s.value);
-                                                setOpenPatientId(false);
-                                              }}
-                                            >
-                                              <span>{s.value}</span>
-                                              <span
-                                                className="text-xs text-muted-foreground hover:text-destructive"
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  patientIdHistory.clearEntry(s.value);
-                                                  patientIdHistory.updateQuery(patientId);
-                                                }}
-                                              >
-                                                Clear
-                                              </span>
-                                            </button>
-                                          </li>
-                                        ))}
-                                        <li className="border-t">
-                                          <button
-                                            type="button"
-                                            className="w-full px-3 py-1.5 text-left text-xs text-muted-foreground hover:text-destructive hover:bg-muted"
-                                            onClick={() => {
-                                              patientIdHistory.clearAll();
-                                              patientIdHistory.updateQuery(patientId);
-                                            }}
-                                          >
-                                            Clear all
-                                          </button>
-                                        </li>
-                                      </ul>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="initials">Patient Initials *</Label>
-                              <div className="history-suggestion-container">
-                                <Input
-                                  id="initials"
-                                  placeholder="e.g., J.D."
-                                  autoComplete="off"
-                                  maxLength={6}
-                                  ref={patientInitialsInputRef}
-                                  value={patientInitials}
-                                  className="h-8 sm:h-9 text-sm sm:text-base uppercase"
-                                  onFocus={() => {
-                                    setOpenPatientInitials(true);
-                                    patientInitialsHistory.updateQuery(patientInitials);
-                                  }}
-                                  onMouseDown={(event) => {
-                                    if (
-                                      document.activeElement === event.currentTarget &&
-                                      event.currentTarget.value.trim() === ''
-                                    ) {
-                                      event.preventDefault();
-                                      setOpenPatientInitials((prev) => {
-                                        const next = !prev;
-                                        if (next) {
-                                          patientInitialsHistory.updateQuery(
-                                            event.currentTarget.value,
-                                          );
-                                        }
-                                        return next;
-                                      });
-                                    }
-                                  }}
-                                  onChange={(e) => {
-                                    const value = e.target.value
-                                      .toUpperCase()
-                                      .replace(/[^A-Z.]/g, '');
-                                    setPatientInitials(value);
-                                    patientInitialsHistory.updateQuery(value);
-                                    if (!openPatientInitials) setOpenPatientInitials(true);
-                                  }}
-                                />
-                                {openPatientInitials &&
-                                  patientInitialsHistory.suggestions.length > 0 && (
+                          <div className="space-y-1.5">
+                            <Label htmlFor="patientId" className="text-sm sm:text-base">
+                              Patient ID *
+                            </Label>
+                            <div className="space-y-1">
+                              <div className="relative">
+                                <div className="history-suggestion-container">
+                                  <Input
+                                    id="patientId"
+                                    placeholder="e.g., 2025-196"
+                                    autoComplete="off"
+                                    ref={patientIdInputRef}
+                                    value={patientId}
+                                    className="h-8 sm:h-9 text-sm sm:text-base"
+                                    onFocus={() => {
+                                      setOpenPatientId(true);
+                                      patientIdHistory.updateQuery(patientId);
+                                    }}
+                                    onMouseDown={(event) => {
+                                      if (
+                                        document.activeElement === event.currentTarget &&
+                                        event.currentTarget.value.trim() === ''
+                                      ) {
+                                        event.preventDefault();
+                                        setOpenPatientId((prev) => {
+                                          const next = !prev;
+                                          if (next) {
+                                            patientIdHistory.updateQuery(
+                                              event.currentTarget.value,
+                                            );
+                                          }
+                                          return next;
+                                        });
+                                      }
+                                    }}
+                                    onChange={(e) => {
+                                      const value = e.target.value;
+                                      setPatientId(value);
+                                      patientIdHistory.updateQuery(value);
+                                      if (!openPatientId) setOpenPatientId(true);
+                                    }}
+                                  />
+                                  {openPatientId && patientIdHistory.suggestions.length > 0 && (
                                     <ul
                                       className="absolute z-50 mt-1 w-full max-h-48 overflow-auto rounded-md border bg-popover text-sm shadow"
                                       role="listbox"
                                     >
-                                      {patientInitialsHistory.suggestions.map((s) => (
+                                      {patientIdHistory.suggestions.map((s) => (
                                         <li key={s.value}>
                                           <button
                                             type="button"
                                             className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-muted"
                                             onClick={() => {
-                                              setPatientInitials(s.value);
-                                              patientInitialsHistory.recordValue(s.value);
-                                              patientInitialsHistory.updateQuery(s.value);
-                                              setOpenPatientInitials(false);
+                                              setPatientId(s.value);
+                                              patientIdHistory.recordValue(s.value);
+                                              patientIdHistory.updateQuery(s.value);
+                                              setOpenPatientId(false);
                                             }}
                                           >
                                             <span>{s.value}</span>
@@ -589,8 +489,8 @@ export function MedicationDetail({
                                               className="text-xs text-muted-foreground hover:text-destructive"
                                               onClick={(e) => {
                                                 e.stopPropagation();
-                                                patientInitialsHistory.clearEntry(s.value);
-                                                patientInitialsHistory.updateQuery(patientInitials);
+                                                patientIdHistory.clearEntry(s.value);
+                                                patientIdHistory.updateQuery(patientId);
                                               }}
                                             >
                                               Clear
@@ -603,8 +503,8 @@ export function MedicationDetail({
                                           type="button"
                                           className="w-full px-3 py-1.5 text-left text-xs text-muted-foreground hover:text-destructive hover:bg-muted"
                                           onClick={() => {
-                                            patientInitialsHistory.clearAll();
-                                            patientInitialsHistory.updateQuery(patientInitials);
+                                            patientIdHistory.clearAll();
+                                            patientIdHistory.updateQuery(patientId);
                                           }}
                                         >
                                           Clear all
@@ -612,6 +512,7 @@ export function MedicationDetail({
                                       </li>
                                     </ul>
                                   )}
+                                </div>
                               </div>
                             </div>
                           </div>

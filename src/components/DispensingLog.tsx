@@ -177,7 +177,7 @@ export function DispensingLog({ records, onEditRecord }: DispensingLogProps) {
     worksheet['!cols'] = [
       { wch: 20 }, // Date/Time
       { wch: maxWidth }, // Medication
-      { wch: 15 }, // Patient Initials
+      { wch: 15 }, // Patient ID
       { wch: 10 }, // Quantity
       { wch: 15 }, // Lot Number
       { wch: 20 }, // Dispensed By
