@@ -33,6 +33,7 @@ export function EditDispensingRecordDialog({
   const [isSaving, setIsSaving] = useState(false);
   const [availableLots, setAvailableLots] = useState<InventoryItem[]>([]);
   const [isLoadingLots, setIsLoadingLots] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 640);
 
   // Populate form when record changes
   useEffect(() => {
@@ -161,16 +162,6 @@ export function EditDispensingRecordDialog({
                     placeholder="e.g., 2025-196"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-quantity">Quantity *</Label>
-                  <Input
-                    id="edit-quantity"
-                    type="number"
-                    value={quantity}
-                    onChange={(e) => setQuantity(e.target.value)}
-                    min="1"
-                  />
-                </div>
               </div>
 
               <div className="space-y-2">
@@ -182,115 +173,123 @@ export function EditDispensingRecordDialog({
                   placeholder="e.g., 1 tab, PRN, 1 gtt"
                 />
               </div>
-              
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="edit-dose">Dose Instructions *</Label>
-              <Input
-                id="edit-dose"
-                value={dose}
-                onChange={(e) => setDose(e.target.value)}
-                placeholder="e.g., 1 tab, PRN, 1 gtt"
-              />
-            </div>
+              <div className="space-y-2">
+                <Label>Lot & Quantity</Label>
 
-            <div className="space-y-2">
-  <Label>Lot & Quantity</Label>
+                {availableLots.length > 0 ? (
+                  <div className="p-3 border rounded-md bg-muted/30 space-y-3">
+                    {/* Lot select */}
+                    <div className="space-y-1">
+                      <Label htmlFor="edit-lotNumber" className="text-xs sm:text-sm">
+                        Lot Number
+                      </Label>
+                      <Select
+                        value={lotNumber}
+                        onValueChange={(value) => setLotNumber(value)}
+                      >
+                        <SelectTrigger id="edit-lotNumber" className="h-8 sm:h-9 w-full">
+                          <SelectValue
+                            placeholder={isLoadingLots ? 'Loading lots...' : 'Select lot'}
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableLots.map((availLot) => (
+                            <SelectItem
+                              key={availLot.lotNumber}
+                              value={availLot.lotNumber}
+                            >
+                              <span className="text-xs sm:text-sm">
+                                {availLot.lotNumber} - Exp:{' '}
+                                {availLot.expirationDate.toLocaleDateString()} - Qty:{' '}
+                                {availLot.quantity}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-  {availableLots.length > 0 ? (
-    <div className="p-3 border rounded-md bg-muted/30 space-y-3">
-      {/* Lot select */}
-      <div className="space-y-1">
-        <Label htmlFor="edit-lotNumber" className="text-xs sm:text-sm">
-          Lot Number
-        </Label>
-        <Select
-          value={lotNumber}
-          onValueChange={(value) => setLotNumber(value)}
-        >
-          <SelectTrigger id="edit-lotNumber" className="h-8 sm:h-9 w-full">
-            <SelectValue
-              placeholder={isLoadingLots ? 'Loading lots...' : 'Select lot'}
-            />
-          </SelectTrigger>
-          <SelectContent>
-            {availableLots.map((availLot) => (
-              <SelectItem
-                key={availLot.lotNumber}
-                value={availLot.lotNumber}
-              >
-                <span className="text-xs sm:text-sm">
-                  {availLot.lotNumber} - Exp:{' '}
-                  {availLot.expirationDate.toLocaleDateString()} - Qty:{' '}
-                  {availLot.quantity}
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+                    {/* Quantity + Available side by side */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <Label htmlFor="edit-quantity" className="text-xs sm:text-sm">
+                          Quantity *
+                        </Label>
+                        <Input
+                          id="edit-quantity"
+                          type="number"
+                          value={quantity}
+                          onChange={(e) => {
+                            // natural numbers only
+                            const v = e.target.value.replace(/\D/g, '');
+                            setQuantity(v === '' ? '' : String(Math.max(1, Number(v))));
+                          }}
+                          min="1"
+                          inputMode="numeric"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs sm:text-sm">Available</Label>
+                        <p className="text-sm font-medium py-2">
+                          {selectedLot ? `${selectedLot.quantity} units` : '-'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  // Fallback when there are no lots in inventory
+                  <div className="space-y-2">
+                    <Input
+                      id="edit-lotNumber"
+                      value={lotNumber}
+                      onChange={(e) => setLotNumber(e.target.value)}
+                      placeholder={
+                        isLoadingLots
+                          ? 'Loading lots...'
+                          : 'No lots available – enter manually'
+                      }
+                    />
+                    <div className="space-y-1">
+                      <Label htmlFor="edit-quantity" className="text-xs sm:text-sm">
+                        Quantity *
+                      </Label>
+                      <Input
+                        id="edit-quantity"
+                        type="number"
+                        value={quantity}
+                        onChange={(e) => {
+                          const v = e.target.value.replace(/\D/g, '');
+                          setQuantity(v === '' ? '' : String(Math.max(1, Number(v))));
+                        }}
+                        min="1"
+                        inputMode="numeric"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
 
-      {/* Quantity + Available side by side */}
-      <div className="grid grid-cols-2 gap-2">
-        <div className="space-y-1">
-          <Label htmlFor="edit-quantity" className="text-xs sm:text-sm">
-            Quantity *
-          </Label>
-          <Input
-            id="edit-quantity"
-            type="number"
-            value={quantity}
-            onChange={(e) => {
-              // natural numbers only
-              const v = e.target.value.replace(/\D/g, '');
-              setQuantity(v === '' ? '' : String(Math.max(1, Number(v))));
-            }}
-            min="1"
-            inputMode="numeric"
-          />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs sm:text-sm">Available</Label>
-          <p className="text-sm font-medium py-2">
-            {selectedLot ? `${selectedLot.quantity} units` : '-'}
-          </p>
-        </div>
-      </div>
-    </div>
-  ) : (
-    // Fallback when there are no lots in inventory
-    <div className="space-y-2">
-      <Input
-        id="edit-lotNumber"
-        value={lotNumber}
-        onChange={(e) => setLotNumber(e.target.value)}
-        placeholder={
-          isLoadingLots
-            ? 'Loading lots...'
-            : 'No lots available – enter manually'
-        }
-      />
-      <div className="space-y-1">
-        <Label htmlFor="edit-quantity" className="text-xs sm:text-sm">
-          Quantity *
-        </Label>
-        <Input
-          id="edit-quantity"
-          type="number"
-          value={quantity}
-          onChange={(e) => {
-            const v = e.target.value.replace(/\D/g, '');
-            setQuantity(v === '' ? '' : String(Math.max(1, Number(v))));
-          }}
-          min="1"
-          inputMode="numeric"
-        />
-      </div>
-    </div>
-  )}
-</div>
-
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-physician">Physician Name *</Label>
+                  <Input
+                    id="edit-physician"
+                    value={physicianName}
+                    onChange={(e) => setPhysicianName(e.target.value)}
+                    placeholder="e.g., Dr. Smith"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-student">Student Name</Label>
+                  <Input
+                    id="edit-student"
+                    value={studentName}
+                    onChange={(e) => setStudentName(e.target.value)}
+                    placeholder="e.g., Jane Doe"
+                  />
+                </div>
+              </div>
 
               <div className="space-y-2">
                 <Label htmlFor="edit-clinic-site">Clinic Site</Label>
