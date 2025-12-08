@@ -625,6 +625,28 @@ export default function App() {
     }
   };
 
+  const handleDeleteDispensingRecord = async (id: string) => {
+    try {
+      if (navigator.onLine) {
+        await MedicationService.deleteDispensingRecordWithRefund(id);
+        setDispensingRecords((prev) => prev.filter((rec) => rec.id !== id));
+        
+        // Reload inventory to reflect refunded stock
+        // We do a "silent" reload to update numbers without showing loading spinner
+        MedicationService.getAllInventory().then(setInventory);
+        MedicationService.getAllMedications().then(setMedications);
+        
+        showSuccessToast('Record deleted & items returned to stock');
+      } else {
+        showWarningToast('Cannot delete records while offline');
+      }
+    } catch (err) {
+      console.error('Error deleting dispensing record:', err);
+      showErrorToast('Failed to delete record');
+      throw err;
+    }
+  };
+
   
 
   // Handler for StockManagement component (with reason parameter)
@@ -1231,7 +1253,7 @@ export default function App() {
             }
           }}
           onSave={handleUpdateDispensingRecord}
-
+          onDelete={handleDeleteDispensingRecord}
         />
       )}
 

@@ -483,8 +483,8 @@ export class MedicationService {
 
   // OPTIONAL BUT NICE: server-side validation that matches your UI (natural numbers only)
   if (updates.quantity !== undefined) { // NEW
-    if (!Number.isInteger(updates.quantity) || updates.quantity <= 0) {
-      throw new Error('Quantity must be a positive whole number');
+    if (!Number.isInteger(updates.quantity) || updates.quantity < 0) {
+      throw new Error('Quantity must be a non-negative whole number');
     }
   }
     const updateData: any = {};
