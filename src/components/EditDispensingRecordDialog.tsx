@@ -93,13 +93,19 @@ export function EditDispensingRecordDialog({
     if (isSaving) return;
     if (!record) return;
 
+    // Validate quantity is not 0
+    const parsedQty = parseInt(quantity);
+    if (parsedQty === 0) {
+      alert('Quantity cannot be saved as 0.\n\nIf you want to remove this dispensing record, please use the "Delete Record" button instead.');
+      return;
+    }
+
     const updates: Partial<Omit<DispensingRecord, 'id'>> = {};
 
     if (patientId !== record.patientId) updates.patientId = patientId;
     if (dose !== record.dose) updates.dose = dose;
 
-    // Ensure we parse the integer correctly, allowing 0
-    const parsedQty = parseInt(quantity);
+    // Ensure we parse the integer correctly
     if (!isNaN(parsedQty) && parsedQty !== record.quantity) {
       updates.quantity = parsedQty;
     }
@@ -255,6 +261,13 @@ export function EditDispensingRecordDialog({
                       </p>
                     </div>
                   </div>
+                  
+                  {/* Warning when quantity is 0 */}
+                  {quantity === '0' && (
+                    <div className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded p-2 mt-2">
+                      ⚠️ Quantity cannot be saved as 0. Use the <strong>Delete Record</strong> button to remove this record.
+                    </div>
+                  )}
                 </div>
               ) : (
                 // Fallback when there are no lots in inventory
@@ -286,6 +299,13 @@ export function EditDispensingRecordDialog({
                       inputMode="numeric"
                     />
                   </div>
+                  
+                  {/* Warning when quantity is 0 */}
+                  {quantity === '0' && (
+                    <div className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded p-2">
+                      ⚠️ Quantity cannot be saved as 0. Use the <strong>Delete Record</strong> button to remove this record.
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -357,7 +377,7 @@ export function EditDispensingRecordDialog({
               </Button>
               <Button
                 onClick={handleSave}
-                disabled={isSaving || isDeleting || !patientId || !dose || quantity === '' || !physicianName}
+                disabled={isSaving || isDeleting || !patientId || !dose || quantity === '' || quantity === '0' || !physicianName}
               >
                 {isSaving ? 'Saving...' : 'Save Changes'}
               </Button>
