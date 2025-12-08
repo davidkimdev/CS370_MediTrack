@@ -79,13 +79,20 @@ export function EditDispensingRecordDialog({
   }, []);
 
   const handleSave = async () => {
+    // FIX: Block the function if it's already running
+    if (isSaving) return;
     if (!record) return;
 
     const updates: Partial<Omit<DispensingRecord, 'id'>> = {};
 
     if (patientId !== record.patientId) updates.patientId = patientId;
     if (dose !== record.dose) updates.dose = dose;
-    if (parseInt(quantity) !== record.quantity) updates.quantity = parseInt(quantity);
+
+    // Ensure we parse the integer correctly, allowing 0
+    const parsedQty = parseInt(quantity);
+    if (!isNaN(parsedQty) && parsedQty !== record.quantity) {
+      updates.quantity = parsedQty;
+    }
     if (lotNumber !== record.lotNumber) updates.lotNumber = lotNumber;
     if (physicianName !== record.physicianName) updates.physicianName = physicianName;
     if (studentName !== record.studentName) updates.studentName = studentName || undefined;
@@ -100,11 +107,10 @@ export function EditDispensingRecordDialog({
     setIsSaving(true);
     try {
       await onSave(record.id, updates);
-      onOpenChange(false);
+      window.location.reload();
     } catch (error) {
       console.error('Failed to save changes:', error);
       alert('Failed to save changes. Please try again.');
-    } finally {
       setIsSaving(false);
     }
   };
@@ -194,18 +200,36 @@ export function EditDispensingRecordDialog({
                           />
                         </SelectTrigger>
                         <SelectContent>
-                          {availableLots.map((availLot) => (
-                            <SelectItem
-                              key={availLot.lotNumber}
-                              value={availLot.lotNumber}
-                            >
-                              <span className="text-xs sm:text-sm">
-                                {availLot.lotNumber} - Exp:{' '}
-                                {availLot.expirationDate.toLocaleDateString()} - Qty:{' '}
-                                {availLot.quantity}
+                          {/* --- FIX START: Always show the current record's lot --- */}
+                          {record?.lotNumber && (
+                            <SelectItem value={record.lotNumber}>
+                              <span className="text-xs sm:text-sm font-semibold">
+                                {record.lotNumber} (Current)
+                                {record.expirationDate &&
+                                  ` - Exp: ${new Date(record.expirationDate).toLocaleDateString()}`
+                                }
+                                {/* We use the original quantity here so they see what it WAS before editing */}
+                                {record.quantity !== undefined && ` - Qty: ${record.quantity}`}
                               </span>
                             </SelectItem>
-                          ))}
+                          )}
+                          {/* --- FIX END --- */}
+
+                          {/* Filter out the current lot to avoid showing it twice, then map the rest */}
+                          {availableLots
+                            .filter((lot) => lot.lotNumber !== record?.lotNumber)
+                            .map((availLot) => (
+                              <SelectItem
+                                key={availLot.lotNumber}
+                                value={availLot.lotNumber}
+                              >
+                                <span className="text-xs sm:text-sm">
+                                  {availLot.lotNumber} - Exp:{' '}
+                                  {availLot.expirationDate.toLocaleDateString()} - Qty:{' '}
+                                  {availLot.quantity}
+                                </span>
+                              </SelectItem>
+                            ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -223,16 +247,18 @@ export function EditDispensingRecordDialog({
                           onChange={(e) => {
                             // natural numbers only
                             const v = e.target.value.replace(/\D/g, '');
-                            setQuantity(v === '' ? '' : String(Math.max(1, Number(v))));
+                            setQuantity(v === '' ? '' : String(Math.max(0, Number(v))));
                           }}
-                          min="1"
+                          min="0"
                           inputMode="numeric"
                         />
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs sm:text-sm">Available</Label>
                         <p className="text-sm font-medium py-2">
-                          {selectedLot ? `${selectedLot.quantity} units` : '-'}
+                          {selectedLot
+                            ? `${selectedLot.quantity} units`
+                            : (record?.lotNumber === lotNumber ? '0 units (Empty)' : '-')}
                         </p>
                       </div>
                     </div>
@@ -260,9 +286,9 @@ export function EditDispensingRecordDialog({
                         value={quantity}
                         onChange={(e) => {
                           const v = e.target.value.replace(/\D/g, '');
-                          setQuantity(v === '' ? '' : String(Math.max(1, Number(v))));
+                          setQuantity(v === '' ? '' : String(Math.max(0, Number(v))));
                         }}
-                        min="1"
+                        min="0"
                         inputMode="numeric"
                       />
                     </div>
