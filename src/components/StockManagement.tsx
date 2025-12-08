@@ -304,8 +304,6 @@ export function StockManagement({
           expirationDate: item.expirationDate,
           dosageForm: item.dosageForm || 'tablet', // Use extracted dosage form, default to tablet
         })),
-        '', // siteId - will use default active site
-        currentUser.id, // userId
       );
 
       if (result.success > 0) {

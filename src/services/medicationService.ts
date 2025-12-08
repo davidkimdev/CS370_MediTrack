@@ -844,8 +844,6 @@ export class MedicationService {
       expirationDate?: string;
       dosageForm?: string;
     }>,
-    p0: string,
-    id: string,
   ): Promise<{ success: number; failed: number; errors: string[] }> {
     const results = {
       success: 0,
@@ -854,30 +852,70 @@ export class MedicationService {
     };
 
     // Process each item
-    for (const item of items) {
+    for (const rawItem of items) {
       try {
-        // 1. Check if medication exists in medications table
+        const name = (rawItem.name || '').trim();
+        const strength = (rawItem.strength || '').trim();
+        const dosageForm = (rawItem.dosageForm || 'tablet').trim().toLowerCase();
+        const quantity = Number(rawItem.quantity);
+        const lotNumber = rawItem.lotNumber?.trim();
+        const providedExpiration = rawItem.expirationDate?.trim();
+
+        if (!name || !strength) {
+          results.failed++;
+          results.errors.push('Medication name and strength are required');
+          continue;
+        }
+
+        if (!Number.isInteger(quantity) || quantity <= 0) {
+          results.failed++;
+          results.errors.push(`Invalid quantity for ${name}: ${rawItem.quantity}`);
+          continue;
+        }
+
+        let expirationDate: string;
+        if (providedExpiration) {
+          const parsed = new Date(providedExpiration);
+          if (Number.isNaN(parsed.getTime())) {
+            results.failed++;
+            results.errors.push(`Invalid expiration date for ${name}: ${providedExpiration}`);
+            continue;
+          }
+          expirationDate = parsed.toISOString().split('T')[0];
+        } else {
+          const oneYearOut = new Date();
+          oneYearOut.setFullYear(oneYearOut.getFullYear() + 1);
+          expirationDate = oneYearOut.toISOString().split('T')[0];
+        }
+
+        // 1. Check if medication exists in medications table (case-insensitive, ignore dosage form)
         const { data: existingMed, error: searchError } = await supabase
           .from('medications')
-          .select('id')
-          .eq('name', item.name)
-          .eq('strength', item.strength)
-          .eq('dosage_form', item.dosageForm || 'tablet')
-          .single();
+          .select('id, dosage_form')
+          .ilike('name', name)
+          .ilike('strength', strength)
+          .limit(1)
+          .maybeSingle();
 
-        let medicationId: string;
+        if (searchError) {
+          results.failed++;
+          results.errors.push(`Failed to search for ${name}: ${searchError.message}`);
+          continue;
+        }
+
+        let medicationId: string | undefined;
+        let createdMedicationId: string | undefined;
 
         if (existingMed) {
-          // Medication exists, use existing ID
           medicationId = existingMed.id;
         } else {
           // Medication doesn't exist, create new one
           const { data: newMed, error: createError } = await supabase
             .from('medications')
             .insert({
-              name: item.name,
-              strength: item.strength,
-              dosage_form: item.dosageForm || 'tablet',
+              name,
+              strength,
+              dosage_form: dosageForm,
               is_active: true,
             })
             .select('id')
@@ -886,30 +924,34 @@ export class MedicationService {
           if (createError || !newMed) {
             results.failed++;
             results.errors.push(
-              `Failed to create medication ${item.name}: ${createError?.message}`,
+              `Failed to create medication ${name}: ${createError?.message}`,
             );
             continue;
           }
 
           medicationId = newMed.id;
+          createdMedicationId = newMed.id;
+        }
+
+        if (!medicationId) {
+          results.failed++;
+          results.errors.push(`Medication ID not resolved for ${name}`);
+          continue;
         }
 
         // 2. Generate lot number and expiration date if not provided
-        const lotNumber =
-          item.lotNumber ||
+        const resolvedLotNumber =
+          lotNumber ||
           `BULK-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
-        const expirationDate =
-          item.expirationDate ||
-          new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]; // +1 year
 
         // 3. Create inventory record in inventory
         const { error: inventoryError } = await supabase.from('inventory').insert({
           medication_id: medicationId,
-          lot_number: lotNumber,
+          lot_number: resolvedLotNumber,
           expiration_date: expirationDate,
-          qty_units: item.quantity,
+          qty_units: quantity,
           low_stock_threshold: 10,
-          notes: item.lotNumber
+          notes: lotNumber
             ? 'Imported from formulary'
             : 'Bulk import - placeholder lot number, please update',
         });
@@ -917,14 +959,29 @@ export class MedicationService {
         if (inventoryError) {
           results.failed++;
           results.errors.push(
-            `Failed to create inventory for ${item.name}: ${inventoryError.message}`,
+            `Failed to create inventory for ${name}: ${inventoryError.message}`,
           );
+
+          // Attempt to roll back the medication creation if this was a new med
+          if (createdMedicationId) {
+            const { error: cleanupError } = await supabase
+              .from('medications')
+              .delete()
+              .eq('id', createdMedicationId);
+
+            if (cleanupError) {
+              logger.warn('Rollback failed after inventory insert error', {
+                medicationId: createdMedicationId,
+                cleanupError,
+              });
+            }
+          }
         } else {
           results.success++;
         }
       } catch (error) {
         results.failed++;
-        results.errors.push(`Error processing ${item.name}: ${error}`);
+        results.errors.push(`Error processing ${rawItem.name}: ${error}`);
       }
     }
 
