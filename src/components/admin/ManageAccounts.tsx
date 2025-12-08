@@ -50,8 +50,11 @@ export default function ManageAccounts({ onBack }: ManageAccountsProps) {
 
   const activeUsers = useMemo(() => {
     return allUsers
-      .filter((user) => user.isApproved)
       .sort((a, b) => {
+        // Sort by approval status first (approved first), then by role, then by email
+        if (a.isApproved !== b.isApproved) {
+          return a.isApproved ? -1 : 1;
+        }
         if (a.role !== b.role) {
           return a.role === 'admin' ? -1 : 1;
         }
@@ -590,8 +593,11 @@ export default function ManageAccounts({ onBack }: ManageAccountsProps) {
         <Card className="order-1 lg:order-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Users className="size-5" /> Active Accounts
+              <Users className="size-5" /> All Accounts
             </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Manage all user accounts and their permissions
+            </p>
           </CardHeader>
           <CardContent className="space-y-4">
             {isLoading ? (
@@ -658,7 +664,7 @@ export default function ManageAccounts({ onBack }: ManageAccountsProps) {
                             disabled={loading || isSelf}
                             onClick={() => handleToggleApproval(account.id, !account.isApproved)}
                           >
-                            {account.isApproved ? 'Disable' : 'Re-enable'}
+                            {account.isApproved ? 'Disable' : 'Enable'}
                           </Button>
                         </TableCell>
                       </TableRow>

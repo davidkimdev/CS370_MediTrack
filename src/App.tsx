@@ -37,7 +37,7 @@ import { MedicationService } from './services/medicationService';
 import { syncService } from './services/syncService';
 import { OfflineStore } from './utils/offlineStore';
 import { logger } from './utils/logger';
-import { showSuccessToast, showErrorToast, showProgressToast } from './utils/toastUtils';
+import { showSuccessToast, showErrorToast, showProgressToast, showWarningToast } from './utils/toastUtils';
 import { RotateCcw } from 'lucide-react';
 
 type AppSection = 'formulary' | 'dispensing' | 'inventory' | 'profile' | 'admin';
@@ -665,13 +665,62 @@ export default function App() {
   };
 
   // Handler for MedicationDetail component (with updates object)
-  const handleUpdateLot = (
+  const handleUpdateLot = async (
     id: string,
     updates: Partial<Pick<InventoryItem, 'quantity' | 'lotNumber' | 'expirationDate'>>,
   ) => {
-    // For now, just handle quantity updates
-    if (updates.quantity !== undefined) {
-      handleUpdateLotWithReason(id, updates.quantity, 'Updated from detail view');
+    try {
+      if (navigator.onLine) {
+        // Update in database
+        await MedicationService.updateInventoryItem(id, updates);
+        
+        // Update local state
+        setInventory((prev) =>
+          prev.map((item) => {
+            if (item.id === id) {
+              return {
+                ...item,
+                ...(updates.quantity !== undefined && { quantity: updates.quantity }),
+                ...(updates.lotNumber !== undefined && { lotNumber: updates.lotNumber }),
+                ...(updates.expirationDate !== undefined && { expirationDate: updates.expirationDate }),
+              };
+            }
+            return item;
+          }),
+        );
+
+        // If quantity changed, update medication stock total
+        if (updates.quantity !== undefined) {
+          const lot = inventory.find((inv) => inv.id === id);
+          if (lot) {
+            const medication = medications.find((m) => m.id === lot.medicationId);
+            if (medication) {
+              const oldQuantity = lot.quantity;
+              const quantityDiff = updates.quantity - oldQuantity;
+              
+              const totalStock = medication.currentStock + quantityDiff;
+
+              setMedications((prev) =>
+                prev.map((med) =>
+                  med.id === lot.medicationId
+                    ? { ...med, currentStock: totalStock, isAvailable: totalStock > 0 }
+                    : med,
+                ),
+              );
+            }
+          }
+        }
+        
+        showSuccessToast('Lot updated successfully');
+      } else {
+        // Handle offline
+        setPendingChanges((prev) => prev + 1);
+        showWarningToast('Offline - changes will sync when online');
+      }
+    } catch (err) {
+      console.error('Error updating lot:', err);
+      showErrorToast('Failed to update lot. Please try again.');
+      throw err;
     }
   };
 
