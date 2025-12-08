@@ -170,7 +170,7 @@ export class SyncService {
     const { error: insertError } = await supabase.from('dispensing_logs').insert({
       // Store the EST calendar date for log_date
       log_date: toESTDateString(p.dispensedAt),
-      patient_id: `offline-${p.dispensedAt.getTime()}`,
+      patient_id: p.patientId?.trim() || null, // Preserve the original patient ID
       medication_id: p.medicationId,
       medication_name: p.medicationName,
       dose_instructions: p.dose,
