@@ -644,6 +644,47 @@ export class AuthService {
   }
 
   /**
+   * Admin: Create profile for a specific user ID
+   * Used to manually sync users from auth.users to user_profiles
+   */
+  static async createProfileForUser(
+    userId: string,
+    email: string,
+    firstName: string,
+    lastName: string,
+  ): Promise<void> {
+    try {
+      const { error } = await supabase.from('user_profiles').insert({
+        id: userId,
+        email: email.toLowerCase().trim(),
+        first_name: firstName,
+        last_name: lastName,
+        role: 'staff',
+        is_approved: false,
+        approved_at: null,
+      });
+
+      if (error) {
+        // Ignore duplicate key errors
+        if (error.code === '23505') {
+          logger.info('Profile already exists', { userId });
+          return;
+        }
+        logger.error('Failed to create profile', error);
+        throw new Error(error.message);
+      }
+
+      logger.info('Profile created for user', { userId, email });
+    } catch (error) {
+      logger.error(
+        'Create profile for user error',
+        error instanceof Error ? error : new Error(String(error)),
+      );
+      throw error;
+    }
+  }
+
+  /**
    * Reject a user's account (admin only)
    */
   static async rejectUser(userId: string): Promise<void> {
