@@ -13,12 +13,61 @@ interface LoginFormProps {
 }
 
 export function LoginForm({ onSwitchToRegister, onSwitchToReset }: LoginFormProps) {
-  const { signIn } = useAuth();
+  const { signIn, user, isApproved, signOut } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Show pending approval state if user is logged in but not approved
+  if (user && !isApproved) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <div className="size-12 bg-primary rounded-lg flex items-center justify-center">
+                <Pill className="size-6 text-primary-foreground" />
+              </div>
+            </div>
+            <h1 className="text-2xl font-bold">EFWP Formulary</h1>
+          </div>
+
+          <Card>
+            <CardHeader className="space-y-1">
+              <CardTitle className="text-xl text-center text-amber-600">Pending Approval</CardTitle>
+              <CardDescription className="text-center">
+                Your account is under review
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="bg-amber-50 border border-amber-200 rounded-md p-4 flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                <div className="space-y-2">
+                  <p className="text-sm text-amber-800">
+                    You are logged in as <strong>{user.email}</strong>.
+                  </p>
+                  <p className="text-sm text-amber-800">
+                    Your account must be approved by an administrator before you can access the full application.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Button onClick={() => window.location.reload()} variant="outline" className="w-full">
+                  Check Status Again
+                </Button>
+                <Button onClick={() => signOut()} variant="ghost" className="w-full">
+                  Sign Out
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
