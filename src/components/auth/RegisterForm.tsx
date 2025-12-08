@@ -118,8 +118,7 @@ export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
                   <Alert>
                     <Info className="h-4 w-4" />
                     <AlertDescription>
-                      Your account is pending approval from an administrator. You'll receive an
-                      email notification once approved.
+                      Please check your email to verify your account. After verification, your account will be pending approval from an administrator.
                     </AlertDescription>
                   </Alert>
                 </div>

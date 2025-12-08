@@ -101,9 +101,9 @@ async function parseWordFile(file: File): Promise<ImportedMedicationRow[]> {
 
 /**
  * Parse formulary rows from 2D array
- * Expected format:
- * - Row 0: Headers (optional) - will skip if contains "name", "strength", "quantity"
- * - Row 1+: [Name, Strength, Quantity, Lot Number?, Expiration Date?]
+ * Expected format (flexible column order):
+ * - Row 0: Headers (optional) - will auto-detect columns
+ * - Row 1+: [Name, Strength, Quantity, Dosage Form?, Lot Number?, Expiration Date?]
  */
 function parseFormularyRows(rows: any[][]): ImportedMedicationRow[] {
   if (rows.length === 0) {
@@ -111,8 +111,23 @@ function parseFormularyRows(rows: any[][]): ImportedMedicationRow[] {
   }
 
   let startIndex = 0;
+  let columnMap: {
+    name: number;
+    strength: number;
+    quantity: number;
+    dosageForm: number;
+    lotNumber: number;
+    expirationDate: number;
+  } = {
+    name: 0,
+    strength: 1,
+    quantity: 2,
+    dosageForm: 3,
+    lotNumber: 4,
+    expirationDate: 5,
+  };
 
-  // Check if first row is a header (contains keywords like "name", "strength", "quantity")
+  // Check if first row is a header
   const firstRow = rows[0].map((cell: any) => String(cell).toLowerCase());
   const hasHeader = firstRow.some(
     (cell: string) =>
@@ -120,7 +135,17 @@ function parseFormularyRows(rows: any[][]): ImportedMedicationRow[] {
   );
 
   if (hasHeader) {
-    startIndex = 1; // Skip header row
+    startIndex = 1;
+
+    // Auto-detect column positions from headers
+    firstRow.forEach((cell: string, index: number) => {
+      if (cell.includes('name') && !cell.includes('lot')) columnMap.name = index;
+      else if (cell.includes('strength')) columnMap.strength = index;
+      else if (cell.includes('quantity') || cell.includes('qty')) columnMap.quantity = index;
+      else if (cell.includes('dosage') || cell.includes('form')) columnMap.dosageForm = index;
+      else if (cell.includes('lot')) columnMap.lotNumber = index;
+      else if (cell.includes('expir')) columnMap.expirationDate = index;
+    });
   }
 
   const results: ImportedMedicationRow[] = [];
@@ -129,15 +154,16 @@ function parseFormularyRows(rows: any[][]): ImportedMedicationRow[] {
     const row = rows[i];
 
     // Skip empty rows
-    if (!row || row.length === 0 || !row[0]) {
+    if (!row || row.length === 0 || !row[columnMap.name]) {
       continue;
     }
 
-    const name = String(row[0] || '').trim();
-    const strength = String(row[1] || '').trim();
-    const quantityStr = String(row[2] || '').trim();
-    const lotNumber = row[3] ? String(row[3]).trim() : undefined;
-    const expirationDate = row[4] ? String(row[4]).trim() : undefined;
+    const name = String(row[columnMap.name] || '').trim();
+    const strength = String(row[columnMap.strength] || '').trim();
+    const quantityStr = String(row[columnMap.quantity] || '').trim();
+    const dosageForm = row[columnMap.dosageForm] ? String(row[columnMap.dosageForm]).trim().toLowerCase() : undefined;
+    const lotNumber = row[columnMap.lotNumber] ? String(row[columnMap.lotNumber]).trim() : undefined;
+    const expirationDate = row[columnMap.expirationDate] ? String(row[columnMap.expirationDate]).trim() : undefined;
 
     // Skip if name or strength is empty
     if (!name || !strength) {
@@ -181,6 +207,7 @@ function parseFormularyRows(rows: any[][]): ImportedMedicationRow[] {
       name,
       strength,
       quantity,
+      dosageForm,
       lotNumber,
       expirationDate: validatedExpDate,
       status,

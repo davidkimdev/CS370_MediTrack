@@ -113,6 +113,7 @@ export class AuthService {
         email: data.email.toLowerCase().trim(),
         password: data.password,
         options: {
+          emailRedirectTo: window.location.origin,
           data: {
             first_name: data.firstName,
             last_name: data.lastName,
@@ -141,10 +142,14 @@ export class AuthService {
       });
 
       if (profileError) {
-        logger.error('Profile creation failed', profileError);
-        // Clean up auth user if profile creation failed
-        await supabase.auth.admin.deleteUser(authData.user.id);
-        throw new Error('Failed to create user profile');
+        // Ignore unique constraint violation (code 23505) as it means profile was created by trigger
+        if (profileError.code === '23505') {
+          logger.info('Profile already exists (likely created by trigger)', { userId: authData.user.id });
+        } else {
+          logger.error('Profile creation failed', profileError);
+          // Note: Cannot delete user from client side without service role
+          throw new Error('Failed to create user profile');
+        }
       }
 
       // Mark invitation as used if applicable
@@ -256,8 +261,47 @@ export class AuthService {
 
       if (error) {
         if (error.code === 'PGRST116') {
-          // No profile found
-          console.log('🔍 AuthService: No profile found (PGRST116)');
+          // No profile found - Attempt self-healing
+          console.log('🔍 AuthService: No profile found (PGRST116) - Attempting to create missing profile...');
+          
+          try {
+            const { data: { user } } = await supabase.auth.getUser();
+            
+            if (user && user.id === userId) {
+               console.log('🛠️ Creating missing profile for current user...');
+               const newProfile = {
+                   id: user.id,
+                   email: user.email!,
+                   first_name: user.user_metadata.first_name || 'Unknown',
+                   last_name: user.user_metadata.last_name || 'User',
+                   role: 'staff',
+                   is_approved: false,
+                   approved_at: null
+               };
+               
+               const { error: createError } = await supabase.from('user_profiles').insert(newProfile);
+               
+               if (!createError) {
+                   logger.info('Created missing user profile', { userId });
+                   return {
+                       id: newProfile.id,
+                       email: newProfile.email,
+                       firstName: newProfile.first_name,
+                       lastName: newProfile.last_name,
+                       role: newProfile.role as 'staff' | 'admin',
+                       isApproved: newProfile.is_approved,
+                       approvedBy: undefined,
+                       approvedAt: undefined,
+                       createdAt: new Date()
+                   };
+               } else {
+                   logger.error('Failed to create missing profile', createError);
+               }
+            }
+          } catch (healError) {
+             console.error('❌ Self-healing failed:', healError);
+          }
+          
           return null;
         }
         console.error('🔍 AuthService: Profile fetch error:', error);

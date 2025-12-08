@@ -1,12 +1,12 @@
 import { useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from './ui/button';
-// import { Label } from './ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Alert, AlertDescription } from './ui/alert';
 import { Badge } from './ui/badge';
-// import { Input } from './ui/input';
-import { Upload, FileSpreadsheet, FileText, AlertTriangle, CheckCircle, X } from 'lucide-react';
+import { Input } from './ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Upload, FileSpreadsheet, FileText, AlertTriangle, CheckCircle, X, Pencil } from 'lucide-react';
 import { logger } from '../utils/logger';
 // dynamic import of parser when needed to avoid loading heavy deps (xlsx/mammoth) upfront
 
@@ -14,6 +14,7 @@ export interface ImportedMedicationRow {
   name: string;
   strength: string;
   quantity: number;
+  dosageForm?: string;
   lotNumber?: string;
   expirationDate?: string;
   status: 'valid' | 'warning' | 'error';
@@ -31,7 +32,10 @@ export function BulkImportDialog({ open, onOpenChange, onImport }: BulkImportDia
   const [importedData, setImportedData] = useState<ImportedMedicationRow[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [step, setStep] = useState<'upload' | 'preview' | 'customize'>('upload');
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const dosageFormOptions = ['tablet', 'capsule', 'solution', 'suspension', 'cream', 'ointment', 'injection', 'inhaler', 'patch', 'suppository', 'drops'];
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
@@ -69,20 +73,28 @@ export function BulkImportDialog({ open, onOpenChange, onImport }: BulkImportDia
     setFile(null);
     setImportedData([]);
     setStep('upload');
+    setEditingIndex(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
     onOpenChange(false);
   };
 
-  // const updateRow = (index: number, field: keyof ImportedMedicationRow, value: string) => {
-  //   const updated = [...importedData];
-  //   updated[index] = { ...updated[index], [field]: value };
-  //   setImportedData(updated);
-  // };
+  const updateRow = (index: number, field: keyof ImportedMedicationRow, value: string | number) => {
+    const updated = [...importedData];
+    if (field === 'quantity') {
+      updated[index] = { ...updated[index], [field]: Number(value) };
+    } else {
+      updated[index] = { ...updated[index], [field]: value as string };
+    }
+    setImportedData(updated);
+  };
 
   const removeRow = (index: number) => {
     setImportedData(importedData.filter((_, i) => i !== index));
+    if (editingIndex === index) {
+      setEditingIndex(null);
+    }
   };
 
   const validCount = importedData.filter((row) => row.status === 'valid').length;
@@ -137,6 +149,28 @@ export function BulkImportDialog({ open, onOpenChange, onImport }: BulkImportDia
                   </Button>
                 </div>
               </div>
+
+              {/* Format Guide */}
+              <Alert>
+                <AlertTriangle className="size-4" />
+                <AlertDescription>
+                  <strong className="block mb-2">Required File Format:</strong>
+                  <div className="text-sm space-y-1">
+                    <p>Your file should contain the following columns (in any order):</p>
+                    <ul className="list-disc list-inside ml-2 space-y-1">
+                      <li><strong>Name</strong> - Medication name (required)</li>
+                      <li><strong>Strength</strong> - e.g., "500 mg", "10 mg/5 mL" (required)</li>
+                      <li><strong>Quantity</strong> - Number of units (required)</li>
+                      <li><strong>Dosage Form</strong> - e.g., "tablet", "capsule", "solution" (optional, defaults to "tablet")</li>
+                      <li><strong>Lot Number</strong> - Inventory lot identifier (optional, auto-generated if missing)</li>
+                      <li><strong>Expiration Date</strong> - Format: MM/YYYY or YYYY-MM-DD (optional, defaults to +1 year)</li>
+                    </ul>
+                    <p className="mt-2 italic text-muted-foreground">
+                      Example: See data/Book1.xlsx for a sample file format
+                    </p>
+                  </div>
+                </AlertDescription>
+              </Alert>
             </div>
           )}
 
@@ -173,65 +207,155 @@ export function BulkImportDialog({ open, onOpenChange, onImport }: BulkImportDia
                   <Table>
                     <TableHeader className="sticky top-0 bg-background z-10">
                       <TableRow className="border-b">
-                        <TableHead className="w-[30%] bg-background">Medication</TableHead>
+                        <TableHead className="w-[22%] bg-background">Medication</TableHead>
                         <TableHead className="w-[12%] bg-background">Strength</TableHead>
+                        <TableHead className="w-[10%] bg-background">Dosage Form</TableHead>
                         <TableHead className="w-[8%] bg-background">Qty</TableHead>
-                        <TableHead className="w-[15%] bg-background">Lot Number</TableHead>
-                        <TableHead className="w-[12%] bg-background">Expiration</TableHead>
-                        <TableHead className="w-[18%] bg-background">Status</TableHead>
-                        <TableHead className="w-[5%] bg-background"></TableHead>
+                        <TableHead className="w-[12%] bg-background">Lot Number</TableHead>
+                        <TableHead className="w-[10%] bg-background">Expiration</TableHead>
+                        <TableHead className="w-[16%] bg-background">Status</TableHead>
+                        <TableHead className="w-[10%] bg-background"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {importedData.map((row, index) => (
-                        <TableRow key={index}>
-                          <TableCell className="font-medium">{row.name}</TableCell>
-                          <TableCell>{row.strength}</TableCell>
-                          <TableCell>{row.quantity}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              {row.lotNumber ? (
-                                row.lotNumber
+                      {importedData.map((row, index) => {
+                        const isEditing = editingIndex === index;
+                        return (
+                          <TableRow key={index}>
+                            <TableCell className="font-medium">
+                              {isEditing ? (
+                                <Input
+                                  value={row.name}
+                                  onChange={(e) => updateRow(index, 'name', e.target.value)}
+                                  className="h-8"
+                                />
                               ) : (
-                                <span className="text-xs text-muted-foreground italic">
-                                  Auto-generated
-                                </span>
+                                row.name
                               )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {row.expirationDate ? (
-                              row.expirationDate
-                            ) : (
-                              <span className="text-xs text-muted-foreground italic">+1 year</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="space-y-1">
-                              <Badge
-                                variant={
-                                  row.status === 'valid'
-                                    ? 'default'
-                                    : row.status === 'warning'
-                                      ? 'secondary'
-                                      : 'destructive'
-                                }
-                                className="text-xs"
-                              >
-                                {row.status}
-                              </Badge>
-                              {row.message && (
-                                <p className="text-xs text-muted-foreground">{row.message}</p>
+                            </TableCell>
+                            <TableCell>
+                              {isEditing ? (
+                                <Input
+                                  value={row.strength}
+                                  onChange={(e) => updateRow(index, 'strength', e.target.value)}
+                                  className="h-8"
+                                />
+                              ) : (
+                                row.strength
                               )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Button variant="ghost" size="sm" onClick={() => removeRow(index)}>
-                              <X className="size-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                            </TableCell>
+                            <TableCell>
+                              {isEditing ? (
+                                <Select
+                                  value={row.dosageForm || 'tablet'}
+                                  onValueChange={(value) => updateRow(index, 'dosageForm', value)}
+                                >
+                                  <SelectTrigger className="h-8">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {dosageFormOptions.map((form) => (
+                                      <SelectItem key={form} value={form}>
+                                        <span className="capitalize">{form}</span>
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              ) : row.dosageForm ? (
+                                <span className="capitalize">{row.dosageForm}</span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground italic">tablet</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {isEditing ? (
+                                <Input
+                                  type="number"
+                                  value={row.quantity}
+                                  onChange={(e) => updateRow(index, 'quantity', e.target.value)}
+                                  className="h-8"
+                                  min="0"
+                                />
+                              ) : (
+                                row.quantity
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {isEditing ? (
+                                <Input
+                                  value={row.lotNumber || ''}
+                                  onChange={(e) => updateRow(index, 'lotNumber', e.target.value)}
+                                  className="h-8"
+                                  placeholder="Auto-gen"
+                                />
+                              ) : (
+                                <div className="flex items-center gap-1">
+                                  {row.lotNumber ? (
+                                    row.lotNumber
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground italic">
+                                      Auto-generated
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {isEditing ? (
+                                <Input
+                                  value={row.expirationDate || ''}
+                                  onChange={(e) => updateRow(index, 'expirationDate', e.target.value)}
+                                  className="h-8"
+                                  placeholder="MM/YYYY"
+                                />
+                              ) : row.expirationDate ? (
+                                row.expirationDate
+                              ) : (
+                                <span className="text-xs text-muted-foreground italic">+1 year</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="space-y-1">
+                                <Badge
+                                  variant={
+                                    row.status === 'valid'
+                                      ? 'default'
+                                      : row.status === 'warning'
+                                        ? 'secondary'
+                                        : 'destructive'
+                                  }
+                                  className="text-xs"
+                                >
+                                  {row.status}
+                                </Badge>
+                                {row.message && (
+                                  <p className="text-xs text-muted-foreground">{row.message}</p>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setEditingIndex(isEditing ? null : index)}
+                                  title={isEditing ? 'Done editing' : 'Edit row'}
+                                >
+                                  <Pencil className={`size-4 ${isEditing ? 'text-blue-600' : ''}`} />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeRow(index)}
+                                  title="Remove row"
+                                >
+                                  <X className="size-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>

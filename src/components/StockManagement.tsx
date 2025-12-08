@@ -302,7 +302,7 @@ export function StockManagement({
           quantity: item.quantity,
           lotNumber: item.lotNumber,
           expirationDate: item.expirationDate,
-          dosageForm: 'tablet', // Default, can be extracted from file if needed
+          dosageForm: item.dosageForm || 'tablet', // Use extracted dosage form, default to tablet
         })),
         '', // siteId - will use default active site
         currentUser.id, // userId
