@@ -36,6 +36,14 @@ export function EditDispensingRecordDialog({
   const [isDeleting, setIsDeleting] = useState(false);
   const [availableLots, setAvailableLots] = useState<InventoryItem[]>([]);
   const [isLoadingLots, setIsLoadingLots] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 640);
+
+  // Detect mobile screen size
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Populate form when record changes
   useEffect(() => {
@@ -137,12 +145,27 @@ export function EditDispensingRecordDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Edit Dispensing Record</DialogTitle>
+      <DialogContent
+        className="max-h-[calc(100vh-5rem)] sm:max-h-[calc(100vh-10rem)] w-[90vw] max-w-[700px] p-0 flex flex-col gap-0 overflow-hidden"
+        style={
+          isMobile
+            ? {
+                top: '5rem',
+                height: 'calc(100vh - 10rem)',
+                transform: 'none',
+              }
+            : {
+                height: 'calc(100vh - 10rem)',
+              }
+        }
+        onOpenAutoFocus={(event) => event.preventDefault()}
+      >
+        <DialogHeader className="flex-shrink-0 px-4 sm:px-6 pt-5 pb-3 border-b">
+          <DialogTitle className="text-base sm:text-lg">Edit Dispensing Record</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6">
+          <div className="space-y-2 sm:space-y-3 py-2 sm:py-3 pb-4">
           {/* Read-only fields */}
           <div className="p-3 bg-muted rounded-md space-y-2">
             <div>
@@ -383,6 +406,7 @@ export function EditDispensingRecordDialog({
               </Button>
             </div>
           </div>
+        </div>
         </div>
       </DialogContent>
     </Dialog>
