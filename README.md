@@ -22,3 +22,7 @@ This project is a Progressive Web App designed to help the Emory Farmworker Proj
 
 ## Deployment Guide
 For complete step-by-step instructions on deploying this application to production (Vercel + Supabase), please see the [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md).
+
+## User Manual
+Please check the following documentation resource for guidances to navigate the system:
+* [MediTrack - User Manual](./MediTrack%20-%20User%20Manual.pdf)
