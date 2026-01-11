@@ -1,4 +1,4 @@
-# Emory CS370 Computer Science Practinum - MediTrack
+# Emory CS370 Computer Science Practicum - MediTrack
 
 ### 📺 [Watch the Video Demo Here](https://youtu.be/HGLpGaYn1xA)
 
